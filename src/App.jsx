@@ -366,7 +366,7 @@ function buildLinkedInPost(form) {
     parts.push(`👥 Featuring ${name1}.`)
   }
   parts.push('')
-  parts.push('Hope to see you there! 🙌 #Meetup #Community')
+  parts.push('Hope to see you there! 🙌 #elastic #elasticcommunity #elasticmeetups')
   parts.push('')
   parts.push('🔗 RSVP:')
   parts.push('[Insert Meetup Link]')
@@ -444,6 +444,18 @@ function generateMeetupCopy(form) {
     sections.push({ title: 'Where', body: where })
   }
 
+  if (has(form.rsvpInstructions)) {
+    sections.push({ title: 'RSVP', body: trim(form.rsvpInstructions) })
+  }
+
+  if (has(form.arrivalInstructions)) {
+    sections.push({ title: 'Arrival', body: trim(form.arrivalInstructions) })
+  }
+
+  if (has(form.parkingNotes)) {
+    sections.push({ title: 'Parking', body: trim(form.parkingNotes) })
+  }
+
   sections.push({
     title: 'Agenda',
     body: buildAgenda(form),
@@ -458,18 +470,6 @@ function generateMeetupCopy(form) {
 
   if (has(form.hostOrSponsor)) {
     sections.push({ title: 'Host / Sponsor', body: trim(form.hostOrSponsor) })
-  }
-
-  if (has(form.rsvpInstructions)) {
-    sections.push({ title: 'RSVP', body: trim(form.rsvpInstructions) })
-  }
-
-  if (has(form.arrivalInstructions)) {
-    sections.push({ title: 'Arrival', body: trim(form.arrivalInstructions) })
-  }
-
-  if (has(form.parkingNotes)) {
-    sections.push({ title: 'Parking', body: trim(form.parkingNotes) })
   }
 
   const sectionHeader = (title) => {
@@ -767,15 +767,42 @@ export default function App() {
               </label>
             </fieldset>
 
-            {!showSpeaker2 && (
-              <button
-                type="button"
-                onClick={() => setShowSpeaker2(true)}
-                className="btn-add-speaker"
-              >
-                + Add Second Speaker
-              </button>
-            )}
+            <div className="speaker-toggle-row">
+              {showSpeaker2 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSpeaker2(false)
+                    setShowSpeaker3(false)
+                    setForm((prev) => ({
+                      ...prev,
+                      speaker2Name: '',
+                      speaker2Title: '',
+                      speaker2Company: '',
+                      speaker2TalkTitle: '',
+                      speaker2TalkAbstract: '',
+                      speaker3Name: '',
+                      speaker3Title: '',
+                      speaker3Company: '',
+                      speaker3TalkTitle: '',
+                      speaker3TalkAbstract: '',
+                    }))
+                  }}
+                  className="btn-remove-speaker"
+                >
+                  Remove Speaker 2
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowSpeaker2(true)}
+                  className="btn-add-speaker"
+                >
+                  + Add Speaker 2
+                </button>
+              )}
+            </div>
+
             {showSpeaker2 && (
             <fieldset className="form-fieldset">
               <legend>Speaker 2</legend>
@@ -827,15 +854,38 @@ export default function App() {
             </fieldset>
             )}
 
-            {showSpeaker2 && !showSpeaker3 && (
-              <button
-                type="button"
-                onClick={() => setShowSpeaker3(true)}
-                className="btn-add-speaker"
-              >
-                + Add Third Speaker
-              </button>
+            {showSpeaker2 && (
+              <div className="speaker-toggle-row">
+                {showSpeaker3 ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSpeaker3(false)
+                      setForm((prev) => ({
+                        ...prev,
+                        speaker3Name: '',
+                        speaker3Title: '',
+                        speaker3Company: '',
+                        speaker3TalkTitle: '',
+                        speaker3TalkAbstract: '',
+                      }))
+                    }}
+                    className="btn-remove-speaker"
+                  >
+                    Remove Speaker 3
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowSpeaker3(true)}
+                    className="btn-add-speaker"
+                  >
+                    + Add Speaker 3
+                  </button>
+                )}
+              </div>
             )}
+
             {showSpeaker3 && (
             <fieldset className="form-fieldset">
               <legend>Speaker 3</legend>
@@ -965,7 +1015,7 @@ export default function App() {
               </>
             ) : (
               <p className="output-placeholder">
-                Fill in the form and click “Generate Meetup Copy” to see the event description here. Leave Speaker 2 blank for a one-speaker agenda.
+                Fill in the form and click “Generate Meetup Copy” to see the event description here. Use the buttons below to add optional Speaker 2 or Speaker 3.
               </p>
             )}
           </div>

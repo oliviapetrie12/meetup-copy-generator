@@ -204,16 +204,25 @@ body {
   transform: scale(0.98);
 }
 
-.btn-add-speaker {
-  margin-top: 0.25rem;
+.speaker-toggle-row {
+  margin-top: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.btn-add-speaker,
+.btn-remove-speaker {
   padding: 0.5rem 1rem;
   font-size: 0.9rem;
   font-weight: 500;
-  color: #2563eb;
-  background: #fff;
-  border: 1px solid #93c5fd;
   border-radius: 8px;
   cursor: pointer;
+  border: 1px solid;
+}
+
+.btn-add-speaker {
+  color: #2563eb;
+  background: #fff;
+  border-color: #93c5fd;
 }
 
 .btn-add-speaker:hover {
@@ -221,7 +230,19 @@ body {
   border-color: #2563eb;
 }
 
-.btn-add-speaker:active {
+.btn-remove-speaker {
+  color: #374151;
+  background: #fff;
+  border-color: #d1d5db;
+}
+
+.btn-remove-speaker:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.btn-add-speaker:active,
+.btn-remove-speaker:active {
   transform: scale(0.98);
 }
 
