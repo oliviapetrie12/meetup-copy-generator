@@ -204,6 +204,27 @@ body {
   transform: scale(0.98);
 }
 
+.btn-add-speaker {
+  margin-top: 0.25rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #2563eb;
+  background: #fff;
+  border: 1px solid #93c5fd;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.btn-add-speaker:hover {
+  background: #eff6ff;
+  border-color: #2563eb;
+}
+
+.btn-add-speaker:active {
+  transform: scale(0.98);
+}
+
 .output-panel {
   display: flex;
   flex-direction: column;

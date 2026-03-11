@@ -186,6 +186,11 @@ const INITIAL_STATE = {
   speaker2Company: '',
   speaker2TalkTitle: '',
   speaker2TalkAbstract: '',
+  speaker3Name: '',
+  speaker3Title: '',
+  speaker3Company: '',
+  speaker3TalkTitle: '',
+  speaker3TalkAbstract: '',
   hostOrSponsor: '',
   rsvpInstructions: '',
   arrivalInstructions: '',
@@ -222,13 +227,33 @@ function buildAgenda(form) {
   const hasSpeaker2 =
     [form.speaker2Name, form.speaker2Title, form.speaker2Company, form.speaker2TalkTitle, form.speaker2TalkAbstract]
       .some((v) => trim(v).length > 0)
+  const hasSpeaker3 =
+    [form.speaker3Name, form.speaker3Title, form.speaker3Company, form.speaker3TalkTitle, form.speaker3TalkAbstract]
+      .some((v) => trim(v).length > 0)
 
   const startMins = parseTime(form.eventStartTime)
   const timeStr = (mins) => (startMins != null ? formatTime(addMinutes(startMins, mins)) : '')
 
   const lines = []
+  const prefix = (t) => (t ? `${t} – ` : '')
 
-  if (hasSpeaker2) {
+  if (hasSpeaker3) {
+    // Three-speaker: 0, 15, 20, 50, 80, 110, 120
+    const t0 = timeStr(0)
+    const t15 = timeStr(15)
+    const t20 = timeStr(20)
+    const t50 = timeStr(50)
+    const t80 = timeStr(80)
+    const t110 = timeStr(110)
+    const t120 = timeStr(120)
+    lines.push(`${prefix(t0)}Doors open / event start`)
+    lines.push(`${prefix(t15)}Welcome and introductions`)
+    lines.push(`${prefix(t20)}Speaker 1${form.speaker1TalkTitle ? `: ${trim(form.speaker1TalkTitle)}` : ''}`)
+    lines.push(`${prefix(t50)}Speaker 2${form.speaker2TalkTitle ? `: ${trim(form.speaker2TalkTitle)}` : ''}`)
+    lines.push(`${prefix(t80)}Speaker 3${form.speaker3TalkTitle ? `: ${trim(form.speaker3TalkTitle)}` : ''}`)
+    lines.push(`${prefix(t110)}Networking`)
+    lines.push(`${prefix(t120)}Event concludes`)
+  } else if (hasSpeaker2) {
     // Two-speaker: 0, 15, 20, 50, 80, 120
     const t0 = timeStr(0)
     const t15 = timeStr(15)
@@ -236,7 +261,6 @@ function buildAgenda(form) {
     const t50 = timeStr(50)
     const t80 = timeStr(80)
     const t120 = timeStr(120)
-    const prefix = (t) => (t ? `${t} – ` : '')
     lines.push(`${prefix(t0)}Doors open / event start`)
     lines.push(`${prefix(t15)}Welcome and introductions`)
     lines.push(`${prefix(t20)}Speaker 1${form.speaker1TalkTitle ? `: ${trim(form.speaker1TalkTitle)}` : ''}`)
@@ -250,7 +274,6 @@ function buildAgenda(form) {
     const t20 = timeStr(20)
     const t80 = timeStr(80)
     const t120 = timeStr(120)
-    const prefix = (t) => (t ? `${t} – ` : '')
     lines.push(`${prefix(t0)}Doors open / event start`)
     lines.push(`${prefix(t15)}Welcome and introductions`)
     lines.push(`${prefix(t20)}Talk${form.speaker1TalkTitle ? `: ${trim(form.speaker1TalkTitle)}` : ''}`)
@@ -269,6 +292,13 @@ function buildTalkAbstracts(form) {
     form.speaker2Company,
     form.speaker2TalkTitle,
     form.speaker2TalkAbstract,
+  ].some((v) => trim(v).length > 0)
+  const hasSpeaker3 = [
+    form.speaker3Name,
+    form.speaker3Title,
+    form.speaker3Company,
+    form.speaker3TalkTitle,
+    form.speaker3TalkAbstract,
   ].some((v) => trim(v).length > 0)
 
   const formatTalk = (name, title, company, talkTitle, abstract) => {
@@ -295,6 +325,9 @@ function buildTalkAbstracts(form) {
   if (hasSpeaker2) {
     talks.push(formatTalk(form.speaker2Name, form.speaker2Title, form.speaker2Company, form.speaker2TalkTitle, form.speaker2TalkAbstract))
   }
+  if (hasSpeaker3) {
+    talks.push(formatTalk(form.speaker3Name, form.speaker3Title, form.speaker3Company, form.speaker3TalkTitle, form.speaker3TalkAbstract))
+  }
 
   return talks.join('\n\n')
 }
@@ -307,7 +340,9 @@ function buildLinkedInPost(form) {
   const venue = trim(form.venueName) || trim(form.venueAddress)
   const name1 = trim(form.speaker1Name)
   const name2 = trim(form.speaker2Name)
+  const name3 = trim(form.speaker3Name)
   const hasSpeaker2 = [form.speaker2Name, form.speaker2Title, form.speaker2Company, form.speaker2TalkTitle, form.speaker2TalkAbstract].some((v) => trim(v).length > 0)
+  const hasSpeaker3 = [form.speaker3Name, form.speaker3Title, form.speaker3Company, form.speaker3TalkTitle, form.speaker3TalkAbstract].some((v) => trim(v).length > 0)
 
   const timezone = trim(form.timezone)
   const parts = []
@@ -323,7 +358,9 @@ function buildLinkedInPost(form) {
     parts.push(`🎉 ${groupName} is hosting an upcoming meetup.`)
   }
   if (venue) parts.push(`📍 ${venue}`)
-  if (name1 && hasSpeaker2 && name2) {
+  if (name1 && hasSpeaker2 && name2 && hasSpeaker3 && name3) {
+    parts.push(`👥 Featuring ${name1}, ${name2}, and ${name3}.`)
+  } else if (name1 && hasSpeaker2 && name2) {
     parts.push(`👥 Featuring ${name1} and ${name2}.`)
   } else if (name1) {
     parts.push(`👥 Featuring ${name1}.`)
@@ -342,14 +379,18 @@ function buildIntro(form) {
   const date = trim(form.date)
   const name1 = trim(form.speaker1Name)
   const name2 = trim(form.speaker2Name)
+  const name3 = trim(form.speaker3Name)
   const hasSpeaker2 = [form.speaker2Name, form.speaker2Title, form.speaker2Company, form.speaker2TalkTitle, form.speaker2TalkAbstract].some((v) => trim(v).length > 0)
+  const hasSpeaker3 = [form.speaker3Name, form.speaker3Title, form.speaker3Company, form.speaker3TalkTitle, form.speaker3TalkAbstract].some((v) => trim(v).length > 0)
 
   const groupName = city
     ? (city.includes('User Group') || city.includes('Elastic') || city.includes('Meetup') ? city : `The Elastic ${city} User Group`)
     : 'The Elastic User Group'
   const when = date ? ` on ${date}` : ''
   let presentations
-  if (name1 && hasSpeaker2 && name2) {
+  if (name1 && hasSpeaker2 && name2 && hasSpeaker3 && name3) {
+    presentations = `presentations from ${name1}, ${name2}, and ${name3}`
+  } else if (name1 && hasSpeaker2 && name2) {
     presentations = `presentations from ${name1} and ${name2}`
   } else if (name1) {
     presentations = `a presentation from ${name1}`
@@ -377,6 +418,13 @@ function generateMeetupCopy(form) {
     form.speaker2TalkTitle,
     form.speaker2TalkAbstract,
   ].some(has)
+  const hasSpeaker3 = [
+    form.speaker3Name,
+    form.speaker3Title,
+    form.speaker3Company,
+    form.speaker3TalkTitle,
+    form.speaker3TalkAbstract,
+  ].some(has)
 
   const sections = []
 
@@ -401,7 +449,7 @@ function generateMeetupCopy(form) {
     body: buildAgenda(form),
   })
 
-  if (hasSpeaker1 || hasSpeaker2) {
+  if (hasSpeaker1 || hasSpeaker2 || hasSpeaker3) {
     sections.push({
       title: 'Talk Abstracts',
       body: buildTalkAbstracts(form),
@@ -454,6 +502,8 @@ export default function App() {
   const [comboboxOpen, setComboboxOpen] = useState(false)
   const [comboboxHighlight, setComboboxHighlight] = useState(0)
   const comboboxRef = useRef(null)
+  const [showSpeaker2, setShowSpeaker2] = useState(false)
+  const [showSpeaker3, setShowSpeaker3] = useState(false)
 
   const query = (form.chapterOrCity || '').trim().toLowerCase()
   const filteredGroups = query
@@ -533,6 +583,8 @@ export default function App() {
   const handleReset = () => {
     setForm(INITIAL_STATE)
     setGeneratedCopy('')
+    setShowSpeaker2(false)
+    setShowSpeaker3(false)
   }
 
   const handleCopyLinkedIn = async () => {
@@ -715,6 +767,16 @@ export default function App() {
               </label>
             </fieldset>
 
+            {!showSpeaker2 && (
+              <button
+                type="button"
+                onClick={() => setShowSpeaker2(true)}
+                className="btn-add-speaker"
+              >
+                + Add Second Speaker
+              </button>
+            )}
+            {showSpeaker2 && (
             <fieldset className="form-fieldset">
               <legend>Speaker 2</legend>
               <label>
@@ -758,11 +820,72 @@ export default function App() {
                 <textarea
                   value={form.speaker2TalkAbstract}
                   onChange={update('speaker2TalkAbstract')}
-                  placeholder="Leave blank for one-speaker agenda"
+                  placeholder="Brief description of the talk..."
                   rows={3}
                 />
               </label>
             </fieldset>
+            )}
+
+            {showSpeaker2 && !showSpeaker3 && (
+              <button
+                type="button"
+                onClick={() => setShowSpeaker3(true)}
+                className="btn-add-speaker"
+              >
+                + Add Third Speaker
+              </button>
+            )}
+            {showSpeaker3 && (
+            <fieldset className="form-fieldset">
+              <legend>Speaker 3</legend>
+              <label>
+                Speaker 3 name
+                <input
+                  type="text"
+                  value={form.speaker3Name}
+                  onChange={update('speaker3Name')}
+                  placeholder="e.g. Alex Chen"
+                />
+              </label>
+              <label>
+                Speaker 3 title
+                <input
+                  type="text"
+                  value={form.speaker3Title}
+                  onChange={update('speaker3Title')}
+                  placeholder="e.g. Senior Developer"
+                />
+              </label>
+              <label>
+                Speaker 3 company
+                <input
+                  type="text"
+                  value={form.speaker3Company}
+                  onChange={update('speaker3Company')}
+                  placeholder="e.g. StartupCo"
+                />
+              </label>
+              <label>
+                Speaker 3 talk title
+                <input
+                  type="text"
+                  value={form.speaker3TalkTitle}
+                  onChange={update('speaker3TalkTitle')}
+                  placeholder="e.g. Talk title"
+                />
+              </label>
+              <label>
+                Speaker 3 talk abstract
+                <textarea
+                  value={form.speaker3TalkAbstract}
+                  onChange={update('speaker3TalkAbstract')}
+                  placeholder="Brief description of the talk..."
+                  rows={3}
+                />
+              </label>
+            </fieldset>
+            )}
 
             <label>
               Host or sponsor
