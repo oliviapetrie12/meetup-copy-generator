@@ -200,6 +200,7 @@ const INITIAL_STATE = {
 const GENERATOR_TYPES = [
   { value: 'eventPromotion', label: 'Event Promotion' },
   { value: 'knowBeforeYouGo', label: 'Meetup Know Before You Go' },
+  { value: 'speakerOutreach', label: 'Speaker Outreach' },
 ]
 
 const KBYG_INITIAL_STATE = {
@@ -230,6 +231,18 @@ const KBYG_INITIAL_STATE = {
   avNotes: '',
   internalAgenda: '',
   additionalNotes: '',
+}
+
+const SPEAKER_OUTREACH_INITIAL_STATE = {
+  speakerName: '',
+  whyReachingOut: '',
+  whereFoundThem: '',
+  meetupChapterOrCity: '',
+  eventThemeOrTopic: '',
+  potentialTalkIdea: '',
+  whatAsking: '',
+  flexibilityNote: '',
+  senderName: '',
 }
 
 function generateKnowBeforeYouGoSubject(form) {
@@ -387,6 +400,89 @@ function generateKnowBeforeYouGoEmail(form, includeTldr) {
 
   lines.push('Please let me know if you have any questions.')
   return lines.join('\n')
+}
+
+function generateSpeakerOutreachSubject(form) {
+  const trim = (s) => (typeof s === 'string' ? s.trim() : '')
+  const chapter = trim(form.meetupChapterOrCity)
+  if (chapter) return `Potential speaker for ${chapter}`
+  return 'Would you be open to speaking at an Elastic meetup?'
+}
+
+function generateSpeakerOutreachEmail(form) {
+  const trim = (s) => (typeof s === 'string' ? s.trim() : '')
+  const has = (s) => trim(s).length > 0
+  const name = trim(form.speakerName) || 'there'
+  const sender = trim(form.senderName)
+  const why = trim(form.whyReachingOut)
+  const where = trim(form.whereFoundThem)
+  const chapter = trim(form.meetupChapterOrCity)
+  const theme = trim(form.eventThemeOrTopic)
+  const talkIdea = trim(form.potentialTalkIdea)
+  const ask = trim(form.whatAsking)
+  const flex = trim(form.flexibilityNote)
+
+  const lines = []
+  lines.push(`Hi ${name},`)
+  lines.push('')
+  if (why) {
+    lines.push(why.endsWith('.') ? why : `${why}.`)
+    if (where) lines.push(`I came across you via ${where.endsWith('.') ? where : where + '.'}`)
+    lines.push('')
+  } else if (where) {
+    lines.push(`I came across you via ${where.endsWith('.') ? where : where + '.'}`)
+    lines.push('')
+  }
+  if (sender) {
+    lines.push(`I'm ${sender} and I help run the Elastic community and meetup program.`)
+    lines.push('')
+  }
+  if (chapter || theme) {
+    const context = []
+    if (chapter) context.push(`We run the ${chapter} and`)
+    if (theme) context.push(`we're focusing on ${theme} for an upcoming meetup.`)
+    else if (chapter) context.push("we'd love to have you speak at an upcoming meetup.")
+    if (context.length) lines.push(context.join(' ').replace(/\s+/g, ' ').trim())
+    if (talkIdea) lines.push(talkIdea.endsWith('.') ? talkIdea : `${talkIdea}.`)
+    if (context.length || talkIdea) lines.push('')
+  }
+  const askText = ask || 'Would you be open to giving a short talk at an upcoming meetup?'
+  lines.push(askText.endsWith('.') ? askText : `${askText}.`)
+  lines.push('')
+  if (flex) {
+    lines.push(flex.endsWith('.') ? flex : `${flex}.`)
+    lines.push('')
+  }
+  lines.push('Please let me know if you\'re interested.')
+  lines.push('')
+  if (sender) lines.push(sender)
+  return lines.join('\n')
+}
+
+function generateSpeakerOutreachLinkedIn(form) {
+  const trim = (s) => (typeof s === 'string' ? s.trim() : '')
+  const has = (s) => trim(s).length > 0
+  const name = trim(form.speakerName) || 'there'
+  const sender = trim(form.senderName)
+  const why = trim(form.whyReachingOut)
+  const chapter = trim(form.meetupChapterOrCity)
+  const theme = trim(form.eventThemeOrTopic)
+  const ask = trim(form.whatAsking)
+
+  const parts = []
+  parts.push(`Hi ${name},`)
+  if (why) parts.push(why.endsWith('.') ? why : `${why}.`)
+  if (trim(form.whereFoundThem)) parts.push(`I came across you via ${trim(form.whereFoundThem)}.`)
+  if (chapter || theme) {
+    const ctx = chapter ? `We run the ${chapter}` : 'We run Elastic meetups'
+    const rest = theme ? ` and we're focusing on ${theme} for an upcoming event.` : ' and we\'d love to have you speak.'
+    parts.push(ctx + rest)
+  }
+  const askText = ask || 'Would you be open to giving a short talk at an upcoming meetup?'
+  parts.push(askText.endsWith('.') ? askText : `${askText}.`)
+  parts.push('Please let me know if you\'re interested!')
+  if (sender) parts.push(`— ${sender}`)
+  return parts.join(' ')
 }
 
 function parseTime(timeStr) {
@@ -691,11 +787,14 @@ export default function App() {
   const [form, setForm] = useState(INITIAL_STATE)
   const [kbygForm, setKbygForm] = useState(KBYG_INITIAL_STATE)
   const [kbygIncludeTldr, setKbygIncludeTldr] = useState(true)
+  const [outreachForm, setOutreachForm] = useState(SPEAKER_OUTREACH_INITIAL_STATE)
   const [generatedCopy, setGeneratedCopy] = useState('')
   const [generatedSubject, setGeneratedSubject] = useState('')
+  const [generatedOutreachLinkedIn, setGeneratedOutreachLinkedIn] = useState('')
   const [subjectCopied, setSubjectCopied] = useState(false)
   const [copied, setCopied] = useState(false)
   const [linkedInCopied, setLinkedInCopied] = useState(false)
+  const [outreachLinkedInCopied, setOutreachLinkedInCopied] = useState(false)
   const [comboboxOpen, setComboboxOpen] = useState(false)
   const [comboboxHighlight, setComboboxHighlight] = useState(0)
   const comboboxRef = useRef(null)
@@ -777,13 +876,22 @@ export default function App() {
       contacts: [...prev.contacts, { name: '', role: '', contactInfo: '' }],
     }))
 
+  const updateOutreach = (key) => (e) =>
+    setOutreachForm((prev) => ({ ...prev, [key]: e.target.value }))
+
   const handleGenerate = () => {
     if (generatorType === 'knowBeforeYouGo') {
       setGeneratedSubject(generateKnowBeforeYouGoSubject(kbygForm))
       setGeneratedCopy(generateKnowBeforeYouGoEmail(kbygForm, kbygIncludeTldr))
+      setGeneratedOutreachLinkedIn('')
+    } else if (generatorType === 'speakerOutreach') {
+      setGeneratedSubject(generateSpeakerOutreachSubject(outreachForm))
+      setGeneratedCopy(generateSpeakerOutreachEmail(outreachForm))
+      setGeneratedOutreachLinkedIn(generateSpeakerOutreachLinkedIn(outreachForm))
     } else {
       setGeneratedSubject('')
       setGeneratedCopy(generateMeetupCopy(form))
+      setGeneratedOutreachLinkedIn('')
     }
   }
 
@@ -801,6 +909,8 @@ export default function App() {
   const handleReset = () => {
     if (generatorType === 'knowBeforeYouGo') {
       setKbygForm(KBYG_INITIAL_STATE)
+    } else if (generatorType === 'speakerOutreach') {
+      setOutreachForm(SPEAKER_OUTREACH_INITIAL_STATE)
     } else {
       setForm(INITIAL_STATE)
       setShowSpeaker2(false)
@@ -808,6 +918,7 @@ export default function App() {
     }
     setGeneratedCopy('')
     setGeneratedSubject('')
+    setGeneratedOutreachLinkedIn('')
   }
 
   const handleCopySubject = async () => {
@@ -833,6 +944,17 @@ export default function App() {
     }
   }
 
+  const handleCopyOutreachLinkedIn = async () => {
+    if (!generatedOutreachLinkedIn) return
+    try {
+      await navigator.clipboard.writeText(generatedOutreachLinkedIn)
+      setOutreachLinkedInCopied(true)
+      setTimeout(() => setOutreachLinkedInCopied(false), 2000)
+    } catch (err) {
+      console.error('Copy failed', err)
+    }
+  }
+
   return (
     <div className="app">
       <header className="header">
@@ -851,6 +973,7 @@ export default function App() {
                 setGeneratorType(e.target.value)
                 setGeneratedCopy('')
                 setGeneratedSubject('')
+                setGeneratedOutreachLinkedIn('')
               }}
               className="generator-type-select"
               aria-label="Generator type"
@@ -1307,12 +1430,48 @@ export default function App() {
             <button type="button" onClick={handleReset} className="btn-reset">🔄 Reset Form</button>
           </form>
           )}
+
+          {generatorType === 'speakerOutreach' && (
+          <form
+            onSubmit={(e) => { e.preventDefault(); handleGenerate() }}
+            className="form"
+          >
+            <fieldset className="form-fieldset">
+              <legend>Speaker</legend>
+              <label>Speaker name <input type="text" value={outreachForm.speakerName} onChange={updateOutreach('speakerName')} placeholder="e.g. Jane Smith" /></label>
+            </fieldset>
+            <fieldset className="form-fieldset">
+              <legend>Outreach Context</legend>
+              <label>Why I'm Reaching Out <textarea value={outreachForm.whyReachingOut} onChange={updateOutreach('whyReachingOut')} placeholder="e.g. I saw your blog post about vector search with Elasticsearch; I noticed you indicated interest in presenting when you joined the user group." rows={4} /></label>
+              <label>Where I found them (optional) <input type="text" value={outreachForm.whereFoundThem} onChange={updateOutreach('whereFoundThem')} placeholder="e.g. LinkedIn, user group signup, conference talk, blog post" /></label>
+            </fieldset>
+            <fieldset className="form-fieldset">
+              <legend>Meetup Details</legend>
+              <label>Meetup chapter / city <input type="text" value={outreachForm.meetupChapterOrCity} onChange={updateOutreach('meetupChapterOrCity')} placeholder="e.g. Elastic Seattle User Group" /></label>
+              <label>Event theme or topic area <input type="text" value={outreachForm.eventThemeOrTopic} onChange={updateOutreach('eventThemeOrTopic')} placeholder="e.g. search and observability" /></label>
+              <label>Potential talk idea (optional) <input type="text" value={outreachForm.potentialTalkIdea} onChange={updateOutreach('potentialTalkIdea')} placeholder="e.g. a 20-min session on your recent work" /></label>
+            </fieldset>
+            <fieldset className="form-fieldset">
+              <legend>Ask</legend>
+              <label>What I'm asking <textarea value={outreachForm.whatAsking} onChange={updateOutreach('whatAsking')} placeholder="e.g. Would you be open to giving a 20 minute talk followed by Q&A at an upcoming meetup?" rows={2} /></label>
+              <label>Flexibility note (optional) <input type="text" value={outreachForm.flexibilityNote} onChange={updateOutreach('flexibilityNote')} placeholder="e.g. Happy to work around your schedule and topic if something sounds interesting." /></label>
+            </fieldset>
+            <fieldset className="form-fieldset">
+              <legend>Sender</legend>
+              <label>Sender name <input type="text" value={outreachForm.senderName} onChange={updateOutreach('senderName')} placeholder="e.g. Your Name" /></label>
+            </fieldset>
+            <button type="submit" className="btn-generate">Generate</button>
+            <button type="button" onClick={handleReset} className="btn-reset">🔄 Reset Form</button>
+          </form>
+          )}
         </aside>
 
         <main className="output-panel">
           <div className="output-header">
-            <h2>{generatorType === 'knowBeforeYouGo' ? 'Generated email' : 'Generated copy'}</h2>
-            {generatedCopy && (
+            <h2>
+              {generatorType === 'knowBeforeYouGo' ? 'Generated email' : generatorType === 'speakerOutreach' ? 'Speaker Outreach' : 'Generated copy'}
+            </h2>
+            {generatedCopy && generatorType !== 'speakerOutreach' && (
               <button
                 type="button"
                 onClick={handleCopy}
@@ -1324,46 +1483,68 @@ export default function App() {
             )}
           </div>
           <div className="output-content">
-            {generatedCopy ? (
+            {generatedCopy || (generatorType === 'speakerOutreach' && generatedSubject) ? (
               <>
-                {generatorType === 'knowBeforeYouGo' && generatedSubject && (
-                  <div className="subject-line-section">
-                    <h3 className="subject-line-heading">Subject Line</h3>
-                    <pre className="output-text subject-line-text">{generatedSubject}</pre>
-                    <button
-                      type="button"
-                      onClick={handleCopySubject}
-                      className="btn-copy"
-                      aria-pressed={subjectCopied}
-                    >
-                      {subjectCopied ? 'Copied!' : 'Copy Subject'}
-                    </button>
-                  </div>
+                {generatorType === 'speakerOutreach' && (
+                  <>
+                    <div className="subject-line-section">
+                      <h3 className="subject-line-heading">Subject Line</h3>
+                      <pre className="output-text subject-line-text">{generatedSubject}</pre>
+                      <button type="button" onClick={handleCopySubject} className="btn-copy" aria-pressed={subjectCopied}>
+                        {subjectCopied ? 'Copied!' : 'Copy Subject'}
+                      </button>
+                    </div>
+                    <div className="subject-line-section">
+                      <h3 className="subject-line-heading">Outreach Email</h3>
+                      <pre className="output-text subject-line-text">{generatedCopy}</pre>
+                      <button type="button" onClick={handleCopy} className="btn-copy" aria-pressed={copied}>
+                        {copied ? 'Copied!' : 'Copy Email'}
+                      </button>
+                    </div>
+                    <div className="linkedin-section">
+                      <h3 className="linkedin-heading">LinkedIn Message</h3>
+                      <pre className="linkedin-text">{generatedOutreachLinkedIn}</pre>
+                      <button type="button" onClick={handleCopyOutreachLinkedIn} className="btn-copy btn-copy-linkedin" aria-pressed={outreachLinkedInCopied}>
+                        {outreachLinkedInCopied ? 'Copied!' : 'Copy LinkedIn Message'}
+                      </button>
+                    </div>
+                  </>
                 )}
                 {generatorType === 'knowBeforeYouGo' && (
-                  <h3 className="generated-email-heading">Generated Email</h3>
+                  <>
+                    {generatedSubject && (
+                      <div className="subject-line-section">
+                        <h3 className="subject-line-heading">Subject Line</h3>
+                        <pre className="output-text subject-line-text">{generatedSubject}</pre>
+                        <button type="button" onClick={handleCopySubject} className="btn-copy" aria-pressed={subjectCopied}>
+                          {subjectCopied ? 'Copied!' : 'Copy Subject'}
+                        </button>
+                      </div>
+                    )}
+                    <h3 className="generated-email-heading">Generated Email</h3>
+                    <pre className="output-text">{generatedCopy}</pre>
+                  </>
                 )}
-                <pre className="output-text">{generatedCopy}</pre>
                 {generatorType === 'eventPromotion' && (
-                <div className="linkedin-section">
-                  <h3 className="linkedin-heading">📣 LinkedIn Promo Post</h3>
-                  <pre className="linkedin-text">{buildLinkedInPost(form)}</pre>
-                  <button
-                    type="button"
-                    onClick={handleCopyLinkedIn}
-                    className="btn-copy btn-copy-linkedin"
-                    aria-pressed={linkedInCopied}
-                  >
-                    {linkedInCopied ? 'Copied!' : 'Copy LinkedIn Post'}
-                  </button>
-                </div>
+                  <>
+                    <pre className="output-text">{generatedCopy}</pre>
+                    <div className="linkedin-section">
+                      <h3 className="linkedin-heading">📣 LinkedIn Promo Post</h3>
+                      <pre className="linkedin-text">{buildLinkedInPost(form)}</pre>
+                      <button type="button" onClick={handleCopyLinkedIn} className="btn-copy btn-copy-linkedin" aria-pressed={linkedInCopied}>
+                        {linkedInCopied ? 'Copied!' : 'Copy LinkedIn Post'}
+                      </button>
+                    </div>
+                  </>
                 )}
               </>
             ) : (
               <p className="output-placeholder">
                 {generatorType === 'knowBeforeYouGo'
                   ? 'Fill in the form and click "Generate Email" to create the Know Before You Go logistics email.'
-                  : 'Fill in the form and click "Generate Meetup Copy" to see the event description here. Use the buttons below to add optional Speaker 2 or Speaker 3.'}
+                  : generatorType === 'speakerOutreach'
+                    ? 'Fill in the form and click "Generate" to create the subject line, outreach email, and LinkedIn message.'
+                    : 'Fill in the form and click "Generate Meetup Copy" to see the event description here. Use the buttons below to add optional Speaker 2 or Speaker 3.'}
               </p>
             )}
           </div>
