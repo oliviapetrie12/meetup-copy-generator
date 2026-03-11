@@ -355,6 +355,28 @@ body {
   font-size: 0.95rem;
 }
 
+.subject-line-section {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.subject-line-heading,
+.generated-email-heading {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.subject-line-section .subject-line-text {
+  margin: 0 0 0.75rem;
+}
+
+.generated-email-heading {
+  margin-top: 0;
+}
+
 .linkedin-section {
   margin-top: 2rem;
   padding-top: 1.5rem;

@@ -232,6 +232,14 @@ const KBYG_INITIAL_STATE = {
   additionalNotes: '',
 }
 
+function generateKnowBeforeYouGoSubject(form) {
+  const trim = (s) => (typeof s === 'string' ? s.trim() : '')
+  const title = trim(form.eventTitle)
+  const date = trim(form.eventDate)
+  if (!title) return 'Meetup Know Before You Go'
+  return `${title} | Meetup Know Before You Go${date ? ` | ${date}` : ''}`
+}
+
 function generateKnowBeforeYouGoEmail(form, includeTldr) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const has = (s) => trim(s).length > 0
@@ -243,14 +251,49 @@ function generateKnowBeforeYouGoEmail(form, includeTldr) {
   lines.push('')
 
   if (includeTldr) {
-    lines.push('TL;DR')
+    // Build TL;DR after reviewing all logistics and agenda; prioritize for speakers and hosts
     const bullets = []
-    if (has(form.arrivalTime)) bullets.push(`Arrive by ${trim(form.arrivalTime)}.`)
+    const add = (condition, text) => { if (condition && text && bullets.length < 5) bullets.push(text) }
+
+    // Priority 1: When (critical for everyone)
+    if (has(form.arrivalTime)) add(true, `Arrive by ${trim(form.arrivalTime)}.`)
+    if (has(form.eventDate) || has(form.eventTime)) {
+      const when = [trim(form.eventDate), trim(form.eventTime)].filter(Boolean).join(' at ')
+      if (when) add(true, `Event: ${when}.`)
+    }
+
+    // Priority 2: Who to contact (hosts/speakers)
     const hasAnyContact = (form.contacts || []).some((c) => has(c.name) || has(c.role) || has(c.contactInfo))
-    if (hasAnyContact) bullets.push('Your host and key contacts are listed in Helpful Contacts below.')
-    if (has(form.speaker1Name) || has(form.speaker2Name)) bullets.push('Speakers: bring your laptop, slides, and any demo setup.')
-    if (has(form.foodDetails) || has(form.drinkDetails)) bullets.push('Food and drinks will be provided.')
-    if (has(form.setupNotes)) bullets.push(`Setup: ${trim(form.setupNotes)}`)
+    add(hasAnyContact, 'Your host and key contacts are listed in Helpful Contacts below.')
+
+    // Priority 3: Speaker prep and AV
+    if (has(form.speaker1Name) || has(form.speaker2Name)) add(true, 'Speakers: bring your laptop, slides, and any demo setup.')
+    if (has(form.avNotes)) {
+      const firstAv = trim(form.avNotes).split(/\n+/).map((s) => s.trim()).filter(Boolean)[0]
+      add(!!firstAv, firstAv ? `AV: ${firstAv}` : 'See AV section below.')
+    }
+
+    // Priority 4: Where (venue)
+    if (has(form.venueName)) add(true, `Venue: ${trim(form.venueName)}.`)
+    else if (has(form.venueAddress)) add(true, `Location: ${trim(form.venueAddress)}.`)
+
+    // Priority 5: Food & drink
+    if (has(form.foodDetails) || has(form.drinkDetails)) {
+      const fd = [trim(form.foodDetails), trim(form.drinkDetails)].filter(Boolean).join('; ')
+      add(true, `Food & drinks: ${fd}.`)
+    }
+
+    // Priority 6: Setup / swag (reviewed from logistics)
+    if (has(form.setupNotes)) add(true, `Setup: ${trim(form.setupNotes)}`)
+    if (has(form.swagNotes) && bullets.length < 5) add(true, `Swag: ${trim(form.swagNotes)}`)
+
+    // Priority 7: Agenda (reviewed; one line for speakers/hosts)
+    if (has(form.internalAgenda) && bullets.length < 5) {
+      const agendaLines = trim(form.internalAgenda).split(/\n+/).map((s) => s.trim()).filter(Boolean)
+      add(agendaLines.length > 0, agendaLines.length > 0 ? `Agenda: ${agendaLines[0]}${agendaLines.length > 1 ? ' … (see full agenda below)' : ''}` : null)
+    }
+
+    lines.push('TL;DR')
     bullets.slice(0, 5).forEach((b) => lines.push(`• ${b}`))
     lines.push('')
   }
@@ -649,6 +692,8 @@ export default function App() {
   const [kbygForm, setKbygForm] = useState(KBYG_INITIAL_STATE)
   const [kbygIncludeTldr, setKbygIncludeTldr] = useState(true)
   const [generatedCopy, setGeneratedCopy] = useState('')
+  const [generatedSubject, setGeneratedSubject] = useState('')
+  const [subjectCopied, setSubjectCopied] = useState(false)
   const [copied, setCopied] = useState(false)
   const [linkedInCopied, setLinkedInCopied] = useState(false)
   const [comboboxOpen, setComboboxOpen] = useState(false)
@@ -734,8 +779,10 @@ export default function App() {
 
   const handleGenerate = () => {
     if (generatorType === 'knowBeforeYouGo') {
+      setGeneratedSubject(generateKnowBeforeYouGoSubject(kbygForm))
       setGeneratedCopy(generateKnowBeforeYouGoEmail(kbygForm, kbygIncludeTldr))
     } else {
+      setGeneratedSubject('')
       setGeneratedCopy(generateMeetupCopy(form))
     }
   }
@@ -760,6 +807,18 @@ export default function App() {
       setShowSpeaker3(false)
     }
     setGeneratedCopy('')
+    setGeneratedSubject('')
+  }
+
+  const handleCopySubject = async () => {
+    if (!generatedSubject) return
+    try {
+      await navigator.clipboard.writeText(generatedSubject)
+      setSubjectCopied(true)
+      setTimeout(() => setSubjectCopied(false), 2000)
+    } catch (err) {
+      console.error('Copy failed', err)
+    }
   }
 
   const handleCopyLinkedIn = async () => {
@@ -791,6 +850,7 @@ export default function App() {
               onChange={(e) => {
                 setGeneratorType(e.target.value)
                 setGeneratedCopy('')
+                setGeneratedSubject('')
               }}
               className="generator-type-select"
               aria-label="Generator type"
@@ -1266,6 +1326,23 @@ export default function App() {
           <div className="output-content">
             {generatedCopy ? (
               <>
+                {generatorType === 'knowBeforeYouGo' && generatedSubject && (
+                  <div className="subject-line-section">
+                    <h3 className="subject-line-heading">Subject Line</h3>
+                    <pre className="output-text subject-line-text">{generatedSubject}</pre>
+                    <button
+                      type="button"
+                      onClick={handleCopySubject}
+                      className="btn-copy"
+                      aria-pressed={subjectCopied}
+                    >
+                      {subjectCopied ? 'Copied!' : 'Copy Subject'}
+                    </button>
+                  </div>
+                )}
+                {generatorType === 'knowBeforeYouGo' && (
+                  <h3 className="generated-email-heading">Generated Email</h3>
+                )}
                 <pre className="output-text">{generatedCopy}</pre>
                 {generatorType === 'eventPromotion' && (
                 <div className="linkedin-section">
