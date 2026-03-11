@@ -197,6 +197,155 @@ const INITIAL_STATE = {
   parkingNotes: '',
 }
 
+const GENERATOR_TYPES = [
+  { value: 'eventPromotion', label: 'Event Promotion' },
+  { value: 'knowBeforeYouGo', label: 'Meetup Know Before You Go' },
+]
+
+const KBYG_INITIAL_STATE = {
+  recipients: '',
+  greetingNames: '',
+  eventTitle: '',
+  eventDate: '',
+  eventTime: '',
+  arrivalTime: '',
+  venueName: '',
+  venueAddress: '',
+  meetupLink: '',
+  lumaLink: '',
+  contacts: [
+    { name: '', role: '', contactInfo: '' },
+    { name: '', role: '', contactInfo: '' },
+  ],
+  speaker1Name: '',
+  speaker1Title: '',
+  speaker1TalkTitle: '',
+  speaker2Name: '',
+  speaker2Title: '',
+  speaker2TalkTitle: '',
+  foodDetails: '',
+  drinkDetails: '',
+  swagNotes: '',
+  setupNotes: '',
+  avNotes: '',
+  internalAgenda: '',
+  additionalNotes: '',
+}
+
+function generateKnowBeforeYouGoEmail(form, includeTldr) {
+  const trim = (s) => (typeof s === 'string' ? s.trim() : '')
+  const has = (s) => trim(s).length > 0
+
+  const lines = []
+
+  const names = trim(form.greetingNames) || 'everyone'
+  lines.push(`Hi ${names},`)
+  lines.push('')
+
+  if (includeTldr) {
+    lines.push('TL;DR')
+    const bullets = []
+    if (has(form.arrivalTime)) bullets.push(`Arrive by ${trim(form.arrivalTime)}.`)
+    const hasAnyContact = (form.contacts || []).some((c) => has(c.name) || has(c.role) || has(c.contactInfo))
+    if (hasAnyContact) bullets.push('Your host and key contacts are listed in Helpful Contacts below.')
+    if (has(form.speaker1Name) || has(form.speaker2Name)) bullets.push('Speakers: bring your laptop, slides, and any demo setup.')
+    if (has(form.foodDetails) || has(form.drinkDetails)) bullets.push('Food and drinks will be provided.')
+    if (has(form.setupNotes)) bullets.push(`Setup: ${trim(form.setupNotes)}`)
+    bullets.slice(0, 5).forEach((b) => lines.push(`• ${b}`))
+    lines.push('')
+  }
+
+  const eventTitle = trim(form.eventTitle)
+  const eventDate = trim(form.eventDate)
+  if (eventDate && eventTitle) {
+    lines.push(`Thank you for being part of the ${eventTitle} meetup on ${eventDate}. Below are the logistics to help you prepare for the event.`)
+  } else if (eventTitle) {
+    lines.push(`Thank you for being part of the ${eventTitle} meetup. Below are the logistics to help you prepare for the event.`)
+  } else if (eventDate) {
+    lines.push(`Thank you for being part of this meetup on ${eventDate}. Below are the logistics to help you prepare for the event.`)
+  } else {
+    lines.push('Thank you for being part of this meetup. Below are the logistics to help you prepare for the event.')
+  }
+  lines.push('')
+
+  if (has(form.eventDate) || has(form.eventTime)) {
+    lines.push('Date and Time')
+    const when = [trim(form.eventDate), trim(form.eventTime)].filter(Boolean).join(' at ')
+    if (when) lines.push(when)
+    if (has(form.arrivalTime)) lines.push(`Arrival time: ${trim(form.arrivalTime)}`)
+    lines.push('')
+  }
+
+  if (has(form.meetupLink) || has(form.lumaLink)) {
+    lines.push('Event Page')
+    if (has(form.meetupLink)) lines.push(`• Meetup: ${trim(form.meetupLink)}`)
+    if (has(form.lumaLink)) lines.push(`• Luma: ${trim(form.lumaLink)}`)
+    lines.push('')
+  }
+
+  const contactEntries = (form.contacts || []).filter((c) => has(c.name) || has(c.role) || has(c.contactInfo))
+  if (contactEntries.length > 0) {
+    lines.push('Helpful Contacts')
+    contactEntries.forEach((c) => {
+      const name = trim(c.name)
+      const role = trim(c.role)
+      const info = trim(c.contactInfo)
+      let main = ''
+      if (name && info) main = `${name} (${info})`
+      else if (name) main = name
+      else if (info) main = info
+      if (main && role) lines.push(`• ${main} – ${role}`)
+      else if (main) lines.push(`• ${main}`)
+      else if (role) lines.push(`• ${role}`)
+    })
+    lines.push('')
+  }
+
+  if (has(form.venueName) || has(form.venueAddress)) {
+    lines.push('Location')
+    if (has(form.venueName)) lines.push(trim(form.venueName))
+    if (has(form.venueAddress)) lines.push(trim(form.venueAddress))
+    lines.push('')
+  }
+
+  if (has(form.foodDetails) || has(form.drinkDetails)) {
+    lines.push('Food & Refreshments')
+    if (has(form.foodDetails)) lines.push(`• ${trim(form.foodDetails)}`)
+    if (has(form.drinkDetails)) lines.push(`• ${trim(form.drinkDetails)}`)
+    lines.push('')
+  }
+
+  if (has(form.setupNotes) || has(form.swagNotes)) {
+    lines.push('Setup')
+    if (has(form.setupNotes)) lines.push(`• ${trim(form.setupNotes)}`)
+    if (has(form.swagNotes)) lines.push(`• ${trim(form.swagNotes)}`)
+    lines.push('')
+  }
+
+  if (has(form.avNotes)) {
+    lines.push('AV')
+    const avBullets = trim(form.avNotes).split(/\n+/).map((s) => s.trim()).filter(Boolean)
+    avBullets.forEach((b) => lines.push(`• ${b}`))
+    lines.push('')
+  }
+
+  if (has(form.internalAgenda)) {
+    lines.push('Internal Agenda')
+    const agendaBullets = trim(form.internalAgenda).split(/\n+/).map((s) => s.trim()).filter(Boolean)
+    agendaBullets.forEach((b) => lines.push(`• ${b}`))
+    lines.push('')
+  }
+
+  if (has(form.additionalNotes)) {
+    lines.push('Additional notes')
+    lines.push(trim(form.additionalNotes))
+    lines.push('')
+  }
+
+  lines.push('Please let me know if you have any questions.')
+  return lines.join('\n')
+}
+
 function parseTime(timeStr) {
   const s = String(timeStr).trim()
   const match = s.match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/i)
@@ -495,7 +644,10 @@ function generateMeetupCopy(form) {
 }
 
 export default function App() {
+  const [generatorType, setGeneratorType] = useState('eventPromotion')
   const [form, setForm] = useState(INITIAL_STATE)
+  const [kbygForm, setKbygForm] = useState(KBYG_INITIAL_STATE)
+  const [kbygIncludeTldr, setKbygIncludeTldr] = useState(true)
   const [generatedCopy, setGeneratedCopy] = useState('')
   const [copied, setCopied] = useState(false)
   const [linkedInCopied, setLinkedInCopied] = useState(false)
@@ -565,8 +717,27 @@ export default function App() {
   const update = (key) => (e) =>
     setForm((prev) => ({ ...prev, [key]: e.target.value }))
 
+  const updateKbyg = (key) => (e) =>
+    setKbygForm((prev) => ({ ...prev, [key]: e.target.value }))
+
+  const updateKbygContact = (index, field) => (e) =>
+    setKbygForm((prev) => ({
+      ...prev,
+      contacts: prev.contacts.map((c, i) => (i === index ? { ...c, [field]: e.target.value } : c)),
+    }))
+
+  const addKbygContact = () =>
+    setKbygForm((prev) => ({
+      ...prev,
+      contacts: [...prev.contacts, { name: '', role: '', contactInfo: '' }],
+    }))
+
   const handleGenerate = () => {
-    setGeneratedCopy(generateMeetupCopy(form))
+    if (generatorType === 'knowBeforeYouGo') {
+      setGeneratedCopy(generateKnowBeforeYouGoEmail(kbygForm, kbygIncludeTldr))
+    } else {
+      setGeneratedCopy(generateMeetupCopy(form))
+    }
   }
 
   const handleCopy = async () => {
@@ -581,10 +752,14 @@ export default function App() {
   }
 
   const handleReset = () => {
-    setForm(INITIAL_STATE)
+    if (generatorType === 'knowBeforeYouGo') {
+      setKbygForm(KBYG_INITIAL_STATE)
+    } else {
+      setForm(INITIAL_STATE)
+      setShowSpeaker2(false)
+      setShowSpeaker3(false)
+    }
     setGeneratedCopy('')
-    setShowSpeaker2(false)
-    setShowSpeaker3(false)
   }
 
   const handleCopyLinkedIn = async () => {
@@ -602,14 +777,33 @@ export default function App() {
   return (
     <div className="app">
       <header className="header">
-        <h1>Meetup Page Generator</h1>
-        {form.chapterOrCity && (
-          <p className="subtitle">{form.chapterOrCity}</p>
-        )}
+        <h1>Elastic Meetup Toolkit</h1>
+        <p className="subtitle">Generate meetup event pages, promo posts, and speaker logistics emails.</p>
       </header>
 
       <div className="layout">
+        <>
         <aside className="form-panel">
+          <label className="generator-type-label">
+            Generator Type
+            <select
+              value={generatorType}
+              onChange={(e) => {
+                setGeneratorType(e.target.value)
+                setGeneratedCopy('')
+              }}
+              className="generator-type-select"
+              aria-label="Generator type"
+            >
+              {GENERATOR_TYPES.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {generatorType === 'eventPromotion' && (
           <form
             onSubmit={(e) => {
               e.preventDefault()
@@ -980,11 +1174,84 @@ export default function App() {
               🔄 Reset Form
             </button>
           </form>
+          )}
+
+          {generatorType === 'knowBeforeYouGo' && (
+          <form
+            onSubmit={(e) => { e.preventDefault(); handleGenerate() }}
+            className="form"
+          >
+            <fieldset className="form-fieldset">
+              <legend>Email Details</legend>
+              <label>Recipients <input type="text" value={kbygForm.recipients} onChange={updateKbyg('recipients')} placeholder="e.g. Speakers, hosts" /></label>
+              <label>Greeting names <input type="text" value={kbygForm.greetingNames} onChange={updateKbyg('greetingNames')} placeholder="e.g. everyone" /></label>
+            </fieldset>
+            <fieldset className="form-fieldset">
+              <legend>Event Details</legend>
+              <label>Event title <input type="text" value={kbygForm.eventTitle} onChange={updateKbyg('eventTitle')} placeholder="e.g. March Meetup" /></label>
+              <label>Event date <input type="text" value={kbygForm.eventDate} onChange={updateKbyg('eventDate')} placeholder="e.g. Tuesday, March 18" /></label>
+              <label>Event time <input type="text" value={kbygForm.eventTime} onChange={updateKbyg('eventTime')} placeholder="e.g. 6:00 PM" /></label>
+              <label>Arrival time <input type="text" value={kbygForm.arrivalTime} onChange={updateKbyg('arrivalTime')} placeholder="e.g. 5:45 PM" /></label>
+            </fieldset>
+            <fieldset className="form-fieldset">
+              <legend>Location</legend>
+              <label>Venue name <input type="text" value={kbygForm.venueName} onChange={updateKbyg('venueName')} placeholder="e.g. WeWork Downtown" /></label>
+              <label>Venue address <input type="text" value={kbygForm.venueAddress} onChange={updateKbyg('venueAddress')} placeholder="e.g. 123 Main St" /></label>
+            </fieldset>
+            <fieldset className="form-fieldset">
+              <legend>Event Links</legend>
+              <label>Meetup link <input type="text" value={kbygForm.meetupLink} onChange={updateKbyg('meetupLink')} placeholder="https://..." /></label>
+              <label>Luma link <input type="text" value={kbygForm.lumaLink} onChange={updateKbyg('lumaLink')} placeholder="https://..." /></label>
+            </fieldset>
+            <fieldset className="form-fieldset">
+              <legend>Helpful Contacts</legend>
+              {(kbygForm.contacts || []).map((contact, index) => (
+                <div key={index} className="contact-row">
+                  <label>Contact Name <input type="text" value={contact.name} onChange={updateKbygContact(index, 'name')} placeholder="e.g. Jane Smith" /></label>
+                  <label>Role / Description <input type="text" value={contact.role} onChange={updateKbygContact(index, 'role')} placeholder="e.g. onsite host, program manager, venue contact" /></label>
+                  <label>Contact Info (email or Slack) <input type="text" value={contact.contactInfo} onChange={updateKbygContact(index, 'contactInfo')} placeholder="e.g. jane@example.com or @jane" /></label>
+                </div>
+              ))}
+              <button type="button" onClick={addKbygContact} className="btn-add-speaker">+ Add Contact</button>
+            </fieldset>
+            <fieldset className="form-fieldset">
+              <legend>Speakers</legend>
+              <label>Speaker 1 name <input type="text" value={kbygForm.speaker1Name} onChange={updateKbyg('speaker1Name')} placeholder="e.g. Jane Smith" /></label>
+              <label>Speaker 1 title <input type="text" value={kbygForm.speaker1Title} onChange={updateKbyg('speaker1Title')} placeholder="e.g. Staff Engineer" /></label>
+              <label>Speaker 1 talk title <input type="text" value={kbygForm.speaker1TalkTitle} onChange={updateKbyg('speaker1TalkTitle')} placeholder="Talk title" /></label>
+              <label>Speaker 2 name <input type="text" value={kbygForm.speaker2Name} onChange={updateKbyg('speaker2Name')} placeholder="e.g. John Doe" /></label>
+              <label>Speaker 2 title <input type="text" value={kbygForm.speaker2Title} onChange={updateKbyg('speaker2Title')} placeholder="e.g. Principal Engineer" /></label>
+              <label>Speaker 2 talk title <input type="text" value={kbygForm.speaker2TalkTitle} onChange={updateKbyg('speaker2TalkTitle')} placeholder="Talk title" /></label>
+            </fieldset>
+            <fieldset className="form-fieldset">
+              <legend>Logistics</legend>
+              <label>Food details <input type="text" value={kbygForm.foodDetails} onChange={updateKbyg('foodDetails')} placeholder="e.g. Pizza and snacks" /></label>
+              <label>Drink details <input type="text" value={kbygForm.drinkDetails} onChange={updateKbyg('drinkDetails')} placeholder="e.g. Coffee, water, soda" /></label>
+              <label>Swag notes <input type="text" value={kbygForm.swagNotes} onChange={updateKbyg('swagNotes')} placeholder="e.g. T-shirts for attendees" /></label>
+              <label>Setup notes <input type="text" value={kbygForm.setupNotes} onChange={updateKbyg('setupNotes')} placeholder="e.g. Tables and signage" /></label>
+              <label>AV notes <input type="text" value={kbygForm.avNotes} onChange={updateKbyg('avNotes')} placeholder="e.g. HDMI adapter provided" /></label>
+            </fieldset>
+            <fieldset className="form-fieldset">
+              <legend>Agenda</legend>
+              <label>Internal agenda <textarea value={kbygForm.internalAgenda} onChange={updateKbyg('internalAgenda')} placeholder="Paste or type agenda..." rows={4} /></label>
+            </fieldset>
+            <fieldset className="form-fieldset">
+              <legend>Additional</legend>
+              <label>Additional notes <textarea value={kbygForm.additionalNotes} onChange={updateKbyg('additionalNotes')} placeholder="Any other logistics..." rows={3} /></label>
+            </fieldset>
+            <label className="checkbox-label">
+              <input type="checkbox" checked={kbygIncludeTldr} onChange={(e) => setKbygIncludeTldr(e.target.checked)} />
+              Include TL;DR summary
+            </label>
+            <button type="submit" className="btn-generate">Generate Email</button>
+            <button type="button" onClick={handleReset} className="btn-reset">🔄 Reset Form</button>
+          </form>
+          )}
         </aside>
 
         <main className="output-panel">
           <div className="output-header">
-            <h2>Generated copy</h2>
+            <h2>{generatorType === 'knowBeforeYouGo' ? 'Generated email' : 'Generated copy'}</h2>
             {generatedCopy && (
               <button
                 type="button"
@@ -1000,6 +1267,7 @@ export default function App() {
             {generatedCopy ? (
               <>
                 <pre className="output-text">{generatedCopy}</pre>
+                {generatorType === 'eventPromotion' && (
                 <div className="linkedin-section">
                   <h3 className="linkedin-heading">📣 LinkedIn Promo Post</h3>
                   <pre className="linkedin-text">{buildLinkedInPost(form)}</pre>
@@ -1012,14 +1280,18 @@ export default function App() {
                     {linkedInCopied ? 'Copied!' : 'Copy LinkedIn Post'}
                   </button>
                 </div>
+                )}
               </>
             ) : (
               <p className="output-placeholder">
-                Fill in the form and click “Generate Meetup Copy” to see the event description here. Use the buttons below to add optional Speaker 2 or Speaker 3.
+                {generatorType === 'knowBeforeYouGo'
+                  ? 'Fill in the form and click "Generate Email" to create the Know Before You Go logistics email.'
+                  : 'Fill in the form and click "Generate Meetup Copy" to see the event description here. Use the buttons below to add optional Speaker 2 or Speaker 3.'}
               </p>
             )}
           </div>
         </main>
+        </>
       </div>
     </div>
   )
