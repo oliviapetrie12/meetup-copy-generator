@@ -779,18 +779,46 @@ function getIntroTheme(talkTitle, talkAbstract) {
   return words.length > 12 ? words.replace(/\s+$/, '') + '…' : title.slice(0, 42)
 }
 
+const SUBJECT_TOPIC_PHRASES = {
+  'search and relevance': 'Search with Elasticsearch',
+  'observability and monitoring': 'Observability and monitoring',
+  'AI and ML with Elastic': 'AI and ML with Elastic',
+  'data pipelines and ingest': 'Data pipelines and ingest',
+  'scaling and production use cases': 'Production use cases with Elastic',
+  'migration and upgrades': 'Migration and upgrades',
+  'real-world Elastic use cases': 'Real-world use cases',
+}
+
+function capitalizeTopic(s) {
+  if (!s || typeof s !== 'string') return ''
+  const t = s.trim()
+  if (!t) return ''
+  const proper = ['Elastic', 'Elasticsearch', 'Kafka', 'AI', 'ML', 'MCP', 'AWS', 'EKS', 'Kubernetes']
+  const words = t.split(/\s+/)
+  const out = words.map((w, i) => {
+    const clean = w.replace(/[&]/g, ' and ')
+    const lower = clean.toLowerCase()
+    if (i === 0 && lower.length > 0) return clean.charAt(0).toUpperCase() + clean.slice(1).toLowerCase()
+    const match = proper.find((p) => lower === p.toLowerCase())
+    if (match) return match
+    if (lower === 'and' || lower === 'with' || lower === 'for' || lower === 'the') return lower
+    return clean.charAt(0).toUpperCase() + clean.slice(1).toLowerCase()
+  })
+  return out.join(' ')
+}
+
 function getSubjectTopic(talkTitle, talkAbstract) {
+  const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const theme = getTalkTheme(talkTitle, talkAbstract)
-  const short = {
-    'search and relevance': 'search & Elasticsearch',
-    'observability and monitoring': 'observability',
-    'AI and ML with Elastic': 'AI & ML',
-    'data pipelines and ingest': 'data pipelines',
-    'scaling and production use cases': 'production use cases',
-    'migration and upgrades': 'migration',
-    'real-world Elastic use cases': 'real-world use cases',
-  }
-  return short[theme] || (theme.length <= 28 ? theme : theme.split(/\s+/).slice(0, 4).join(' '))
+  const title = trim(talkTitle)
+  const text = `${title} ${trim(talkAbstract)}`.toLowerCase()
+  if (/\bkafka\b/.test(text) && /\bstream(ing)?\b/.test(text)) return 'Streaming data with Kafka'
+  if (/\bvector\s+search\b/.test(text) || (/\bvector\b/.test(text) && /\bsearch\b/.test(text))) return 'Vector search with Elasticsearch'
+  const phrase = SUBJECT_TOPIC_PHRASES[theme]
+  if (phrase) return phrase
+  if (theme.length <= 28) return capitalizeTopic(theme)
+  const short = theme.split(/\s+/).slice(0, 4).join(' ')
+  return capitalizeTopic(short)
 }
 
 function capSubject(s, max = MAX_SUBJECT_LENGTH) {
@@ -807,33 +835,34 @@ function buildIntuitionEmailSubjects(form, variant = 0) {
   const title = trim(form.eventTitle)
   const date = trim(form.date)
   const city = getCityForIntuition(form)
-  const theme1 = getTalkTheme(form.speaker1TalkTitle, form.speaker1TalkAbstract)
   const theme2 = trim(form.speaker2TalkTitle) ? getTalkTheme(form.speaker2TalkTitle, form.speaker2TalkAbstract) : ''
   const topic1 = getSubjectTopic(form.speaker1TalkTitle, form.speaker1TalkAbstract)
   const topic2 = theme2 ? getSubjectTopic(form.speaker2TalkTitle, form.speaker2TalkAbstract) : ''
-  const topic = topic1 || topic2 || 'Elastic'
+  const topic = topic1 || topic2 || 'Real-world use cases'
+  const topicNoSuffix = topic.replace(/\s+with Elastic$/i, '').trim() || topic
+  const addWithElastic = (t) => (/\s+with Elastic$/i.test(t) ? t : `${t} with Elastic`)
 
   const options = []
 
   if (city) {
     options.push(capSubject(`${city} Elastic Meetup: ${topic}`))
-    options.push(capSubject(`${topic} with Elastic — ${city} Meetup`))
-    options.push(capSubject(`How teams use ${topic} — ${city} Meetup`))
+    options.push(capSubject(`${addWithElastic(topicNoSuffix)} — ${city} Meetup`))
+    options.push(capSubject(`How teams use ${topicNoSuffix} — ${city} Meetup`))
     if (date) {
       options.push(capSubject(`${city} Elastic Meetup on ${date}: ${topic}`))
-      options.push(capSubject(`${city} on ${date}: ${topic} with Elastic`))
+      options.push(capSubject(`${city} on ${date}: ${addWithElastic(topicNoSuffix)}`))
     }
-    options.push(capSubject(`Real-world ${topic} — ${city} Elastic Meetup`))
+    options.push(capSubject(`Real-world ${topicNoSuffix} — ${city} Elastic Meetup`))
   }
 
   if (date && !city) {
     options.push(capSubject(`Elastic Meetup on ${date}: ${topic}`))
-    options.push(capSubject(`Real-world ${topic} with Elastic — ${date}`))
+    options.push(capSubject(`${addWithElastic(topicNoSuffix)} — ${date}`))
   }
 
-  const realWorldLine = topic === 'real-world use cases' ? 'Real-world Elastic use cases' : `Real-world ${topic} with Elastic`
+  const realWorldLine = topic === 'Real-world use cases' ? 'Real-world Elastic use cases' : `Real-world ${topicNoSuffix} with Elastic`
   options.push(capSubject(realWorldLine))
-  if (topic !== 'real-world use cases') options.push(capSubject(`${topic} with Elastic — community meetup`))
+  if (topic !== 'Real-world use cases') options.push(capSubject(`${addWithElastic(topicNoSuffix)} — community meetup`))
   options.push(capSubject(`Elastic Meetup: ${topic}`))
 
   if (title && title.length <= 50) {
@@ -851,7 +880,7 @@ function buildIntuitionEmailSubjects(form, variant = 0) {
   })
   let result = dedupe.slice(0, 5).map((o) => capSubject(o))
   if (result.length < 3) {
-    const extra = [capSubject(`${topic} and Elastic community`), capSubject(`Elastic: ${topic} talks`), capSubject(`Meetup: ${topic} with Elastic`)].filter((o) => o && !result.includes(o))
+    const extra = [capSubject(`${topic} and Elastic community`), capSubject(`Elastic: ${topic} talks`), capSubject(`Meetup: ${addWithElastic(topicNoSuffix)}`)].filter((o) => o && !result.includes(o))
     result = [...result, ...extra].slice(0, 5)
   }
   return result
