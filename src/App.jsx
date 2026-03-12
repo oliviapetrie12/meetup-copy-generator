@@ -811,19 +811,87 @@ function buildIntuitionPreviewText(form) {
   return cap(text)
 }
 
+const WHY_ATTEND_INTROS = [
+  'Learn how ',
+  'Hear how ',
+  'Explore how ',
+  'Get a real-world look at ',
+  'See how ',
+]
+
+function toLearningOutcomeBullet(talkTitle, talkAbstract, introIndex) {
+  const trim = (s) => (typeof s === 'string' ? s.trim() : '')
+  const title = trim(talkTitle)
+  const abstract = trim(talkAbstract)
+  const intro = WHY_ATTEND_INTROS[introIndex % WHY_ATTEND_INTROS.length]
+
+  if (!title && !abstract) return null
+
+  let topic = ''
+  if (abstract && abstract.length > 20) {
+    const firstSentence = abstract.split(/[.!?]/)[0].trim()
+    const snippet = firstSentence.length > 12 ? firstSentence.slice(0, 80) : abstract.slice(0, 80)
+    topic = snippet.replace(/\s+/g, ' ').trim()
+    if (!topic.endsWith('.') && !topic.endsWith(',')) topic += '.'
+    topic = topic.toLowerCase().replace(/^./, (c) => c.toUpperCase())
+  }
+  if (!topic && title) {
+    const t = title.toLowerCase().trim()
+    if (t.includes(' with ')) {
+      const [a, b] = t.split(/\s+with\s+/, 2).map((s) => s.trim())
+      const a2 = a.replace(/\b(longterm|long-term)\b/gi, 'long-term').replace(/^./, (c) => c.toUpperCase())
+      const b2 = b.replace(/^(a|an|the)\s+/i, '').replace(/^./, (c) => c.toUpperCase())
+      if (/\w+ing\s/.test(a) || a.endsWith('ing')) {
+        const parts = a.split(/\s+/)
+        const first = parts[0]
+        const rest = parts.slice(1).join(' ')
+        const nounPhrase = rest ? `${rest} ${first}`.trim() : first
+        topic = `Elastic can support real-world ${nounPhrase.replace(/\blongterm\b/gi, 'long-term')} use cases`
+      } else {
+        topic = `${a2} and ${b2} work in practice`
+      }
+    } else if (t.includes(' for ')) {
+      const [a, b] = t.split(/\s+for\s+/, 2).map((s) => s.trim())
+      const b2 = b.replace(/^./, (c) => c.toUpperCase())
+      const aShort = a.replace(/\b(operator|solution|strategy|strategies)\b/gi, '').trim().replace(/^./, (c) => c.toUpperCase())
+      topic = `engineers are improving ${b2} with ${aShort} strategies`
+    } else if (t.split(/\s+/).length <= 4) {
+      topic = t.replace(/^./, (c) => c.toUpperCase()) + ' works in practice'
+    } else {
+      topic = t.replace(/^./, (c) => c.toUpperCase())
+    }
+  }
+  if (!topic) return null
+
+  const tail = topic.endsWith('.') ? topic.slice(0, -1) : topic
+  if (intro === 'Get a real-world look at ' || intro === 'Explore how ') {
+    return intro + tail + '.'
+  }
+  if (tail.toLowerCase().startsWith('how ') || tail.toLowerCase().startsWith('engineers ') || tail.toLowerCase().startsWith('teams ')) {
+    return (intro === 'Hear how ' ? 'Hear ' : intro.slice(0, -5) + ' ') + tail + '.'
+  }
+  return intro + tail + '.'
+}
+
 function buildIntuitionWhyAttend(form) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const city = getCityForIntuition(form)
   const networkBullet = city
     ? `Network with the ${city} Elastic community.`
     : 'Network with the local Elastic community.'
-  const talk1 = trim(form.speaker1TalkTitle)
-  const talk2 = trim(form.speaker2TalkTitle)
+  const talk1Title = trim(form.speaker1TalkTitle)
+  const talk1Abstract = trim(form.speaker1TalkAbstract)
+  const talk2Title = trim(form.speaker2TalkTitle)
+  const talk2Abstract = trim(form.speaker2TalkAbstract)
   const hasSpeaker2 = [form.speaker2Name, form.speaker2Title, form.speaker2Company, form.speaker2TalkTitle, form.speaker2TalkAbstract].some((v) => trim(v).length > 0)
   const whyAttend = trim(form.intuitionWhyAttend)
   const takeaway = trim(form.intuitionKeyTakeaway)
-  const bullet1 = talk1 ? `Real-world take on ${talk1}.` : (whyAttend ? (whyAttend.endsWith('.') ? whyAttend : `${whyAttend}.`) : 'Practical knowledge you can use right away.')
-  const bullet2 = (hasSpeaker2 && talk2) ? `Learn from the community: ${talk2}.` : (takeaway ? (takeaway.endsWith('.') ? takeaway : `${takeaway}.`) : 'Hear how others solve search and observability challenges.')
+
+  const bullet1 = toLearningOutcomeBullet(talk1Title, talk1Abstract, 0) ||
+    (whyAttend ? (whyAttend.endsWith('.') ? whyAttend : `${whyAttend}.`) : 'Learn how Elastic users solve real-world search and observability challenges.')
+  const bullet2 = (hasSpeaker2 && (talk2Title || talk2Abstract))
+    ? (toLearningOutcomeBullet(talk2Title, talk2Abstract, 1) || `Hear how ${talk2Title || 'the community'} applies in practice.`)
+    : (takeaway ? (takeaway.endsWith('.') ? takeaway : `${takeaway}.`) : 'Explore how others are building with Elastic in production.')
   const three = [
     bullet1.endsWith('.') ? bullet1 : `${bullet1}.`,
     bullet2.endsWith('.') ? bullet2 : `${bullet2}.`,
