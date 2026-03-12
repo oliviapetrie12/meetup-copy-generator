@@ -31,6 +31,13 @@ body {
   font-weight: 600;
 }
 
+.header-emoji {
+  display: inline-block;
+  margin-right: 0.25rem;
+  font-style: normal;
+  line-height: 1;
+}
+
 .header .subtitle {
   margin: 0.25rem 0 0;
   font-size: 0.9rem;
