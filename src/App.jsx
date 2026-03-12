@@ -168,6 +168,42 @@ function getTimezoneDisplay(iana) {
   return tz ? (TIMEZONE_ABBREVIATIONS[tz] || tz) : ''
 }
 
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+function ordinal(n) {
+  const d = n % 10
+  const teens = n >= 11 && n <= 13
+  if (teens) return `${n}th`
+  if (d === 1) return `${n}st`
+  if (d === 2) return `${n}nd`
+  if (d === 3) return `${n}rd`
+  return `${n}th`
+}
+
+function formatDateForLinkedIn(dateStr) {
+  const s = (dateStr || '').trim()
+  if (!s) return ''
+  let d
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    d = new Date(s + 'T12:00:00')
+  } else if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(s)) {
+    const [a, b, c] = s.split('/').map(Number)
+    const year = c < 100 ? 2000 + c : c
+    d = new Date(year, a - 1, b)
+  } else {
+    const parsed = Date.parse(s)
+    if (!Number.isNaN(parsed)) d = new Date(parsed)
+  }
+  if (d && !Number.isNaN(d.getTime())) {
+    const dayName = DAY_NAMES[d.getDay()]
+    const month = MONTH_NAMES[d.getMonth()]
+    const dayNum = d.getDate()
+    return `${dayName}, ${month} ${ordinal(dayNum)}`
+  }
+  return s
+}
+
 const INITIAL_STATE = {
   chapterOrCity: '',
   eventTitle: '',
@@ -676,55 +712,90 @@ function buildTalkAbstracts(form) {
   return talks.join('\n\n')
 }
 
-const LINKEDIN_OPENINGS = [
-  (groupName, when) => when ? `🎉 ${groupName} is hosting a meetup ${when}.` : `🎉 ${groupName} is hosting an upcoming meetup.`,
-  (groupName, when) => when ? `You're invited — ${groupName} meetup ${when}.` : `${groupName} has an upcoming meetup.`,
-  (groupName, when) => when ? `Join ${groupName} for a meetup ${when}.` : `Join ${groupName} for our next meetup.`,
-]
-const LINKEDIN_SPEAKERS = [
-  (n1, n2, n3, has2, has3) => has2 && has3 ? `👥 Featuring ${n1}, ${n2}, and ${n3}.` : has2 ? `👥 Featuring ${n1} and ${n2}.` : n1 ? `👥 Featuring ${n1}.` : '',
-  (n1, n2, n3, has2, has3) => has2 && has3 ? `👥 Talks from ${n1}, ${n2}, and ${n3}.` : has2 ? `👥 Talks from ${n1} and ${n2}.` : n1 ? `👥 Hear from ${n1}.` : '',
-  (n1, n2, n3, has2, has3) => has2 && has3 ? `👥 With ${n1}, ${n2}, and ${n3}.` : has2 ? `👥 With ${n1} and ${n2}.` : n1 ? `👥 ${n1} will be speaking.` : '',
-]
-const LINKEDIN_CLOSINGS = [
-  () => 'Hope to see you there! 🙌 #elastic #elasticcommunity #elasticmeetups',
-  () => 'See you there! 🙌 #elastic #elasticcommunity #elasticmeetups',
-  () => 'Can\'t wait! 🙌 #elastic #elasticcommunity #elasticmeetups',
-]
+function getLinkedInGroupName(form) {
+  const trim = (s) => (typeof s === 'string' ? s.trim() : '')
+  const cityRaw = trim(form.chapterOrCity)
+  const city = cityRaw || extractCity(form)
+  if (cityRaw && (cityRaw.includes('User Group') || cityRaw.includes('Elastic') || cityRaw.includes('Meetup'))) return cityRaw
+  if (city) return `Elastic ${city} User Group`
+  return 'Elastic community'
+}
 
 function buildLinkedInPost(form, variant = 0) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const v = variant % 3
-  const cityRaw = trim(form.chapterOrCity)
-  const city = cityRaw || extractCity(form)
-  const date = trim(form.date)
-  const time = trim(form.eventStartTime)
+  const groupName = getLinkedInGroupName(form)
+  const city = trim(form.chapterOrCity) || extractCity(form)
+  const dateStr = trim(form.date)
+  const dateFormatted = formatDateForLinkedIn(dateStr) || dateStr
   const venue = trim(form.venueName) || trim(form.venueAddress)
   const name1 = trim(form.speaker1Name)
+  const title1 = trim(form.speaker1Title)
+  const company1 = trim(form.speaker1Company)
   const name2 = trim(form.speaker2Name)
+  const title2 = trim(form.speaker2Title)
+  const company2 = trim(form.speaker2Company)
   const name3 = trim(form.speaker3Name)
+  const title3 = trim(form.speaker3Title)
+  const company3 = trim(form.speaker3Company)
   const hasSpeaker2 = [form.speaker2Name, form.speaker2Title, form.speaker2Company, form.speaker2TalkTitle, form.speaker2TalkAbstract].some((x) => trim(x).length > 0)
   const hasSpeaker3 = [form.speaker3Name, form.speaker3Title, form.speaker3Company, form.speaker3TalkTitle, form.speaker3TalkAbstract].some((x) => trim(x).length > 0)
-  const timezone = trim(form.timezone)
-  const groupName = city
-    ? (city.includes('User Group') || city.includes('Elastic') || city.includes('Meetup') ? city : `The Elastic ${city} User Group`)
-    : 'Our community'
-  let when = ''
-  if (date || time) {
-    when = [date, time].filter(Boolean).join(' at ')
-    const tzDisplay = getTimezoneDisplay(timezone)
-    if (tzDisplay) when += ` ${tzDisplay}`
+
+  const speakerCredits = (name, title, company) => {
+    if (!name) return ''
+    const parts = [name]
+    if (title || company) {
+      const cred = [title, company].filter(Boolean).join(' at ')
+      if (cred) parts.push(`(${cred})`)
+    }
+    return parts.join(' ')
   }
-  const parts = []
-  parts.push(LINKEDIN_OPENINGS[v](groupName, when))
-  if (venue) parts.push(`📍 ${venue}`)
-  const speakerLine = LINKEDIN_SPEAKERS[v](name1, name2, name3, hasSpeaker2, hasSpeaker3)
-  if (speakerLine) parts.push(speakerLine)
-  parts.push('')
-  parts.push(LINKEDIN_CLOSINGS[v]())
-  parts.push('')
-  parts.push('🔗 RSVP:')
-  parts.push('[Insert Meetup Link]')
+
+  const para1Variants = [
+    () => dateFormatted ? `Join the ${groupName} on ${dateFormatted} for an exciting meetup.` : `Join the ${groupName} for an exciting meetup.`,
+    () => dateFormatted ? `You're invited: join the ${groupName} on ${dateFormatted} for our next meetup.` : `You're invited: join the ${groupName} for our next meetup.`,
+    () => dateFormatted ? `Save the date — the ${groupName} is hosting a meetup on ${dateFormatted}.` : `The ${groupName} is hosting an upcoming meetup.`,
+  ]
+  let para2 = ''
+  const communityTail = city ? `with the ${city} tech and Elastic community` : 'with the local Elastic community'
+  if (hasSpeaker2 && hasSpeaker3 && name1 && name2 && name3) {
+    const cred1 = speakerCredits(name1, title1, company1)
+    const cred2 = speakerCredits(name2, title2, company2)
+    const cred3 = speakerCredits(name3, title3, company3)
+    const para2Variants = [
+      `We'll feature presentations from ${cred1}, ${cred2}, and ${cred3}, followed by networking, refreshments, and pizza ${communityTail}.`,
+      `We'll hear from ${cred1}, ${cred2}, and ${cred3}, followed by networking, refreshments, and pizza ${communityTail}.`,
+      `Presentations from ${cred1}, ${cred2}, and ${cred3}, followed by networking, refreshments, and pizza ${communityTail}.`,
+    ]
+    para2 = para2Variants[v]
+  } else if (hasSpeaker2 && name1 && name2) {
+    const cred1 = speakerCredits(name1, title1, company1)
+    const cred2 = speakerCredits(name2, title2, company2)
+    const para2Variants = [
+      `We'll feature presentations from ${cred1} and ${cred2}, followed by networking, refreshments, and pizza ${communityTail}.`,
+      `We'll hear from ${cred1} and ${cred2}, followed by networking, refreshments, and pizza ${communityTail}.`,
+      `Presentations from ${cred1} and ${cred2}, followed by networking, refreshments, and pizza ${communityTail}.`,
+    ]
+    para2 = para2Variants[v]
+  } else if (name1) {
+    const cred1 = speakerCredits(name1, title1, company1)
+    const para2Variants = [
+      `We'll feature a presentation from ${cred1}, followed by networking, refreshments, and pizza ${communityTail}.`,
+      `We'll hear from ${cred1}, followed by networking, refreshments, and pizza ${communityTail}.`,
+      `${cred1} will present, followed by networking, refreshments, and pizza ${communityTail}.`,
+    ]
+    para2 = para2Variants[v]
+  } else {
+    para2 = `We'll have community talks, followed by networking, refreshments, and pizza ${communityTail}.`
+  }
+
+  const venueLine = venue ? (v === 0 ? ` We'll be at ${venue}.` : v === 1 ? ` Location: ${venue}.` : '') : ''
+  if (venue && v === 2) para2 = para2.replace(/\.$/, ` at ${venue}.`)
+
+  const hashtagCity = city ? `#${city.replace(/\s+/g, '')}Tech` : '#ElasticMeetups'
+  const hashtags = `#Elastic #ElasticCommunity ${hashtagCity}`
+
+  const parts = [para1Variants[v](), '', para2 + venueLine, '', hashtags, '', '[Insert Meetup Link]']
   return parts.join('\n')
 }
 
