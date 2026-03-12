@@ -981,6 +981,8 @@ export default function App() {
   const [generatedCopy, setGeneratedCopy] = useState('')
   const [generatedSubject, setGeneratedSubject] = useState('')
   const [generatedOutreachLinkedIn, setGeneratedOutreachLinkedIn] = useState('')
+  const [linkedInPost, setLinkedInPost] = useState('')
+  const [intuitionRegenKey, setIntuitionRegenKey] = useState(0)
   const [subjectCopied, setSubjectCopied] = useState(false)
   const [copied, setCopied] = useState(false)
   const [linkedInCopied, setLinkedInCopied] = useState(false)
@@ -1093,7 +1095,29 @@ export default function App() {
       setGeneratedSubject('')
       setGeneratedCopy(generateMeetupCopy(form))
       setGeneratedOutreachLinkedIn('')
+      setLinkedInPost(buildLinkedInPost(form))
     }
+  }
+
+  const handleRegenMeetup = () => {
+    setGeneratedCopy(generateMeetupCopy(form))
+  }
+  const handleRegenLinkedIn = () => {
+    setLinkedInPost(buildLinkedInPost(form))
+  }
+  const handleRegenIntuition = () => {
+    setIntuitionRegenKey((k) => k + 1)
+  }
+  const handleRegenKbyg = () => {
+    setGeneratedSubject(generateKnowBeforeYouGoSubject(kbygForm))
+    setGeneratedCopy(generateKnowBeforeYouGoEmail(kbygForm, kbygIncludeTldr))
+  }
+  const handleRegenOutreachLinkedIn = () => {
+    setGeneratedOutreachLinkedIn(generateSpeakerOutreachLinkedIn(outreachForm))
+  }
+  const handleRegenOutreachEmail = () => {
+    setGeneratedSubject(generateSpeakerOutreachSubject(outreachForm))
+    setGeneratedCopy(generateSpeakerOutreachEmail(outreachForm))
   }
 
   const handleCopy = async () => {
@@ -1120,6 +1144,7 @@ export default function App() {
     setGeneratedCopy('')
     setGeneratedSubject('')
     setGeneratedOutreachLinkedIn('')
+    setLinkedInPost('')
   }
 
   const handleCopySubject = async () => {
@@ -1134,7 +1159,7 @@ export default function App() {
   }
 
   const handleCopyLinkedIn = async () => {
-    const post = buildLinkedInPost(form)
+    const post = linkedInPost || buildLinkedInPost(form)
     if (!post) return
     try {
       await navigator.clipboard.writeText(post)
@@ -1191,6 +1216,7 @@ export default function App() {
                     setGeneratedCopy('')
                     setGeneratedSubject('')
                     setGeneratedOutreachLinkedIn('')
+                    setLinkedInPost('')
                   }}
                   aria-pressed={generatorType === card.value}
                   aria-label={`Select ${card.title} generator`}
@@ -1662,11 +1688,11 @@ export default function App() {
               <legend>Channel</legend>
               <div className="channel-selector" role="group" aria-label="Outreach channel">
                 <label className={`channel-option ${outreachForm.channel === 'linkedin' ? 'channel-option-active' : ''}`}>
-                  <input type="radio" name="outreachChannel" value="linkedin" checked={outreachForm.channel === 'linkedin'} onChange={() => { setOutreachForm((p) => ({ ...p, channel: 'linkedin' })); setGeneratedSubject(''); setGeneratedCopy(''); setGeneratedOutreachLinkedIn(''); }} />
+                  <input type="radio" name="outreachChannel" value="linkedin" checked={outreachForm.channel === 'linkedin'} onChange={() => { setOutreachForm((p) => ({ ...p, channel: 'linkedin' })); setGeneratedSubject(''); setGeneratedCopy(''); setGeneratedOutreachLinkedIn(''); setLinkedInPost(''); }} />
                   <span>💬 LinkedIn Message</span>
                 </label>
                 <label className={`channel-option ${outreachForm.channel === 'email' ? 'channel-option-active' : ''}`}>
-                  <input type="radio" name="outreachChannel" value="email" checked={outreachForm.channel === 'email'} onChange={() => { setOutreachForm((p) => ({ ...p, channel: 'email' })); setGeneratedSubject(''); setGeneratedCopy(''); setGeneratedOutreachLinkedIn(''); }} />
+                  <input type="radio" name="outreachChannel" value="email" checked={outreachForm.channel === 'email'} onChange={() => { setOutreachForm((p) => ({ ...p, channel: 'email' })); setGeneratedSubject(''); setGeneratedCopy(''); setGeneratedOutreachLinkedIn(''); setLinkedInPost(''); }} />
                   <span>📧 Email</span>
                 </label>
               </div>
@@ -1728,9 +1754,12 @@ export default function App() {
                         <h3 className="subject-line-heading">LinkedIn Message</h3>
                         <pre className="output-text subject-line-text">{generatedOutreachLinkedIn}</pre>
                         <p className="outreach-char-count">{generatedOutreachLinkedIn.length} characters</p>
-                        <button type="button" onClick={handleCopyOutreachLinkedIn} className="btn-copy" aria-pressed={outreachLinkedInCopied}>
-                          {outreachLinkedInCopied ? 'Copied!' : 'Copy LinkedIn Message'}
-                        </button>
+                        <div className="output-actions">
+                          <button type="button" onClick={handleRegenOutreachLinkedIn} className="btn-regenerate" title="Regenerate this section">🔄 Regenerate</button>
+                          <button type="button" onClick={handleCopyOutreachLinkedIn} className="btn-copy" aria-pressed={outreachLinkedInCopied}>
+                            {outreachLinkedInCopied ? 'Copied!' : 'Copy LinkedIn Message'}
+                          </button>
+                        </div>
                       </div>
                     )}
                     {outreachForm.channel === 'email' && (generatedSubject || generatedCopy) && (
@@ -1739,18 +1768,24 @@ export default function App() {
                           <div className="subject-line-section outreach-output-card">
                             <h3 className="subject-line-heading">Subject</h3>
                             <pre className="output-text subject-line-text">{generatedSubject}</pre>
-                            <button type="button" onClick={handleCopySubject} className="btn-copy" aria-pressed={subjectCopied}>
-                              {subjectCopied ? 'Copied!' : 'Copy Subject'}
-                            </button>
+                            <div className="output-actions">
+                              <button type="button" onClick={handleRegenOutreachEmail} className="btn-regenerate" title="Regenerate this section">🔄 Regenerate</button>
+                              <button type="button" onClick={handleCopySubject} className="btn-copy" aria-pressed={subjectCopied}>
+                                {subjectCopied ? 'Copied!' : 'Copy Subject'}
+                              </button>
+                            </div>
                           </div>
                         )}
                         {generatedCopy && (
                           <div className="subject-line-section outreach-output-card">
                             <h3 className="subject-line-heading">Email Body</h3>
                             <pre className="output-text subject-line-text">{generatedCopy}</pre>
-                            <button type="button" onClick={handleCopy} className="btn-copy" aria-pressed={copied}>
-                              {copied ? 'Copied!' : 'Copy Email'}
-                            </button>
+                            <div className="output-actions">
+                              <button type="button" onClick={handleRegenOutreachEmail} className="btn-regenerate" title="Regenerate this section">🔄 Regenerate</button>
+                              <button type="button" onClick={handleCopy} className="btn-copy" aria-pressed={copied}>
+                                {copied ? 'Copied!' : 'Copy Email'}
+                              </button>
+                            </div>
                           </div>
                         )}
                       </>
@@ -1763,28 +1798,49 @@ export default function App() {
                       <div className="subject-line-section">
                         <h3 className="subject-line-heading">Subject Line</h3>
                         <pre className="output-text subject-line-text">{generatedSubject}</pre>
-                        <button type="button" onClick={handleCopySubject} className="btn-copy" aria-pressed={subjectCopied}>
-                          {subjectCopied ? 'Copied!' : 'Copy Subject'}
-                        </button>
+                        <div className="output-actions">
+                          <button type="button" onClick={handleRegenKbyg} className="btn-regenerate" title="Regenerate this section">🔄 Regenerate</button>
+                          <button type="button" onClick={handleCopySubject} className="btn-copy" aria-pressed={subjectCopied}>
+                            {subjectCopied ? 'Copied!' : 'Copy Subject'}
+                          </button>
+                        </div>
                       </div>
                     )}
                     <h3 className="generated-email-heading">Generated Email</h3>
                     <pre className="output-text">{generatedCopy}</pre>
+                    <div className="output-actions">
+                      <button type="button" onClick={handleRegenKbyg} className="btn-regenerate" title="Regenerate this section">🔄 Regenerate</button>
+                      <button type="button" onClick={handleCopy} className="btn-copy" aria-pressed={copied}>
+                        {copied ? 'Copied!' : 'Copy to clipboard'}
+                      </button>
+                    </div>
                   </>
                 )}
                 {generatorType === 'eventPromotion' && (
                   <>
                     <h3 className="generated-email-heading">Meetup Event Page Copy</h3>
                     <pre className="output-text">{generatedCopy}</pre>
-                    <div className="linkedin-section">
-                      <h3 className="linkedin-heading">📣 LinkedIn Promo Post</h3>
-                      <pre className="linkedin-text">{buildLinkedInPost(form)}</pre>
-                      <button type="button" onClick={handleCopyLinkedIn} className="btn-copy btn-copy-linkedin" aria-pressed={linkedInCopied}>
-                        {linkedInCopied ? 'Copied!' : 'Copy LinkedIn Post'}
+                    <div className="output-actions">
+                      <button type="button" onClick={handleRegenMeetup} className="btn-regenerate" title="Regenerate this section">🔄 Regenerate</button>
+                      <button type="button" onClick={handleCopy} className="btn-copy" aria-pressed={copied}>
+                        {copied ? 'Copied!' : 'Copy to clipboard'}
                       </button>
                     </div>
-                    <div className="linkedin-section intuition-email-section">
-                      <h3 className="linkedin-heading">Intuition Email Copy</h3>
+                    <div className="linkedin-section">
+                      <h3 className="linkedin-heading">📣 LinkedIn Promo Post</h3>
+                      <pre className="linkedin-text">{linkedInPost || buildLinkedInPost(form)}</pre>
+                      <div className="output-actions">
+                        <button type="button" onClick={handleRegenLinkedIn} className="btn-regenerate" title="Regenerate this section">🔄 Regenerate</button>
+                        <button type="button" onClick={handleCopyLinkedIn} className="btn-copy btn-copy-linkedin" aria-pressed={linkedInCopied}>
+                          {linkedInCopied ? 'Copied!' : 'Copy LinkedIn Post'}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="linkedin-section intuition-email-section" key={intuitionRegenKey}>
+                      <div className="section-heading-row">
+                        <h3 className="linkedin-heading">Intuition Email Copy</h3>
+                        <button type="button" onClick={handleRegenIntuition} className="btn-regenerate" title="Regenerate this section">🔄 Regenerate</button>
+                      </div>
                       <div className="subject-line-section">
                         <h4 className="intuition-subheading">Subject Line</h4>
                         <p className="intuition-subject-hint">Choose one (3–5 options, ~70 characters or less).</p>
