@@ -780,49 +780,111 @@ function getIntroTheme(talkTitle, talkAbstract) {
 }
 
 const TECHNICAL_HOOKS = [
-  { pattern: /\b(ai[- ]?powered\s+search|ai\s+search)\b/i, phrase: 'AI-powered search' },
-  { pattern: /\b(llm\s+queries?|llm[- ]?powered)\b/i, phrase: 'LLM queries' },
-  { pattern: /\bnatural\s+language\b/i, phrase: 'Natural language' },
-  { pattern: /\bzero[- ]?downtime\b/i, phrase: 'Zero-downtime' },
-  { pattern: /\breindex(ing)?\b/i, phrase: 'reindexing' },
-  { pattern: /\bblue[- ]?green\b/i, phrase: 'Blue-green deployment' },
-  { pattern: /\btime[- ]?series\b/i, phrase: 'Time-series analytics' },
-  { pattern: /\breal[- ]?time\s+(?:analytics|search|data)\b/i, phrase: 'Real-time analytics' },
-  { pattern: /\breal[- ]?time\b/i, phrase: 'Real-time' },
-  { pattern: /\bvector\s+search\b/i, phrase: 'Vector search' },
-  { pattern: /\b(knn|k\-?nn)\b/i, phrase: 'KNN search' },
-  { pattern: /\bobservability\b/i, phrase: 'Observability' },
-  { pattern: /\b(apm|application\s+performance)\b/i, phrase: 'APM' },
-  { pattern: /\bstreaming\s+data\b/i, phrase: 'Streaming data' },
-  { pattern: /\bkafka\b/i, phrase: 'Kafka' },
-  { pattern: /\bml\s+workloads?\b/i, phrase: 'ML workloads' },
-  { pattern: /\bmachine\s+learning\b/i, phrase: 'Machine learning' },
-  { pattern: /\belasticsearch\s+architectures?\b/i, phrase: 'Elasticsearch architectures' },
-  { pattern: /\bproduction\s+(?:use\s+cases?|deployments?)\b/i, phrase: 'Production use cases' },
+  { pattern: /\b(ai[- ]?powered\s+search|ai\s+search)\b/i, phrase: 'AI-powered search', priority: 10 },
+  { pattern: /\b(llm\s+queries?|llm[- ]?powered)\b/i, phrase: 'LLM queries', priority: 10 },
+  { pattern: /\bnatural\s+language\s+(?:search|to\s+elasticsearch|queries?)\b/i, phrase: 'Natural language to Elasticsearch', priority: 10 },
+  { pattern: /\bnatural\s+language\b/i, phrase: 'Natural language', priority: 9 },
+  { pattern: /\belasticsearch\s+queries?\b/i, phrase: 'Elasticsearch queries', priority: 9 },
+  { pattern: /\bzero[- ]?downtime\s+reindex(ing)?\b/i, phrase: 'Zero-downtime reindexing', priority: 10 },
+  { pattern: /\bzero[- ]?downtime\b/i, phrase: 'Zero-downtime', priority: 8 },
+  { pattern: /\breindex(ing)?\b/i, phrase: 'reindexing', priority: 7 },
+  { pattern: /\bblue[- ]?green\s+(?:deployments?|index)\b/i, phrase: 'Blue-green deployments', priority: 9 },
+  { pattern: /\bblue[- ]?green\b/i, phrase: 'Blue-green deployment', priority: 8 },
+  { pattern: /\btime[- ]?series\s+analytics\b/i, phrase: 'Time-series analytics', priority: 9 },
+  { pattern: /\btime[- ]?series\b/i, phrase: 'Time-series analytics', priority: 7 },
+  { pattern: /\breal[- ]?time\s+(?:analytics|search|data)\b/i, phrase: 'Real-time analytics', priority: 8 },
+  { pattern: /\breal[- ]?time\b/i, phrase: 'Real-time', priority: 6 },
+  { pattern: /\bproduction\s+elasticsearch\s+architectures?\b/i, phrase: 'Production Elasticsearch architectures', priority: 9 },
+  { pattern: /\belasticsearch\s+architectures?\b/i, phrase: 'Elasticsearch architectures', priority: 7 },
+  { pattern: /\binventory\s+analytics\b/i, phrase: 'Inventory analytics', priority: 8 },
+  { pattern: /\breal[- ]?world\s+engineering\b/i, phrase: 'Real-world engineering lessons', priority: 8 },
+  { pattern: /\bvector\s+search\b/i, phrase: 'Vector search', priority: 7 },
+  { pattern: /\b(knn|k\-?nn)\b/i, phrase: 'KNN search', priority: 7 },
+  { pattern: /\bobservability\b/i, phrase: 'Observability', priority: 6 },
+  { pattern: /\b(apm|application\s+performance)\b/i, phrase: 'APM', priority: 6 },
+  { pattern: /\bstreaming\s+data\b/i, phrase: 'Streaming data', priority: 6 },
+  { pattern: /\bkafka\b/i, phrase: 'Kafka', priority: 6 },
+  { pattern: /\bml\s+workloads?\b/i, phrase: 'ML workloads', priority: 6 },
+  { pattern: /\bmachine\s+learning\b/i, phrase: 'Machine learning', priority: 6 },
+  { pattern: /\bproduction\s+(?:use\s+cases?|deployments?)\b/i, phrase: 'Production use cases', priority: 5 },
 ]
 
 function getTechnicalHooks(talkTitle, talkAbstract) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
-  const text = `${trim(talkTitle)} ${trim(talkAbstract)}`.toLowerCase()
+  const text = `${trim(talkTitle)} ${trim(talkAbstract)}`
+  const lower = text.toLowerCase()
   const seen = new Set()
   const hooks = []
-  for (const { pattern, phrase } of TECHNICAL_HOOKS) {
-    if (pattern.test(text) && !seen.has(phrase)) {
+  for (const { pattern, phrase, priority } of TECHNICAL_HOOKS) {
+    const re = new RegExp(pattern.source, pattern.flags)
+    if (re.test(lower) && !seen.has(phrase)) {
       seen.add(phrase)
-      hooks.push(phrase)
+      hooks.push({ phrase, priority: priority || 5 })
     }
   }
-  return hooks
+  return hooks.sort((a, b) => (b.priority - a.priority)).map((h) => h.phrase)
+}
+
+function extractKeyThemes(form) {
+  const hooks1 = getTechnicalHooks(form.speaker1TalkTitle, form.speaker1TalkAbstract)
+  const hooks2 = getTechnicalHooks(form.speaker2TalkTitle, form.speaker2TalkAbstract)
+  const all = []
+  const seen = new Set()
+  for (const p of [...hooks1, ...hooks2]) {
+    if (!seen.has(p)) {
+      seen.add(p)
+      all.push(p)
+    }
+  }
+  if (all.length === 0) return []
+  const theme1 = all[0]
+  if (all.length === 1) return [theme1]
+  const a = all[0]
+  const b = all[1]
+  if ((a === 'Zero-downtime' && b === 'reindexing') || (a === 'reindexing' && b === 'Zero-downtime')) return ['Zero-downtime reindexing']
+  if ((a === 'Zero-downtime' && b !== 'reindexing') || (b === 'Zero-downtime' && a !== 'reindexing')) {
+    const other = a === 'Zero-downtime' ? b : a
+    return ['Zero-downtime reindexing', other]
+  }
+  if ((a === 'Natural language' || a === 'Natural language to Elasticsearch') && (b && (b.toLowerCase().includes('elasticsearch') || b === 'Elasticsearch queries'))) return ['Natural language to Elasticsearch']
+  return [theme1, b].filter(Boolean).slice(0, 2)
 }
 
 function getCombinedHook(hooks, maxLen = 38) {
   if (!hooks.length) return null
-  if (hooks.length === 1) return hooks[0]
-  const [a, b] = hooks
-  if ((a === 'Zero-downtime' && b === 'reindexing') || (a === 'reindexing' && b === 'Zero-downtime')) return 'Zero-downtime reindexing'
-  if ((a === 'Natural language' && b.includes('Elasticsearch')) || (b === 'Natural language' && a.includes('search'))) return 'Natural language to Elasticsearch'
-  const withPlus = `${a} + ${b}`
-  return withPlus.length <= maxLen ? withPlus : a
+  const themes = extractKeyThemesFromHooks(hooks)
+  if (themes.length === 1) return themes[0]
+  if (themes.length >= 2) {
+    const [t1, t2] = themes
+    if ((t1 === 'Zero-downtime' && t2 === 'reindexing') || (t1 === 'reindexing' && t2 === 'Zero-downtime')) return 'Zero-downtime reindexing'
+    const withPlus = `${t1} + ${t2}`
+    return withPlus.length <= maxLen ? withPlus : t1
+  }
+  return hooks[0]
+}
+
+function extractKeyThemesFromHooks(hooks) {
+  if (!hooks.length) return []
+  const seen = new Set()
+  const out = []
+  for (const h of hooks) {
+    if (seen.has(h)) continue
+    if ((h === 'Zero-downtime' || h === 'reindexing') && (hooks.includes('Zero-downtime') && hooks.includes('reindexing'))) {
+      if (!seen.has('Zero-downtime reindexing')) {
+        out.push('Zero-downtime reindexing')
+        seen.add('Zero-downtime')
+        seen.add('reindexing')
+        seen.add('Zero-downtime reindexing')
+      }
+      continue
+    }
+    if (h === 'Zero-downtime' || h === 'reindexing') continue
+    seen.add(h)
+    out.push(h)
+  }
+  if (out.length === 0 && hooks.includes('Zero-downtime')) out.push('Zero-downtime reindexing')
+  if (out.length === 0) return hooks.slice(0, 2)
+  return out.slice(0, 2)
 }
 
 const SUBJECT_TOPIC_PHRASES = {
@@ -881,25 +943,37 @@ function buildIntuitionEmailSubjects(form, variant = 0) {
   const title = trim(form.eventTitle)
   const date = trim(form.date)
   const city = getCityForIntuition(form)
+
+  const keyThemes = extractKeyThemes(form)
   const hooks1 = getTechnicalHooks(form.speaker1TalkTitle, form.speaker1TalkAbstract)
   const hooks2 = getTechnicalHooks(form.speaker2TalkTitle, form.speaker2TalkAbstract)
-  const allHooks = [...new Set([...hooks1, ...hooks2])]
-  const hook = getCombinedHook(allHooks) || (allHooks[0] || null)
+  const allHooks = []
+  const seenHook = new Set()
+  for (const p of [...hooks1, ...hooks2]) {
+    if (!seenHook.has(p)) {
+      seenHook.add(p)
+      allHooks.push(p)
+    }
+  }
+  const hook = keyThemes.length > 0 ? keyThemes[0] : (getCombinedHook(allHooks) || (allHooks[0] || null))
+  const hook2 = keyThemes.length >= 2 ? keyThemes[1] : (allHooks[1] || null)
   const topic1 = getSubjectTopic(form.speaker1TalkTitle, form.speaker1TalkAbstract)
   const topic2 = trim(form.speaker2TalkTitle) ? getSubjectTopic(form.speaker2TalkTitle, form.speaker2TalkAbstract) : ''
   const topic = topic1 || topic2 || 'Real-world use cases'
   const topicNoSuffix = topic.replace(/\s+with Elastic$/i, '').trim() || topic
   const addWithElastic = (t) => (/\s+with Elastic$/i.test(t) ? t : `${t} with Elastic`)
+  const isGenericTopic = (t) => /^Search with Elasticsearch$/i.test(t) || /^Real-world use cases$/i.test(t)
+  const useGenericFallbacks = !hook || isGenericTopic(topic)
   const options = []
 
-  if (hook) {
+  if (hook && !isGenericTopic(hook)) {
     options.push(capSubject(`${hook} with Elasticsearch — ${city || 'Elastic Meetup'}`))
     options.push(capSubject(`${hook}: Real-world Elasticsearch lessons`))
     if (city) {
       options.push(capSubject(`From ${hook} to Elasticsearch: ${city} Meetup`))
       options.push(capSubject(`Building ${hook} with Elasticsearch — ${city}`))
       options.push(capSubject(`${hook} — ${city} Elastic Meetup`))
-      if (allHooks.length >= 2) options.push(capSubject(`${getCombinedHook(allHooks.slice(0, 2), 32)} — ${city}`))
+      if (hook2 && (hook + hook2).length < 50) options.push(capSubject(`${hook} + ${hook2} — ${city}`))
     } else {
       options.push(capSubject(`From ${hook} to Elasticsearch: Elastic Meetup`))
       options.push(capSubject(`Building ${hook} with Elasticsearch`))
@@ -907,25 +981,31 @@ function buildIntuitionEmailSubjects(form, variant = 0) {
   }
 
   if (city) {
-    options.push(capSubject(`${city} Elastic Meetup: ${topic}`))
-    options.push(capSubject(`${addWithElastic(topicNoSuffix)} — ${city} Meetup`))
-    options.push(capSubject(`How teams use ${topicNoSuffix} — ${city} Meetup`))
-    if (date) {
-      options.push(capSubject(`${city} Elastic Meetup on ${date}: ${topic}`))
-      options.push(capSubject(`${city} on ${date}: ${hook || addWithElastic(topicNoSuffix)}`))
+    if (date && hook && !isGenericTopic(hook)) {
+      options.push(capSubject(`${city} Elastic Meetup on ${date}: ${hook}`))
     }
-    if (hook) options.push(capSubject(`${hook} with Elasticsearch — ${city}`))
+    if (useGenericFallbacks || !hook) {
+      options.push(capSubject(`${city} Elastic Meetup: ${topic}`))
+      options.push(capSubject(`${addWithElastic(topicNoSuffix)} — ${city} Meetup`))
+      options.push(capSubject(`How teams use ${topicNoSuffix} — ${city} Meetup`))
+    }
+    if (date) {
+      options.push(capSubject(`${city} Elastic Meetup on ${date}: ${hook || topic}`))
+      options.push(capSubject(`${city} on ${date}: ${hook ? hook + ' with Elasticsearch' : addWithElastic(topicNoSuffix)}`))
+    }
   }
 
   if (date && !city) {
-    options.push(capSubject(`Elastic Meetup on ${date}: ${topic}`))
+    options.push(capSubject(`Elastic Meetup on ${date}: ${hook || topic}`))
     options.push(capSubject(`${hook ? hook + ' with Elasticsearch' : addWithElastic(topicNoSuffix)} — ${date}`))
   }
 
-  const realWorldLine = topic === 'Real-world use cases' ? 'Real-world Elastic use cases' : `Real-world ${topicNoSuffix} with Elastic`
-  options.push(capSubject(realWorldLine))
-  if (topic !== 'Real-world use cases') options.push(capSubject(`${addWithElastic(topicNoSuffix)} — community meetup`))
-  options.push(capSubject(`Elastic Meetup: ${topic}`))
+  if (useGenericFallbacks) {
+    const realWorldLine = topic === 'Real-world use cases' ? 'Real-world Elastic use cases' : `Real-world ${topicNoSuffix} with Elastic`
+    options.push(capSubject(realWorldLine))
+    options.push(capSubject(`${addWithElastic(topicNoSuffix)} — community meetup`))
+  }
+  options.push(capSubject(`Elastic Meetup: ${hook || topic}`))
 
   if (title && title.length <= 50) {
     if (city) options.push(capSubject(`${city} Elastic Meetup: ${title}`))
@@ -934,15 +1014,18 @@ function buildIntuitionEmailSubjects(form, variant = 0) {
 
   const seen = new Set()
   const dedupe = options.filter((o) => {
-    if (!o || o.length > MAX_SUBJECT_LENGTH) return false
-    const k = o.slice(0, 52)
+    const s = (o || '').trim()
+    if (!s || s.length > MAX_SUBJECT_LENGTH) return false
+    if (useGenericFallbacks && /Search with Elasticsearch/i.test(s) && keyThemes.length > 0) return false
+    const k = s.slice(0, 52)
     if (seen.has(k)) return false
     seen.add(k)
     return true
   })
   let result = dedupe.slice(0, 5).map((o) => capSubject(o))
   if (result.length < 3) {
-    const extra = [capSubject(`${topic} and Elastic community`), capSubject(`Elastic: ${topic} talks`), capSubject(`Meetup: ${addWithElastic(topicNoSuffix)}`)].filter((o) => o && !result.includes(o))
+    const fallbackTopic = hook || topic
+    const extra = [capSubject(`${fallbackTopic} and Elastic community`), capSubject(`Elastic: ${fallbackTopic} talks`), capSubject(`Meetup: ${hook ? hook + ' with Elasticsearch' : addWithElastic(topicNoSuffix)}`)].filter((o) => o && !result.includes(o))
     result = [...result, ...extra].slice(0, 5)
   }
   return result
