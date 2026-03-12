@@ -757,7 +757,8 @@ function getTalkTheme(talkTitle, talkAbstract) {
 
 function getIntroTheme(talkTitle, talkAbstract) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
-  const title = trim(talkTitle)
+  const rawTitle = trim(talkTitle)
+  const title = cleanTalkInput(rawTitle) || rawTitle
   const lower = title.toLowerCase()
   if (!title) return getTalkTheme(talkTitle, talkAbstract)
   if (title.length <= 45) return title
@@ -770,6 +771,8 @@ function getIntroTheme(talkTitle, talkAbstract) {
   if (/\b(streaming|real-time)\s+data\s+.+/i.test(lower)) return 'streaming data architectures'
   if (/\bkafka\b/i.test(lower)) return 'streaming data and Kafka'
   if (/\b(mcp|model context protocol)\b/i.test(lower)) return 'the Model Context Protocol (MCP)'
+  if (/\b(long[- ]?term\s+health|health\s+tracking)\b/i.test(lower)) return 'long-term health tracking with Elasticsearch'
+  if (/\b(ai|ml|machine learning)\b/i.test(lower)) return 'emerging AI development patterns'
   const theme = getTalkTheme(talkTitle, talkAbstract)
   if (theme !== 'real-world Elastic use cases') return theme
   const words = title.split(/\s+/).slice(0, 5).join(' ')
@@ -876,60 +879,76 @@ const WHY_ATTEND_INTROS = [
   'Learn how ',
   'Hear how ',
   'Explore how ',
-  'Get a real-world look at ',
-  'See how ',
+  'Get a practical look at ',
+  'Understand how ',
 ]
 
-function toLearningOutcomeBullet(talkTitle, talkAbstract, introIndex) {
+function cleanTalkInput(text) {
+  if (!text || typeof text !== 'string') return ''
+  let s = text.trim().replace(/\s+/g, ' ')
+  const stripPatterns = [
+    /^this\s+talk\s+will\s+(?:introduce|cover|explore|discuss|present|walk\s+through)\s+/i,
+    /^in\s+this\s+(?:session|talk|presentation)\s+(?:\w+\s+)?(?:we'll|we\s+will|you'll|i'll)?\s*(?:explore|cover|discuss|introduce|walk\s+through)?\s*/i,
+    /^in\s+this\s+(?:session|talk)\s*,?\s*/i,
+    /^(?:\w+\s+){1,3}will\s+(?:discuss|cover|explore|present|speak\s+about|be\s+speaking\s+about)\s+/i,
+    /^the\s+speaker\s+will\s+(?:discuss|cover|explore|present)\s+/i,
+    /^(?:we'll|we\s+will)\s+(?:explore|cover|discuss|introduce|walk\s+through)\s+/i,
+    /^(?:this\s+)?(?:session\s+)?(?:will\s+)?(?:introduce|cover|discuss)\s+/i,
+  ]
+  for (const re of stripPatterns) {
+    s = s.replace(re, '').trim()
+  }
+  return s.replace(/^\.+\s*/, '').trim()
+}
+
+function extractTopicForBullet(talkTitle, talkAbstract) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const title = trim(talkTitle)
   const abstract = trim(talkAbstract)
+  const cleanedAbs = cleanTalkInput(abstract)
+  const cleanedTitle = cleanTalkInput(title)
+  const text = `${cleanedTitle} ${cleanedAbs}`.trim() || `${title} ${abstract}`.trim()
+  const lower = text.toLowerCase()
+
+  if (!text) return null
+
+  const cap = (s) => (s.length ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s)
+  const short = (phrase, maxWords = 12) => {
+    const w = phrase.trim().split(/\s+/)
+    if (w.length <= maxWords) return phrase.trim()
+    return w.slice(0, maxWords).join(' ').trim()
+  }
+
+  if (/\b(model context protocol|mcp)\b/i.test(text)) return short('the Model Context Protocol (MCP) helps developers build smarter AI applications')
+  if (/\bkafka\b/i.test(lower) || /\bstreaming\s+data\b/i.test(lower)) return short('streaming data architectures power modern applications')
+  if (/\bkubernetes\s+operator\b/i.test(lower) && /\beks\b/i.test(lower)) return short('a Kubernetes operator improves ML workload resilience on AWS EKS')
+  if (/\b(search|elasticsearch|relevance)\b/i.test(lower)) return short('teams build better search and relevance with Elastic')
+  if (/\b(observability|apm|logging)\b/i.test(lower)) return short('observability and monitoring work in production')
+  if (/\b(ai|ml|machine learning)\b/i.test(lower)) return short('AI and ML use cases with Elastic')
+  if (/\b(pipeline|ingest)\b/i.test(lower)) return short('data pipelines and ingest scale in practice')
+  if (/\b(long[- ]?term\s+health|health\s+tracking)\b/i.test(lower)) return short('long-term health tracking with Elasticsearch')
+  if (cleanedAbs.length > 15) {
+    const first = cleanedAbs.split(/[.!?]/)[0].trim()
+    if (first.length > 20 && first.length < 120 && !/^(this|in\s+this|the\s+speaker)\s+/i.test(first)) return short(first, 12)
+  }
+  const useTitle = cleanedTitle.length > 0 ? cleanedTitle : title
+  if (useTitle.length <= 50) {
+    const t = useTitle.toLowerCase()
+    if (t.includes(' with ')) return short(cap(t.replace(/\bwith\s+/, 'and ')) + ' in practice')
+    if (t.includes(' for ')) return short('teams use ' + cap(t.split(/\s+for\s+/)[1] || t) + ' in production')
+    return short(cap(useTitle) + ' in practice')
+  }
+  const words = useTitle.split(/\s+/).slice(0, 6).join(' ')
+  return short(cap(words) + ' in practice')
+}
+
+function toLearningOutcomeBullet(talkTitle, talkAbstract, introIndex) {
   const intro = WHY_ATTEND_INTROS[introIndex % WHY_ATTEND_INTROS.length]
-
-  if (!title && !abstract) return null
-
-  let topic = ''
-  if (abstract && abstract.length > 20) {
-    const firstSentence = abstract.split(/[.!?]/)[0].trim()
-    const snippet = firstSentence.length > 12 ? firstSentence.slice(0, 80) : abstract.slice(0, 80)
-    topic = snippet.replace(/\s+/g, ' ').trim()
-    if (!topic.endsWith('.') && !topic.endsWith(',')) topic += '.'
-    topic = topic.toLowerCase().replace(/^./, (c) => c.toUpperCase())
-  }
-  if (!topic && title) {
-    const t = title.toLowerCase().trim()
-    if (t.includes(' with ')) {
-      const [a, b] = t.split(/\s+with\s+/, 2).map((s) => s.trim())
-      const a2 = a.replace(/\b(longterm|long-term)\b/gi, 'long-term').replace(/^./, (c) => c.toUpperCase())
-      const b2 = b.replace(/^(a|an|the)\s+/i, '').replace(/^./, (c) => c.toUpperCase())
-      if (/\w+ing\s/.test(a) || a.endsWith('ing')) {
-        const parts = a.split(/\s+/)
-        const first = parts[0]
-        const rest = parts.slice(1).join(' ')
-        const nounPhrase = rest ? `${rest} ${first}`.trim() : first
-        topic = `Elastic can support real-world ${nounPhrase.replace(/\blongterm\b/gi, 'long-term')} use cases`
-      } else {
-        topic = `${a2} and ${b2} work in practice`
-      }
-    } else if (t.includes(' for ')) {
-      const [a, b] = t.split(/\s+for\s+/, 2).map((s) => s.trim())
-      const b2 = b.replace(/^./, (c) => c.toUpperCase())
-      const aShort = a.replace(/\b(operator|solution|strategy|strategies)\b/gi, '').trim().replace(/^./, (c) => c.toUpperCase())
-      topic = `engineers are improving ${b2} with ${aShort} strategies`
-    } else if (t.split(/\s+/).length <= 4) {
-      topic = t.replace(/^./, (c) => c.toUpperCase()) + ' works in practice'
-    } else {
-      topic = t.replace(/^./, (c) => c.toUpperCase())
-    }
-  }
+  const topic = extractTopicForBullet(talkTitle, talkAbstract)
   if (!topic) return null
-
   const tail = topic.endsWith('.') ? topic.slice(0, -1) : topic
-  if (intro === 'Get a real-world look at ' || intro === 'Explore how ') {
-    return intro + tail + '.'
-  }
-  if (tail.toLowerCase().startsWith('how ') || tail.toLowerCase().startsWith('engineers ') || tail.toLowerCase().startsWith('teams ')) {
-    return (intro === 'Hear how ' ? 'Hear ' : intro.slice(0, -5) + ' ') + tail + '.'
+  if (tail.toLowerCase().startsWith('how ') || tail.toLowerCase().startsWith('the ') || tail.toLowerCase().startsWith('teams ')) {
+    return intro === 'Hear how ' ? `Hear ${tail}.` : intro.slice(0, -5) + ' ' + tail + '.'
   }
   return intro + tail + '.'
 }
