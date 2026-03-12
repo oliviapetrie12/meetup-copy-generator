@@ -725,7 +725,7 @@ function buildLinkedInPost(form, variant = 0) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const v = variant % 3
   const groupName = getLinkedInGroupName(form)
-  const city = trim(form.chapterOrCity) || extractCity(form)
+  const city = extractCity(form) || trim(form.chapterOrCity)
   const dateStr = trim(form.date)
   const dateFormatted = formatDateForLinkedIn(dateStr) || dateStr
   const venue = trim(form.venueName) || trim(form.venueAddress)
@@ -797,9 +797,15 @@ function buildLinkedInPost(form, variant = 0) {
     ? `After the talks, stick around for pizza, refreshments, and networking ${communityLine}.`
     : `After the talk, stick around for pizza, refreshments, and networking ${communityLine}.`
 
+  const cityForHashtag = extractCity(form)
+  const shortCityTag = cityForHashtag && cityForHashtag.length <= 20 && cityForHashtag.split(/\s+/).length <= 2
+    ? ` #${cityForHashtag.replace(/\s+/g, '')}Tech`
+    : ' #ElasticMeetups'
+  const hashtags = `#Elastic #ElasticCommunity${shortCityTag}`
+
   const parts = [para1Variants[v](), '', para2, '', para3]
   if (venue) parts.push('', `📍 ${venue}`)
-  parts.push('', '👉 RSVP: [Meetup Link]', '', '#Elastic #ElasticCommunity' + (city ? ` #${String(city).replace(/\s+/g, '')}Tech` : ' #ElasticMeetups'))
+  parts.push('', '👉 RSVP: [Meetup Link]', '', hashtags)
   return parts.join('\n')
 }
 
