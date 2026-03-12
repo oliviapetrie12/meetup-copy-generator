@@ -1788,14 +1788,23 @@ export default function App() {
             {generatedCopy || (generatorType === 'speakerOutreach' && (generatedSubject || generatedOutreachLinkedIn)) ? (
               <>
                 {generatorType === 'speakerOutreach' && (
-                  <>
+                  <div className="outreach-output-wrapper">
+                    <div className="section-heading-row outreach-actions-row">
+                      <h3 className="subject-line-heading">Outreach output</h3>
+                      <div className="output-actions">
+                        {outreachForm.channel === 'linkedin' ? (
+                          <button type="button" onClick={handleRegenOutreachLinkedIn} className="btn-regenerate" title="Regenerate this section">🔄 Regenerate</button>
+                        ) : (
+                          <button type="button" onClick={handleRegenOutreachEmail} className="btn-regenerate" title="Regenerate this section">🔄 Regenerate</button>
+                        )}
+                      </div>
+                    </div>
                     {outreachForm.channel === 'linkedin' && generatedOutreachLinkedIn && (
                       <div className="subject-line-section outreach-output-card">
-                        <h3 className="subject-line-heading">LinkedIn Message</h3>
+                        <h3 className="subject-line-heading">💬 LinkedIn Message</h3>
                         <pre className="output-text subject-line-text">{generatedOutreachLinkedIn}</pre>
                         <p className="outreach-char-count">{generatedOutreachLinkedIn.length} characters</p>
                         <div className="output-actions">
-                          <button type="button" onClick={handleRegenOutreachLinkedIn} className="btn-regenerate" title="Regenerate this section">🔄 Regenerate</button>
                           <button type="button" onClick={handleCopyOutreachLinkedIn} className="btn-copy" aria-pressed={outreachLinkedInCopied}>
                             {outreachLinkedInCopied ? 'Copied!' : 'Copy LinkedIn Message'}
                           </button>
@@ -1809,7 +1818,6 @@ export default function App() {
                             <h3 className="subject-line-heading">Subject</h3>
                             <pre className="output-text subject-line-text">{generatedSubject}</pre>
                             <div className="output-actions">
-                              <button type="button" onClick={handleRegenOutreachEmail} className="btn-regenerate" title="Regenerate this section">🔄 Regenerate</button>
                               <button type="button" onClick={handleCopySubject} className="btn-copy" aria-pressed={subjectCopied}>
                                 {subjectCopied ? 'Copied!' : 'Copy Subject'}
                               </button>
@@ -1818,10 +1826,9 @@ export default function App() {
                         )}
                         {generatedCopy && (
                           <div className="subject-line-section outreach-output-card">
-                            <h3 className="subject-line-heading">Email Body</h3>
+                            <h3 className="subject-line-heading">📧 Email Body</h3>
                             <pre className="output-text subject-line-text">{generatedCopy}</pre>
                             <div className="output-actions">
-                              <button type="button" onClick={handleRegenOutreachEmail} className="btn-regenerate" title="Regenerate this section">🔄 Regenerate</button>
                               <button type="button" onClick={handleCopy} className="btn-copy" aria-pressed={copied}>
                                 {copied ? 'Copied!' : 'Copy Email'}
                               </button>
@@ -1830,7 +1837,7 @@ export default function App() {
                         )}
                       </>
                     )}
-                  </>
+                  </div>
                 )}
                 {generatorType === 'knowBeforeYouGo' && (
                   <>

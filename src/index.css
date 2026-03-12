@@ -327,6 +327,14 @@ body {
   margin-bottom: 1rem;
 }
 
+.outreach-output-wrapper {
+  margin-bottom: 0;
+}
+
+.outreach-output-wrapper .section-heading-row.outreach-actions-row {
+  margin-bottom: 1rem;
+}
+
 .outreach-char-count {
   margin: 0 0 0.5rem;
   font-size: 0.8rem;
