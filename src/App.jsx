@@ -203,6 +203,24 @@ const GENERATOR_TYPES = [
   { value: 'speakerOutreach', label: 'Speaker Outreach' },
 ]
 
+const GENERATOR_CARDS = [
+  {
+    value: 'eventPromotion',
+    title: 'Event Promotion',
+    description: 'Generate Meetup event page copy and a LinkedIn promo post.',
+  },
+  {
+    value: 'knowBeforeYouGo',
+    title: 'Meetup Know Before You Go',
+    description: 'Generate the speaker and host logistics email including TL;DR, agenda, and contacts.',
+  },
+  {
+    value: 'speakerOutreach',
+    title: 'Speaker Outreach',
+    description: 'Generate a speaker outreach email and LinkedIn message.',
+  },
+]
+
 const KBYG_INITIAL_STATE = {
   recipients: '',
   greetingNames: '',
@@ -441,7 +459,7 @@ function generateSpeakerOutreachEmail(form) {
     const context = []
     if (chapter) context.push(`We run the ${chapter} and`)
     if (theme) context.push(`we're focusing on ${theme} for an upcoming meetup.`)
-    else if (chapter) context.push("we'd love to have you speak at an upcoming meetup.")
+    else if (chapter) context.push("We'd love to have you speak at an upcoming meetup.")
     if (context.length) lines.push(context.join(' ').replace(/\s+/g, ' ').trim())
     if (talkIdea) lines.push(talkIdea.endsWith('.') ? talkIdea : `${talkIdea}.`)
     if (context.length || talkIdea) lines.push('')
@@ -965,26 +983,29 @@ export default function App() {
       <div className="layout">
         <>
         <aside className="form-panel">
-          <label className="generator-type-label">
-            Generator Type
-            <select
-              value={generatorType}
-              onChange={(e) => {
-                setGeneratorType(e.target.value)
-                setGeneratedCopy('')
-                setGeneratedSubject('')
-                setGeneratedOutreachLinkedIn('')
-              }}
-              className="generator-type-select"
-              aria-label="Generator type"
-            >
-              {GENERATOR_TYPES.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
+          <section className="generator-chooser" aria-label="Choose a generator">
+            <h2 className="generator-chooser-heading">Choose a Generator</h2>
+            <div className="generator-cards">
+              {GENERATOR_CARDS.map((card) => (
+                <button
+                  key={card.value}
+                  type="button"
+                  className={`generator-card ${generatorType === card.value ? 'generator-card-active' : ''}`}
+                  onClick={() => {
+                    setGeneratorType(card.value)
+                    setGeneratedCopy('')
+                    setGeneratedSubject('')
+                    setGeneratedOutreachLinkedIn('')
+                  }}
+                  aria-pressed={generatorType === card.value}
+                  aria-label={`Select ${card.title} generator`}
+                >
+                  <span className="generator-card-title">{card.title}</span>
+                  <span className="generator-card-description">{card.description}</span>
+                </button>
               ))}
-            </select>
-          </label>
+            </div>
+          </section>
 
           {generatorType === 'eventPromotion' && (
           <form
