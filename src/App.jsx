@@ -976,22 +976,43 @@ function buildIntuitionEmailBody(form, variant = 0) {
   const theme2 = hasTalk2 ? getIntroTheme(form.speaker2TalkTitle, form.speaker2TalkAbstract) : ''
   const hasTalk1 = [form.speaker1TalkTitle, form.speaker1TalkAbstract].some((x) => trim(x).length > 0)
 
-  let sentence1 = 'Join us for the next Elastic meetup.'
-  if (date && city) sentence1 = `Join us on ${date} for the next Elastic meetup in ${city}.`
-  else if (date) sentence1 = `Join us on ${date} for the next Elastic meetup.`
-  else if (city) sentence1 = `Join us in ${city} for the next Elastic meetup.`
-
-  let sentence2 = "We'll hear from community speakers sharing insights on practical Elastic use cases."
-  if (hasTalk1 && hasTalk2 && theme2) {
-    sentence2 = `We'll hear from community speakers sharing insights on ${theme1} and ${theme2}.`
-  } else if (hasTalk1) {
-    sentence2 = `We'll hear from community speakers sharing insights on ${theme1}.`
-  }
-
   const communityName = city ? `the ${city} Elastic community` : 'the local Elastic community'
-  const sentence3 = `We'll wrap up the evening with networking and conversations with ${communityName}.`
-
-  const intro = `${sentence1} ${sentence2} ${sentence3}`
+  const intros = [
+    (() => {
+      let s1 = 'Join us for the next Elastic meetup.'
+      if (date && city) s1 = `Join us on ${date} for the next Elastic meetup in ${city}.`
+      else if (date) s1 = `Join us on ${date} for the next Elastic meetup.`
+      else if (city) s1 = `Join us in ${city} for the next Elastic meetup.`
+      let s2 = "We'll hear from community speakers sharing insights on practical Elastic use cases."
+      if (hasTalk1 && hasTalk2 && theme2) s2 = `We'll hear from community speakers sharing insights on ${theme1} and ${theme2}.`
+      else if (hasTalk1) s2 = `We'll hear from community speakers sharing insights on ${theme1}.`
+      const s3 = `We'll wrap up the evening with networking and conversations with ${communityName}.`
+      return `${s1} ${s2} ${s3}`
+    })(),
+    (() => {
+      let s1 = 'You\'re invited — join us for the next Elastic meetup.'
+      if (date && city) s1 = `You're invited — join us on ${date} for the next Elastic meetup in ${city}.`
+      else if (date) s1 = `You're invited — join us on ${date} for the next Elastic meetup.`
+      else if (city) s1 = `You're invited — join us in ${city} for the next Elastic meetup.`
+      let s2 = 'Community speakers will share insights on practical Elastic use cases.'
+      if (hasTalk1 && hasTalk2 && theme2) s2 = `Community speakers will share insights on ${theme1} and ${theme2}.`
+      else if (hasTalk1) s2 = `Community speakers will share insights on ${theme1}.`
+      const s3 = `We'll close with networking and conversations with ${communityName}.`
+      return `${s1} ${s2} ${s3}`
+    })(),
+    (() => {
+      let s1 = 'Save the date for the next Elastic meetup.'
+      if (date && city) s1 = `Save the date: ${date}. We're hosting the next Elastic meetup in ${city}.`
+      else if (date) s1 = `Save the date: ${date}. We're hosting the next Elastic meetup.`
+      else if (city) s1 = `We're hosting the next Elastic meetup in ${city}.`
+      let s2 = 'We\'ll hear from the community on practical Elastic use cases.'
+      if (hasTalk1 && hasTalk2 && theme2) s2 = `We'll hear from the community on ${theme1} and ${theme2}.`
+      else if (hasTalk1) s2 = `We'll hear from the community on ${theme1}.`
+      const s3 = `We'll wrap up with networking and the ${communityName}.`
+      return `${s1} ${s2} ${s3}`
+    })(),
+  ]
+  const intro = intros[v]
   const closings = [
     'We would love to see you there.',
     'Hope you can join us.',
@@ -1143,7 +1164,7 @@ export default function App() {
   const [linkedInPost, setLinkedInPost] = useState('')
   const [linkedinVariant, setLinkedinVariant] = useState(0)
   const [outreachVariant, setOutreachVariant] = useState(0)
-  const [intuitionVariant, setIntuitionVariant] = useState(0)
+  const [emailBodyVariant, setEmailBodyVariant] = useState(0)
   const [subjectCopied, setSubjectCopied] = useState(false)
   const [copied, setCopied] = useState(false)
   const [linkedInCopied, setLinkedInCopied] = useState(false)
@@ -1266,7 +1287,7 @@ export default function App() {
     setLinkedInPost(buildLinkedInPost(form, nextVariant))
   }
   const handleRegenIntuition = () => {
-    setIntuitionVariant((v) => (v + 1) % 3)
+    setEmailBodyVariant((v) => (v + 1) % 3)
   }
   const handleRegenOutreachLinkedIn = () => {
     const nextVariant = (outreachVariant + 1) % 3
@@ -2000,16 +2021,16 @@ export default function App() {
                         </button>
                       </div>
                     </div>
-                    <div className="linkedin-section intuition-email-section" key={`intuition-${intuitionVariant}`}>
+                    <div className="linkedin-section intuition-email-section" key={`intuition-body-${emailBodyVariant}`}>
                       <div className="section-heading-row">
                         <h3 className="linkedin-heading">Intuition Email Copy</h3>
-                        <button type="button" onClick={handleRegenIntuition} className="btn-regenerate" title="Regenerate this section">🔄 Regenerate</button>
+                        <button type="button" onClick={handleRegenIntuition} className="btn-regenerate" title="Regenerate email body only">🔄 Regenerate Body</button>
                       </div>
                       <div className="subject-line-section">
                         <h4 className="intuition-subheading">Subject Line</h4>
                         <p className="intuition-subject-hint">Choose one (3–5 options, ~70 characters or less).</p>
                         <ul className="intuition-subject-list">
-                          {buildIntuitionEmailSubjects(form, intuitionVariant).map((subject, i) => (
+                          {buildIntuitionEmailSubjects(form, 0).map((subject, i) => (
                             <li key={i} className="intuition-subject-item">
                               <span className="intuition-subject-text">{subject}</span>
                               <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(subject); setIntuitionSubjectCopiedIndex(i); setTimeout(() => setIntuitionSubjectCopiedIndex(null), 2000) } catch (e) { console.error(e) } }} className="btn-copy btn-copy-sm" aria-pressed={intuitionSubjectCopiedIndex === i}>
@@ -2021,26 +2042,26 @@ export default function App() {
                       </div>
                       <div className="subject-line-section">
                         <h4 className="intuition-subheading">Preview Text</h4>
-                        <pre className="output-text subject-line-text">{buildIntuitionPreviewText(form, intuitionVariant)}</pre>
-                        <button type="button" onClick={copyIntuition(() => buildIntuitionPreviewText(form, intuitionVariant), setIntuitionPreviewCopied)} className="btn-copy" aria-pressed={intuitionPreviewCopied}>
+                        <pre className="output-text subject-line-text">{buildIntuitionPreviewText(form, 0)}</pre>
+                        <button type="button" onClick={copyIntuition(() => buildIntuitionPreviewText(form, 0), setIntuitionPreviewCopied)} className="btn-copy" aria-pressed={intuitionPreviewCopied}>
                           {intuitionPreviewCopied ? 'Copied!' : 'Copy Preview Text'}
                         </button>
                       </div>
                       <div className="subject-line-section">
                         <h4 className="intuition-subheading">Why Attend</h4>
                         <ul className="intuition-why-attend-list">
-                          {buildIntuitionWhyAttend(form, intuitionVariant).map((bullet, i) => (
+                          {buildIntuitionWhyAttend(form, emailBodyVariant).map((bullet, i) => (
                             <li key={i}>{bullet}</li>
                           ))}
                         </ul>
-                        <button type="button" onClick={copyIntuition(() => buildIntuitionWhyAttendText(buildIntuitionWhyAttend(form, intuitionVariant)), setIntuitionWhyAttendCopied)} className="btn-copy" aria-pressed={intuitionWhyAttendCopied}>
+                        <button type="button" onClick={copyIntuition(() => buildIntuitionWhyAttendText(buildIntuitionWhyAttend(form, emailBodyVariant)), setIntuitionWhyAttendCopied)} className="btn-copy" aria-pressed={intuitionWhyAttendCopied}>
                           {intuitionWhyAttendCopied ? 'Copied!' : 'Copy Why Attend'}
                         </button>
                       </div>
                       <div className="subject-line-section">
                         <h4 className="intuition-subheading">Email</h4>
-                        <pre className="output-text subject-line-text">{buildIntuitionEmailBody(form, intuitionVariant)}</pre>
-                        <button type="button" onClick={copyIntuition(() => buildIntuitionEmailBody(form, intuitionVariant), setIntuitionBodyCopied)} className="btn-copy" aria-pressed={intuitionBodyCopied}>
+                        <pre className="output-text subject-line-text">{buildIntuitionEmailBody(form, emailBodyVariant)}</pre>
+                        <button type="button" onClick={copyIntuition(() => buildIntuitionEmailBody(form, emailBodyVariant), setIntuitionBodyCopied)} className="btn-copy" aria-pressed={intuitionBodyCopied}>
                           {intuitionBodyCopied ? 'Copied!' : 'Copy Email'}
                         </button>
                       </div>
