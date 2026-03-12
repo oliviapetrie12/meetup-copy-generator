@@ -1099,9 +1099,6 @@ export default function App() {
     }
   }
 
-  const handleRegenMeetup = () => {
-    setGeneratedCopy(generateMeetupCopy(form))
-  }
   const handleRegenLinkedIn = () => {
     setLinkedInPost(buildLinkedInPost(form))
   }
@@ -1821,7 +1818,6 @@ export default function App() {
                     <h3 className="generated-email-heading">Meetup Event Page Copy</h3>
                     <pre className="output-text">{generatedCopy}</pre>
                     <div className="output-actions">
-                      <button type="button" onClick={handleRegenMeetup} className="btn-regenerate" title="Regenerate this section">🔄 Regenerate</button>
                       <button type="button" onClick={handleCopy} className="btn-copy" aria-pressed={copied}>
                         {copied ? 'Copied!' : 'Copy to clipboard'}
                       </button>
