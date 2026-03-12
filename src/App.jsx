@@ -199,7 +199,7 @@ function formatDateForLinkedIn(dateStr) {
     const dayName = DAY_NAMES[d.getDay()]
     const month = MONTH_NAMES[d.getMonth()]
     const dayNum = d.getDate()
-    return `${dayName}, ${month} ${ordinal(dayNum)}`
+    return `${dayName}, ${month} ${dayNum}`
   }
   return s
 }
@@ -743,12 +743,8 @@ function buildLinkedInPost(form, variant = 0) {
 
   const speakerCredits = (name, title, company) => {
     if (!name) return ''
-    const parts = [name]
-    if (title || company) {
-      const cred = [title, company].filter(Boolean).join(' at ')
-      if (cred) parts.push(`(${cred})`)
-    }
-    return parts.join(' ')
+    const cred = [title, company].filter(Boolean).join(' at ')
+    return cred ? `${name} (${cred})` : name
   }
 
   const communityLine = city ? `with the ${city} tech and Elastic community` : 'with the local Elastic community'
@@ -804,7 +800,7 @@ function buildLinkedInPost(form, variant = 0) {
   const hashtags = `#Elastic #ElasticCommunity${shortCityTag}`
 
   const parts = [para1Variants[v](), '', para2, '', para3]
-  if (venue) parts.push('', `📍 ${venue}`)
+  if (venue) parts.push('', `The meetup will take place at ${venue}.`)
   parts.push('', '👉 RSVP: [Meetup Link]', '', hashtags)
   return parts.join('\n')
 }
@@ -1066,7 +1062,8 @@ function capSubject(s, max = MAX_SUBJECT_LENGTH) {
 function buildIntuitionEmailSubjects(form, variant = 0) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const title = trim(form.eventTitle)
-  const date = trim(form.date)
+  const dateRaw = trim(form.date)
+  const date = dateRaw ? (formatDateForLinkedIn(dateRaw) || dateRaw) : ''
   const city = getCityForIntuition(form)
 
   const keyThemes = extractKeyThemes(form)
@@ -1186,7 +1183,7 @@ function buildIntuitionPreviewText(form, variant = 0) {
   previews.push('Technical talks, practical takeaways, and networking with local Elastic users.')
   previews.push('Learn from real production use cases and meet the local Elastic community.')
   previews.push('Hear how teams use Elastic in production and connect with the community.')
-  const fallback = 'Practical knowledge and networking with the Elastic community. See you there.'
+  const fallback = 'Practical knowledge and networking with the Elastic community.'
   const pick = previews[v % Math.max(1, previews.length)] || previews[0] || fallback
   let text = pick
   if (text.length < PREVIEW_MIN) text = fallback
@@ -1305,7 +1302,8 @@ function buildIntuitionWhyAttendText(bullets) {
 
 function buildIntuitionEmailBody(form, variant = 0) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
-  const date = trim(form.date)
+  const dateRaw = trim(form.date)
+  const date = dateRaw ? (formatDateForLinkedIn(dateRaw) || dateRaw) : ''
   const city = getCityForIntuition(form)
   const v = variant % 3
   const theme1 = getIntroTheme(form.speaker1TalkTitle, form.speaker1TalkAbstract)
@@ -1345,7 +1343,7 @@ function buildIntuitionEmailBody(form, variant = 0) {
       let s2 = 'We\'ll hear from the community on practical Elastic use cases.'
       if (hasTalk1 && hasTalk2 && theme2) s2 = `We'll hear from the community on ${theme1} and ${theme2}.`
       else if (hasTalk1) s2 = `We'll hear from the community on ${theme1}.`
-      const s3 = `We'll wrap up with networking and the ${communityName}.`
+      const s3 = `We'll wrap up with networking and conversations with ${communityName}.`
       return `${s1} ${s2} ${s3}`
     })(),
   ]
@@ -1368,27 +1366,34 @@ function buildIntuitionEmailBody(form, variant = 0) {
   return lines.join('\n')
 }
 
+function formatSpeakerForEvent(name, title, company) {
+  const trim = (s) => (typeof s === 'string' ? s.trim() : '')
+  const n = trim(name)
+  if (!n) return ''
+  const cred = [trim(title), trim(company)].filter(Boolean).join(' at ')
+  return cred ? `${n} (${cred})` : n
+}
+
 function buildIntro(form) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
-  const city = trim(form.chapterOrCity)
-  const date = trim(form.date)
-  const name1 = trim(form.speaker1Name)
-  const name2 = trim(form.speaker2Name)
-  const name3 = trim(form.speaker3Name)
+  const dateRaw = trim(form.date)
+  const date = dateRaw ? (formatDateForLinkedIn(dateRaw) || dateRaw) : ''
+  const s1 = formatSpeakerForEvent(form.speaker1Name, form.speaker1Title, form.speaker1Company)
+  const s2 = formatSpeakerForEvent(form.speaker2Name, form.speaker2Title, form.speaker2Company)
+  const s3 = formatSpeakerForEvent(form.speaker3Name, form.speaker3Title, form.speaker3Company)
   const hasSpeaker2 = [form.speaker2Name, form.speaker2Title, form.speaker2Company, form.speaker2TalkTitle, form.speaker2TalkAbstract].some((v) => trim(v).length > 0)
   const hasSpeaker3 = [form.speaker3Name, form.speaker3Title, form.speaker3Company, form.speaker3TalkTitle, form.speaker3TalkAbstract].some((v) => trim(v).length > 0)
 
-  const groupName = city
-    ? (city.includes('User Group') || city.includes('Elastic') || city.includes('Meetup') ? city : `The Elastic ${city} User Group`)
-    : 'The Elastic User Group'
+  const baseGroup = getLinkedInGroupName(form)
+  const groupName = baseGroup.startsWith('The ') ? baseGroup : `The ${baseGroup}`
   const when = date ? ` on ${date}` : ''
   let presentations
-  if (name1 && hasSpeaker2 && name2 && hasSpeaker3 && name3) {
-    presentations = `presentations from ${name1}, ${name2}, and ${name3}`
-  } else if (name1 && hasSpeaker2 && name2) {
-    presentations = `presentations from ${name1} and ${name2}`
-  } else if (name1) {
-    presentations = `a presentation from ${name1}`
+  if (s1 && hasSpeaker2 && s2 && hasSpeaker3 && s3) {
+    presentations = `presentations from ${s1}, ${s2}, and ${s3}`
+  } else if (s1 && hasSpeaker2 && s2) {
+    presentations = `presentations from ${s1} and ${s2}`
+  } else if (s1) {
+    presentations = `a presentation from ${s1}`
   } else {
     presentations = 'presentations'
   }
