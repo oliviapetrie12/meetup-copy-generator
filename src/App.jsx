@@ -737,6 +737,23 @@ function getCityForIntuition(form) {
 }
 
 const MAX_SUBJECT_LENGTH = 70
+const PREVIEW_MIN = 40
+const PREVIEW_MAX = 90
+
+function getTalkTheme(talkTitle, talkAbstract) {
+  const trim = (s) => (typeof s === 'string' ? s.trim() : '')
+  const title = trim(talkTitle)
+  const abs = trim(talkAbstract)
+  const text = `${title} ${abs}`.toLowerCase()
+  if (/\b(search|elasticsearch|relevance|vector|knn)\b/.test(text)) return 'search and relevance'
+  if (/\b(observability|apm|logging|metrics|monitoring)\b/.test(text)) return 'observability and monitoring'
+  if (/\b(ai|ml|machine learning|vector)\b/.test(text)) return 'AI and ML with Elastic'
+  if (/\b(pipeline|ingest|etl)\b/.test(text)) return 'data pipelines and ingest'
+  if (/\b(scal(e|ing)|production|real-world)\b/.test(text)) return 'scaling and production use cases'
+  if (/\b(migration|upgrade)\b/.test(text)) return 'migration and upgrades'
+  if (title && title.length < 50) return title
+  return 'real-world Elastic use cases'
+}
 
 function buildIntuitionEmailSubjects(form, variant = 0) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
@@ -746,74 +763,55 @@ function buildIntuitionEmailSubjects(form, variant = 0) {
   const city = getCityForIntuition(form)
   const talk1 = trim(form.speaker1TalkTitle)
   const talk2 = trim(form.speaker2TalkTitle)
-  const whyAttend = trim(form.intuitionWhyAttend)
+  const speaker1 = trim(form.speaker1Name)
+  const theme1 = getTalkTheme(form.speaker1TalkTitle, form.speaker1TalkAbstract)
+  const theme2 = talk2 ? getTalkTheme(form.speaker2TalkTitle, form.speaker2TalkAbstract) : ''
   const v = variant % 3
 
-  const valueDriven = []
-  valueDriven.push(cap('When your search outgrows your platform'))
-  valueDriven.push(cap('Building smarter search with Elasticsearch'))
-  valueDriven.push(cap('From messy data to search-ready pipelines'))
-  if (city) valueDriven.push(cap(`${city} engineers: modern search systems`))
-  if (talk1) valueDriven.push(cap(`Real-world Elastic: ${talk1}`))
-  if (talk2) valueDriven.push(cap(`${talk2} — learn from the community`))
-  if (title && !date) valueDriven.push(cap(title))
-  if (whyAttend) valueDriven.push(cap(whyAttend))
-  valueDriven.push(cap('What\'s new in search and observability'))
-  valueDriven.push(cap('Learn how others build with Elastic'))
-  valueDriven.push(cap('Practical Elastic use cases and community'))
-  valueDriven.push(cap('See how teams scale search and observability'))
+  const eventSpecific = []
+  if (city && date) {
+    eventSpecific.push(cap(`Join us in ${city} on ${date} for the next Elastic meetup`))
+    eventSpecific.push(cap(`${city} Elastic Meetup — ${date}`))
+    eventSpecific.push(cap(`Elastic ${city} community meetup, ${date}`))
+  }
+  if (city && title) {
+    eventSpecific.push(cap(`Elastic ${city} Meetup: ${title}`))
+    eventSpecific.push(cap(`${title} — ${city} Elastic community`))
+  }
+  if (city && date && (theme1 || theme2)) {
+    const theme = theme1 || theme2
+    eventSpecific.push(cap(`${city} Elastic Meetup on ${date}: ${theme}`))
+    eventSpecific.push(cap(`${city} on ${date}: Real-world ${theme}`))
+  }
+  if (title && date) eventSpecific.push(cap(`${title} — ${date}`))
+  if (talk1 && city) eventSpecific.push(cap(`Elastic ${city}: ${talk1}`))
+  if (talk1 && date) eventSpecific.push(cap(`${talk1} — ${date} meetup`))
+  if (talk2 && city) eventSpecific.push(cap(`${city} meetup: ${talk1} and more`))
+  if (city && !date) eventSpecific.push(cap(`Next Elastic meetup in ${city}`))
+  if (date && !city) eventSpecific.push(cap(`Elastic community meetup — ${date}`))
 
-  const withDate = []
-  if (date) {
-    if (city) {
-      withDate.push(cap(`${city} Elastic Meetup — ${date}`))
-      withDate.push(cap(`Elastic ${city} community meetup, ${date}`))
-      withDate.push(cap(`Join the ${city} Elastic community — ${date}`))
-    }
-    if (title) withDate.push(cap(`${title} — ${date}`))
-    withDate.push(cap(`Elastic community meetup — ${date}`))
+  const fallbacks = []
+  if (theme1) fallbacks.push(cap(`Real-world ${theme1} and community networking`))
+  fallbacks.push(cap('Practical Elastic use cases and community'))
+  fallbacks.push(cap('Learn from the community and connect with Elastic users'))
+  if (!eventSpecific.length) {
+    fallbacks.push(cap('Join us for the next Elastic meetup'))
+    fallbacks.push(cap('Elastic community meetup: talks and networking'))
   }
 
   const seen = new Set()
   const dedupe = (arr) => arr.filter((o) => {
-    const k = o.slice(0, 45)
+    const k = o.slice(0, 50)
     if (seen.has(k)) return false
     seen.add(k)
     return true
   })
-  const valueUnique = dedupe([...valueDriven])
-  const dateUnique = dedupe([...withDate])
-  const atLeastTwoValue = valueUnique.slice(0, Math.max(2, valueUnique.length))
-  const oneWithDate = dateUnique.slice(0, 1)
-  const combined = [...atLeastTwoValue, ...oneWithDate]
-  const seen2 = new Set()
-  let result = combined.filter((o) => {
-    const k = o.slice(0, 50)
-    if (seen2.has(k)) return false
-    seen2.add(k)
-    return true
-  }).slice(0, 5)
-
-  if (v === 1) {
-    const alt = [...valueUnique].slice(2, 8).concat(dateUnique.slice(0, 1))
-    const seen3 = new Set()
-    result = alt.filter((o) => {
-      const k = o.slice(0, 50)
-      if (seen3.has(k)) return false
-      seen3.add(k)
-      return true
-    }).slice(0, 5)
-  } else if (v === 2) {
-    const alt = [...dateUnique].concat([...valueUnique].slice(1, 5))
-    const seen4 = new Set()
-    result = alt.filter((o) => {
-      const k = o.slice(0, 50)
-      if (seen4.has(k)) return false
-      seen4.add(k)
-      return true
-    }).slice(0, 5)
-  }
-  return result
+  const combined = [...eventSpecific, ...fallbacks]
+  const unique = dedupe(combined)
+  const n = Math.max(1, unique.length)
+  const rotate = (offset) => Array.from({ length: 5 }, (_, i) => unique[(offset + i) % n]).filter(Boolean)
+  const rotated = rotate(v * 2)
+  return [...new Set(rotated)].slice(0, 5)
 }
 
 function buildIntuitionPreviewText(form, variant = 0) {
@@ -821,26 +819,35 @@ function buildIntuitionPreviewText(form, variant = 0) {
   const title = trim(form.eventTitle)
   const why = trim(form.intuitionWhyAttend)
   const city = getCityForIntuition(form)
-  const minLen = 40
-  const maxLen = 90
+  const talk1 = trim(form.speaker1TalkTitle)
+  const theme1 = getTalkTheme(form.speaker1TalkTitle, form.speaker1TalkAbstract)
   const cap = (s) => {
-    if (s.length <= maxLen) return s
-    return s.slice(0, maxLen - 1).trim() + (s[maxLen - 1] === ' ' ? '' : '…')
+    if (s.length <= PREVIEW_MAX) return s
+    return s.slice(0, PREVIEW_MAX - 1).trim() + (s[PREVIEW_MAX - 1] === ' ' ? '' : '…')
   }
   const v = variant % 3
-  const previews = [
-    city
-      ? `Real-world talks and networking with the ${city} Elastic community.`
-      : 'Real-world Elastic use cases, practical tips, and networking with the community.',
-    why && why.length >= minLen
-      ? why
-      : (city ? `Join the ${city} Elastic community for talks and networking.` : 'Learn from the community and connect with local Elastic users.'),
-    title
-      ? `Join us for practical knowledge and community. ${title}.`
-      : 'Practical knowledge and networking with the Elastic community. See you there.',
-  ]
-  let text = previews[v]
-  if (!text || text.length < minLen) text = 'Practical knowledge and networking with the Elastic community. See you there.'
+  const previews = []
+  if (city && theme1) {
+    previews.push(`Hear real-world ${theme1} and connect with the ${city} Elastic community.`)
+    previews.push(`Learn from ${theme1} and network with local engineers in ${city}.`)
+    previews.push(`Technical talks on ${theme1}, plus networking with the ${city} community.`)
+  }
+  if (city && talk1) {
+    previews.push(`Featured: ${talk1}. Join the ${city} Elastic community for talks and networking.`)
+    previews.push(`Hear about ${talk1} and meet the ${city} Elastic community.`)
+  }
+  if (city) {
+    previews.push(`Real-world talks and networking with the ${city} Elastic community.`)
+    previews.push(`Join the ${city} Elastic community for technical talks and networking.`)
+  }
+  if (why && why.length >= PREVIEW_MIN) previews.push(why)
+  previews.push('Technical talks, practical takeaways, and networking with local Elastic users.')
+  previews.push('Learn from real production use cases and meet the local Elastic community.')
+  previews.push('Hear how teams use Elastic in production and connect with the community.')
+  const fallback = 'Practical knowledge and networking with the Elastic community. See you there.'
+  const pick = previews[v % Math.max(1, previews.length)] || previews[0] || fallback
+  let text = pick
+  if (text.length < PREVIEW_MIN) text = fallback
   return cap(text)
 }
 
@@ -941,11 +948,20 @@ function buildIntuitionWhyAttendText(bullets) {
 function buildIntuitionEmailBody(form, variant = 0) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const date = trim(form.date)
+  const city = getCityForIntuition(form)
   const v = variant % 3
+  const place = city ? ` in ${city}` : ''
+  const when = date ? ` on ${date}` : ''
   const intros = [
-    date ? `Join us on ${date} for a meetup. We'll have real-world talks and community networking.` : "Join us for a meetup. We'll have real-world talks and community networking.",
-    date ? `You're invited — join us on ${date} for a meetup with real-world talks and networking.` : "You're invited — join us for a meetup with real-world talks and networking.",
-    date ? `Save the date: ${date}. We're hosting a meetup with talks and community networking.` : "We're hosting a meetup with talks and community networking.",
+    date || city
+      ? `Join us${place}${when} for a meetup. We'll have real-world talks and community networking.`
+      : "Join us for a meetup. We'll have real-world talks and community networking.",
+    date || city
+      ? `You're invited — join us${place}${when} for a meetup with real-world talks and networking.`
+      : "You're invited — join us for a meetup with real-world talks and networking.",
+    date || city
+      ? `Save the date${when}. We're hosting a meetup${place} with talks and community networking.`
+      : "We're hosting a meetup with talks and community networking.",
   ]
   const closings = [
     'We would love to see you there.',
