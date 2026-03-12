@@ -695,7 +695,8 @@ const LINKEDIN_CLOSINGS = [
 function buildLinkedInPost(form, variant = 0) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const v = variant % 3
-  const city = trim(form.chapterOrCity)
+  const cityRaw = trim(form.chapterOrCity)
+  const city = cityRaw || extractCity(form)
   const date = trim(form.date)
   const time = trim(form.eventStartTime)
   const venue = trim(form.venueName) || trim(form.venueAddress)
@@ -727,13 +728,56 @@ function buildLinkedInPost(form, variant = 0) {
   return parts.join('\n')
 }
 
-function getCityForIntuition(form) {
+function extractCity(form) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
-  const raw = trim(form.chapterOrCity)
-  if (!raw) return null
-  const withoutPrefix = raw.replace(/^Elastic\s+/i, '').trim()
-  const withoutSuffix = withoutPrefix.replace(/\s+User Group$/i, '').trim()
-  return withoutSuffix || raw
+
+  const fromChapter = (raw) => {
+    if (!raw) return null
+    let s = raw.replace(/^Elastic\s+/i, '').replace(/\s+User Group$/i, '').replace(/\s+Meetup$/i, '').replace(/\s+community$/i, '').trim()
+    if (s.length > 0 && s.length < 50) return s
+    return null
+  }
+
+  const chapter = trim(form.chapterOrCity)
+  if (chapter) {
+    const c = fromChapter(chapter)
+    if (c) return c
+  }
+
+  const title = trim(form.eventTitle)
+  if (title) {
+    const m = title.match(/\b(\w+(?:\s+\w+)?)\s+Elastic\s+(?:Meetup|User\s+Group)/i)
+    if (m && m[1]) return m[1].trim()
+    const m1b = title.match(/\b(?:Elastic\s+)?(\w+(?:\s+\w+)?)\s+(?:Meetup|User\s+Group|community)\b/i)
+    if (m1b && m1b[1]) return m1b[1].trim()
+    const m2 = title.match(/\b(?:Meetup|event)\s+in\s+(\w+(?:\s+\w+)?)(?:\s|$)/i)
+    if (m2 && m2[1]) return m2[1].trim()
+    const m3 = title.match(/\b(\w+(?:\s+\w+)?)\s+[-–—]\s+(?:Elastic|Meetup)/i)
+    if (m3 && m3[1]) return m3[1].trim()
+  }
+
+  const venue = trim(form.venueName) || trim(form.venueAddress)
+  if (venue) {
+    const parts = venue.split(/[,]/).map((p) => p.trim())
+    if (parts.length >= 2 && parts[1].length > 0 && parts[1].length < 30 && !/^\d+$/.test(parts[1])) return parts[1]
+    const words = venue.split(/\s+/)
+    if (words.length >= 2) {
+      const last = words[words.length - 1]
+      if (last.length > 1 && last.length < 25 && !/^\d+$/.test(last)) return last
+    }
+  }
+
+  const address = trim(form.venueAddress)
+  if (address) {
+    const m = address.match(/,?\s*([A-Za-z\s]+?),?\s*(?:[A-Z]{2}|Texas|California|Washington|New York|Colorado|Illinois)\s+\d+/i)
+    if (m && m[1]) return m[1].trim()
+  }
+
+  return null
+}
+
+function getCityForIntuition(form) {
+  return extractCity(form)
 }
 
 const MAX_SUBJECT_LENGTH = 70
