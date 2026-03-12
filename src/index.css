@@ -467,3 +467,67 @@ body {
 .btn-copy-linkedin {
   margin-top: 0;
 }
+
+.intuition-email-section .subject-line-section:last-of-type {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.intuition-subheading {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.intuition-why-attend-list {
+  margin: 0 0 0.75rem;
+  padding-left: 1.25rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #374151;
+}
+
+.intuition-why-attend-list li {
+  margin-bottom: 0.25rem;
+}
+
+.intuition-subject-hint {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.intuition-subject-list {
+  margin: 0 0 0.75rem;
+  padding-left: 0;
+  list-style: none;
+}
+
+.intuition-subject-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.intuition-subject-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.intuition-subject-text {
+  flex: 1;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: #374151;
+}
+
+.btn-copy-sm {
+  flex-shrink: 0;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.8rem;
+}
