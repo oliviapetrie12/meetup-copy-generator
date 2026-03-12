@@ -838,58 +838,21 @@ function buildIntuitionWhyAttendText(bullets) {
 
 function buildIntuitionEmailBody(form) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
-  const cityRaw = trim(form.chapterOrCity)
-  const cityName = getCityForIntuition(form)
-  const groupName = cityRaw
-    ? (cityRaw.includes('User Group') || cityRaw.includes('Elastic') || cityRaw.includes('Meetup') ? cityRaw : `The Elastic ${cityName || cityRaw} User Group`)
-    : 'We'
-  const title = trim(form.eventTitle)
   const date = trim(form.date)
-  const audience = trim(form.intuitionAudience)
-  const speakerName = trim(form.speaker1Name)
-  const speakerCompany = trim(form.speaker1Company)
-  const talkTopic = trim(form.speaker1TalkTitle)
-  const whyAttend = trim(form.intuitionWhyAttend)
-  const takeaway = trim(form.intuitionKeyTakeaway)
-
   const lines = []
   lines.push('Hi there,')
   lines.push('')
-  if (audience) {
-    lines.push(`${audience.charAt(0).toUpperCase() + audience.slice(1)} — here's an event for you.`)
-    lines.push('')
-  }
-  const city = cityName || cityRaw
-  if (city && date) {
-    if (speakerName && talkTopic) {
-      const company = speakerCompany ? ` (${speakerCompany})` : ''
-      lines.push(`Join the ${city} Elastic community on ${date} for a meetup. We'll kick off with a real-world talk from ${speakerName}${company} on ${talkTopic}, followed by networking.`)
-    } else {
-      lines.push(`Join the ${city} Elastic community on ${date} for a meetup. We'll have talks and demos, then networking.`)
-    }
-  } else if (city) {
-    if (speakerName && talkTopic) {
-      const company = speakerCompany ? ` (${speakerCompany})` : ''
-      lines.push(`Join the ${city} Elastic community for a meetup. We'll kick off with a real-world talk from ${speakerName}${company} on ${talkTopic}, followed by networking.`)
-    } else {
-      lines.push(`Join the ${city} Elastic community for a meetup. We'll have talks and demos, then networking.`)
-    }
-  } else if (date) {
+  if (date) {
     lines.push(`Join us on ${date} for a meetup. We'll have real-world talks and community networking.`)
   } else {
-    lines.push(`Join us for a meetup. We'll have talks and networking with the Elastic community.`)
+    lines.push("Join us for a meetup. We'll have real-world talks and community networking.")
   }
   lines.push('')
+  lines.push('**Why Attend**')
   const whyBullets = buildIntuitionWhyAttend(form)
-  if (whyBullets.length) {
-    whyBullets.forEach((b) => lines.push(`• ${b}`))
-    lines.push('')
-  }
-  if (takeaway) {
-    lines.push(takeaway.endsWith('.') ? takeaway : `${takeaway}.`)
-    lines.push('')
-  }
-  lines.push(`${groupName} would love to see you there.`)
+  whyBullets.forEach((b) => lines.push(`• ${b}`))
+  lines.push('')
+  lines.push('We would love to see you there.')
   return lines.join('\n')
 }
 
