@@ -751,51 +751,55 @@ function buildLinkedInPost(form, variant = 0) {
     return parts.join(' ')
   }
 
+  const communityLine = city ? `with the ${city} tech and Elastic community` : 'with the local Elastic community'
+
   const para1Variants = [
-    () => dateFormatted ? `Join the ${groupName} on ${dateFormatted} for an exciting meetup.` : `Join the ${groupName} for an exciting meetup.`,
-    () => dateFormatted ? `You're invited: join the ${groupName} on ${dateFormatted} for our next meetup.` : `You're invited: join the ${groupName} for our next meetup.`,
-    () => dateFormatted ? `Save the date — the ${groupName} is hosting a meetup on ${dateFormatted}.` : `The ${groupName} is hosting an upcoming meetup.`,
+    () => dateFormatted ? `Join the ${groupName} on ${dateFormatted} for an evening of technical talks and community networking.` : `Join the ${groupName} for an evening of technical talks and community networking.`,
+    () => dateFormatted ? `You're invited — join the ${groupName} on ${dateFormatted} for an evening of technical talks and community networking.` : `You're invited — join the ${groupName} for an evening of technical talks and community networking.`,
+    () => dateFormatted ? `Save the date: the ${groupName} is hosting a meetup on ${dateFormatted} for technical talks and community networking.` : `The ${groupName} is hosting an evening of technical talks and community networking.`,
   ]
+
   let para2 = ''
-  const communityTail = city ? `with the ${city} tech and Elastic community` : 'with the local Elastic community'
+  const insightsSuffix = ', sharing insights from real-world Elastic use cases.'
   if (hasSpeaker2 && hasSpeaker3 && name1 && name2 && name3) {
     const cred1 = speakerCredits(name1, title1, company1)
     const cred2 = speakerCredits(name2, title2, company2)
     const cred3 = speakerCredits(name3, title3, company3)
     const para2Variants = [
-      `We'll feature presentations from ${cred1}, ${cred2}, and ${cred3}, followed by networking, refreshments, and pizza ${communityTail}.`,
-      `We'll hear from ${cred1}, ${cred2}, and ${cred3}, followed by networking, refreshments, and pizza ${communityTail}.`,
-      `Presentations from ${cred1}, ${cred2}, and ${cred3}, followed by networking, refreshments, and pizza ${communityTail}.`,
+      `We'll feature presentations from ${cred1}, ${cred2}, and ${cred3}${insightsSuffix}`,
+      `We'll hear from ${cred1}, ${cred2}, and ${cred3}${insightsSuffix}`,
+      `Presentations from ${cred1}, ${cred2}, and ${cred3}${insightsSuffix}`,
     ]
     para2 = para2Variants[v]
   } else if (hasSpeaker2 && name1 && name2) {
     const cred1 = speakerCredits(name1, title1, company1)
     const cred2 = speakerCredits(name2, title2, company2)
     const para2Variants = [
-      `We'll feature presentations from ${cred1} and ${cred2}, followed by networking, refreshments, and pizza ${communityTail}.`,
-      `We'll hear from ${cred1} and ${cred2}, followed by networking, refreshments, and pizza ${communityTail}.`,
-      `Presentations from ${cred1} and ${cred2}, followed by networking, refreshments, and pizza ${communityTail}.`,
+      `We'll feature presentations from ${cred1} and ${cred2}${insightsSuffix}`,
+      `We'll hear from ${cred1} and ${cred2}${insightsSuffix}`,
+      `Presentations from ${cred1} and ${cred2}${insightsSuffix}`,
     ]
     para2 = para2Variants[v]
   } else if (name1) {
     const cred1 = speakerCredits(name1, title1, company1)
     const para2Variants = [
-      `We'll feature a presentation from ${cred1}, followed by networking, refreshments, and pizza ${communityTail}.`,
-      `We'll hear from ${cred1}, followed by networking, refreshments, and pizza ${communityTail}.`,
-      `${cred1} will present, followed by networking, refreshments, and pizza ${communityTail}.`,
+      `We'll feature a presentation from ${cred1}${insightsSuffix}`,
+      `We'll hear from ${cred1}${insightsSuffix}`,
+      `${cred1} will present${insightsSuffix}`,
     ]
     para2 = para2Variants[v]
   } else {
-    para2 = `We'll have community talks, followed by networking, refreshments, and pizza ${communityTail}.`
+    para2 = "We'll have community talks and demos, sharing insights from real-world Elastic use cases."
   }
 
-  const venueLine = venue ? (v === 0 ? ` We'll be at ${venue}.` : v === 1 ? ` Location: ${venue}.` : '') : ''
-  if (venue && v === 2) para2 = para2.replace(/\.$/, ` at ${venue}.`)
+  const multiTalk = (hasSpeaker2 && name2) || (hasSpeaker3 && name3)
+  const para3 = multiTalk
+    ? `After the talks, stick around for pizza, refreshments, and networking ${communityLine}.`
+    : `After the talk, stick around for pizza, refreshments, and networking ${communityLine}.`
 
-  const hashtagCity = city ? `#${city.replace(/\s+/g, '')}Tech` : '#ElasticMeetups'
-  const hashtags = `#Elastic #ElasticCommunity ${hashtagCity}`
-
-  const parts = [para1Variants[v](), '', para2 + venueLine, '', hashtags, '', '[Insert Meetup Link]']
+  const parts = [para1Variants[v](), '', para2, '', para3]
+  if (venue) parts.push('', `📍 ${venue}`)
+  parts.push('', '👉 RSVP: [Meetup Link]', '', '#Elastic #ElasticCommunity' + (city ? ` #${String(city).replace(/\s+/g, '')}Tech` : ' #ElasticMeetups'))
   return parts.join('\n')
 }
 
