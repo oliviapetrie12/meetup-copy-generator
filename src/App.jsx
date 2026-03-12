@@ -779,63 +779,82 @@ function getIntroTheme(talkTitle, talkAbstract) {
   return words.length > 12 ? words.replace(/\s+$/, '') + '…' : title.slice(0, 42)
 }
 
+function getSubjectTopic(talkTitle, talkAbstract) {
+  const theme = getTalkTheme(talkTitle, talkAbstract)
+  const short = {
+    'search and relevance': 'search & Elasticsearch',
+    'observability and monitoring': 'observability',
+    'AI and ML with Elastic': 'AI & ML',
+    'data pipelines and ingest': 'data pipelines',
+    'scaling and production use cases': 'production use cases',
+    'migration and upgrades': 'migration',
+    'real-world Elastic use cases': 'real-world use cases',
+  }
+  return short[theme] || (theme.length <= 28 ? theme : theme.split(/\s+/).slice(0, 4).join(' '))
+}
+
+function capSubject(s, max = MAX_SUBJECT_LENGTH) {
+  if (typeof s !== 'string' || !s.trim()) return ''
+  const t = s.trim()
+  if (t.length <= max) return t
+  const cut = t.slice(0, max - 1).trim()
+  const last = cut.charAt(cut.length - 1)
+  return last === '.' || last === ':' || last === '—' ? cut : cut + '…'
+}
+
 function buildIntuitionEmailSubjects(form, variant = 0) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
-  const cap = (s, max = MAX_SUBJECT_LENGTH) => (s.length > max ? s.slice(0, max - 1).trim() + (s[max - 1] === ' ' ? '' : '…') : s)
   const title = trim(form.eventTitle)
   const date = trim(form.date)
   const city = getCityForIntuition(form)
-  const talk1 = trim(form.speaker1TalkTitle)
-  const talk2 = trim(form.speaker2TalkTitle)
-  const speaker1 = trim(form.speaker1Name)
   const theme1 = getTalkTheme(form.speaker1TalkTitle, form.speaker1TalkAbstract)
-  const theme2 = talk2 ? getTalkTheme(form.speaker2TalkTitle, form.speaker2TalkAbstract) : ''
-  const v = variant % 3
+  const theme2 = trim(form.speaker2TalkTitle) ? getTalkTheme(form.speaker2TalkTitle, form.speaker2TalkAbstract) : ''
+  const topic1 = getSubjectTopic(form.speaker1TalkTitle, form.speaker1TalkAbstract)
+  const topic2 = theme2 ? getSubjectTopic(form.speaker2TalkTitle, form.speaker2TalkAbstract) : ''
+  const topic = topic1 || topic2 || 'Elastic'
 
-  const eventSpecific = []
-  if (city && date) {
-    eventSpecific.push(cap(`Join us in ${city} on ${date} for the next Elastic meetup`))
-    eventSpecific.push(cap(`${city} Elastic Meetup — ${date}`))
-    eventSpecific.push(cap(`Elastic ${city} community meetup, ${date}`))
-  }
-  if (city && title) {
-    eventSpecific.push(cap(`Elastic ${city} Meetup: ${title}`))
-    eventSpecific.push(cap(`${title} — ${city} Elastic community`))
-  }
-  if (city && date && (theme1 || theme2)) {
-    const theme = theme1 || theme2
-    eventSpecific.push(cap(`${city} Elastic Meetup on ${date}: ${theme}`))
-    eventSpecific.push(cap(`${city} on ${date}: Real-world ${theme}`))
-  }
-  if (title && date) eventSpecific.push(cap(`${title} — ${date}`))
-  if (talk1 && city) eventSpecific.push(cap(`Elastic ${city}: ${talk1}`))
-  if (talk1 && date) eventSpecific.push(cap(`${talk1} — ${date} meetup`))
-  if (talk2 && city) eventSpecific.push(cap(`${city} meetup: ${talk1} and more`))
-  if (city && !date) eventSpecific.push(cap(`Next Elastic meetup in ${city}`))
-  if (date && !city) eventSpecific.push(cap(`Elastic community meetup — ${date}`))
+  const options = []
 
-  const fallbacks = []
-  if (theme1) fallbacks.push(cap(`Real-world ${theme1} and community networking`))
-  fallbacks.push(cap('Practical Elastic use cases and community'))
-  fallbacks.push(cap('Learn from the community and connect with Elastic users'))
-  if (!eventSpecific.length) {
-    fallbacks.push(cap('Join us for the next Elastic meetup'))
-    fallbacks.push(cap('Elastic community meetup: talks and networking'))
+  if (city) {
+    options.push(capSubject(`${city} Elastic Meetup: ${topic}`))
+    options.push(capSubject(`${topic} with Elastic — ${city} Meetup`))
+    options.push(capSubject(`How teams use ${topic} — ${city} Meetup`))
+    if (date) {
+      options.push(capSubject(`${city} Elastic Meetup on ${date}: ${topic}`))
+      options.push(capSubject(`${city} on ${date}: ${topic} with Elastic`))
+    }
+    options.push(capSubject(`Real-world ${topic} — ${city} Elastic Meetup`))
+  }
+
+  if (date && !city) {
+    options.push(capSubject(`Elastic Meetup on ${date}: ${topic}`))
+    options.push(capSubject(`Real-world ${topic} with Elastic — ${date}`))
+  }
+
+  const realWorldLine = topic === 'real-world use cases' ? 'Real-world Elastic use cases' : `Real-world ${topic} with Elastic`
+  options.push(capSubject(realWorldLine))
+  if (topic !== 'real-world use cases') options.push(capSubject(`${topic} with Elastic — community meetup`))
+  options.push(capSubject(`Elastic Meetup: ${topic}`))
+
+  if (title && title.length <= 50) {
+    if (city) options.push(capSubject(`${city} Elastic Meetup: ${title}`))
+    if (date) options.push(capSubject(`${title} — ${date}`))
   }
 
   const seen = new Set()
-  const dedupe = (arr) => arr.filter((o) => {
-    const k = o.slice(0, 50)
+  const dedupe = options.filter((o) => {
+    if (!o || o.length > MAX_SUBJECT_LENGTH) return false
+    const k = o.slice(0, 55)
     if (seen.has(k)) return false
     seen.add(k)
     return true
   })
-  const combined = [...eventSpecific, ...fallbacks]
-  const unique = dedupe(combined)
-  const n = Math.max(1, unique.length)
-  const rotate = (offset) => Array.from({ length: 5 }, (_, i) => unique[(offset + i) % n]).filter(Boolean)
-  const rotated = rotate(v * 2)
-  return [...new Set(rotated)].slice(0, 5)
+  let result = dedupe.slice(0, 5).map((o) => capSubject(o))
+  if (result.length < 3) {
+    const extra = [capSubject(`${topic} and Elastic community`), capSubject(`Elastic: ${topic} talks`), capSubject(`Meetup: ${topic} with Elastic`)].filter((o) => o && !result.includes(o))
+    result = [...result, ...extra].slice(0, 5)
+  }
+  return result
 }
 
 function buildIntuitionPreviewText(form, variant = 0) {
