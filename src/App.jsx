@@ -1148,6 +1148,9 @@ export default function App() {
     setLinkedinVariant(nextVariant)
     setLinkedInPost(buildLinkedInPost(form, nextVariant))
   }
+  const handleRegenIntuition = () => {
+    setIntuitionRegenKey((k) => k + 1)
+  }
   const handleRegenOutreachLinkedIn = () => {
     const nextVariant = (outreachVariant + 1) % 3
     setOutreachVariant(nextVariant)
@@ -1881,7 +1884,10 @@ export default function App() {
                       </div>
                     </div>
                     <div className="linkedin-section intuition-email-section" key={intuitionRegenKey}>
-                      <h3 className="linkedin-heading">Intuition Email Copy</h3>
+                      <div className="section-heading-row">
+                        <h3 className="linkedin-heading">Intuition Email Copy</h3>
+                        <button type="button" onClick={handleRegenIntuition} className="btn-regenerate" title="Regenerate this section">🔄 Regenerate</button>
+                      </div>
                       <div className="subject-line-section">
                         <h4 className="intuition-subheading">Subject Line</h4>
                         <p className="intuition-subject-hint">Choose one (3–5 options, ~70 characters or less).</p>
