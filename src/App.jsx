@@ -738,7 +738,7 @@ function getCityForIntuition(form) {
 
 const MAX_SUBJECT_LENGTH = 70
 
-function buildIntuitionEmailSubjects(form) {
+function buildIntuitionEmailSubjects(form, variant = 0) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const cap = (s, max = MAX_SUBJECT_LENGTH) => (s.length > max ? s.slice(0, max - 1).trim() + (s[max - 1] === ' ' ? '' : '…') : s)
   const title = trim(form.eventTitle)
@@ -747,6 +747,7 @@ function buildIntuitionEmailSubjects(form) {
   const talk1 = trim(form.speaker1TalkTitle)
   const talk2 = trim(form.speaker2TalkTitle)
   const whyAttend = trim(form.intuitionWhyAttend)
+  const v = variant % 3
 
   const valueDriven = []
   valueDriven.push(cap('When your search outgrows your platform'))
@@ -759,14 +760,18 @@ function buildIntuitionEmailSubjects(form) {
   if (whyAttend) valueDriven.push(cap(whyAttend))
   valueDriven.push(cap('What\'s new in search and observability'))
   valueDriven.push(cap('Learn how others build with Elastic'))
+  valueDriven.push(cap('Practical Elastic use cases and community'))
+  valueDriven.push(cap('See how teams scale search and observability'))
 
   const withDate = []
   if (date) {
     if (city) {
       withDate.push(cap(`${city} Elastic Meetup — ${date}`))
       withDate.push(cap(`Elastic ${city} community meetup, ${date}`))
+      withDate.push(cap(`Join the ${city} Elastic community — ${date}`))
     }
     if (title) withDate.push(cap(`${title} — ${date}`))
+    withDate.push(cap(`Elastic community meetup — ${date}`))
   }
 
   const seen = new Set()
@@ -776,21 +781,42 @@ function buildIntuitionEmailSubjects(form) {
     seen.add(k)
     return true
   })
-  const valueUnique = dedupe(valueDriven)
-  const dateUnique = dedupe(withDate)
+  const valueUnique = dedupe([...valueDriven])
+  const dateUnique = dedupe([...withDate])
   const atLeastTwoValue = valueUnique.slice(0, Math.max(2, valueUnique.length))
   const oneWithDate = dateUnique.slice(0, 1)
   const combined = [...atLeastTwoValue, ...oneWithDate]
   const seen2 = new Set()
-  return combined.filter((o) => {
+  let result = combined.filter((o) => {
     const k = o.slice(0, 50)
     if (seen2.has(k)) return false
     seen2.add(k)
     return true
   }).slice(0, 5)
+
+  if (v === 1) {
+    const alt = [...valueUnique].slice(2, 8).concat(dateUnique.slice(0, 1))
+    const seen3 = new Set()
+    result = alt.filter((o) => {
+      const k = o.slice(0, 50)
+      if (seen3.has(k)) return false
+      seen3.add(k)
+      return true
+    }).slice(0, 5)
+  } else if (v === 2) {
+    const alt = [...dateUnique].concat([...valueUnique].slice(1, 5))
+    const seen4 = new Set()
+    result = alt.filter((o) => {
+      const k = o.slice(0, 50)
+      if (seen4.has(k)) return false
+      seen4.add(k)
+      return true
+    }).slice(0, 5)
+  }
+  return result
 }
 
-function buildIntuitionPreviewText(form) {
+function buildIntuitionPreviewText(form, variant = 0) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const title = trim(form.eventTitle)
   const why = trim(form.intuitionWhyAttend)
@@ -801,13 +827,20 @@ function buildIntuitionPreviewText(form) {
     if (s.length <= maxLen) return s
     return s.slice(0, maxLen - 1).trim() + (s[maxLen - 1] === ' ' ? '' : '…')
   }
-  let text = ''
-  if (why) text = why.length >= minLen ? why : `${why} Connect with the Elastic community.`
-  else if (city) text = `Real-world talks and networking with the ${city} Elastic community.`
-  else if (title) text = `Join us for practical knowledge and community. ${title}.`
-  else text = 'Real-world Elastic use cases, practical tips, and networking with the community.'
-  text = cap(text)
-  if (text.length < minLen) text = 'Practical knowledge and networking with the Elastic community. See you there.'
+  const v = variant % 3
+  const previews = [
+    city
+      ? `Real-world talks and networking with the ${city} Elastic community.`
+      : 'Real-world Elastic use cases, practical tips, and networking with the community.',
+    why && why.length >= minLen
+      ? why
+      : (city ? `Join the ${city} Elastic community for talks and networking.` : 'Learn from the community and connect with local Elastic users.'),
+    title
+      ? `Join us for practical knowledge and community. ${title}.`
+      : 'Practical knowledge and networking with the Elastic community. See you there.',
+  ]
+  let text = previews[v]
+  if (!text || text.length < minLen) text = 'Practical knowledge and networking with the Elastic community. See you there.'
   return cap(text)
 }
 
@@ -873,7 +906,7 @@ function toLearningOutcomeBullet(talkTitle, talkAbstract, introIndex) {
   return intro + tail + '.'
 }
 
-function buildIntuitionWhyAttend(form) {
+function buildIntuitionWhyAttend(form, variant = 0) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const city = getCityForIntuition(form)
   const networkBullet = city
@@ -886,11 +919,12 @@ function buildIntuitionWhyAttend(form) {
   const hasSpeaker2 = [form.speaker2Name, form.speaker2Title, form.speaker2Company, form.speaker2TalkTitle, form.speaker2TalkAbstract].some((v) => trim(v).length > 0)
   const whyAttend = trim(form.intuitionWhyAttend)
   const takeaway = trim(form.intuitionKeyTakeaway)
-
-  const bullet1 = toLearningOutcomeBullet(talk1Title, talk1Abstract, 0) ||
+  const v = variant % 3
+  const introOffset = v * 2
+  const bullet1 = toLearningOutcomeBullet(talk1Title, talk1Abstract, 0 + introOffset) ||
     (whyAttend ? (whyAttend.endsWith('.') ? whyAttend : `${whyAttend}.`) : 'Learn how Elastic users solve real-world search and observability challenges.')
   const bullet2 = (hasSpeaker2 && (talk2Title || talk2Abstract))
-    ? (toLearningOutcomeBullet(talk2Title, talk2Abstract, 1) || `Hear how ${talk2Title || 'the community'} applies in practice.`)
+    ? (toLearningOutcomeBullet(talk2Title, talk2Abstract, 1 + introOffset) || `Hear how ${talk2Title || 'the community'} applies in practice.`)
     : (takeaway ? (takeaway.endsWith('.') ? takeaway : `${takeaway}.`) : 'Explore how others are building with Elastic in production.')
   const three = [
     bullet1.endsWith('.') ? bullet1 : `${bullet1}.`,
@@ -904,23 +938,30 @@ function buildIntuitionWhyAttendText(bullets) {
   return bullets.map((b) => `• ${b}`).join('\n')
 }
 
-function buildIntuitionEmailBody(form) {
+function buildIntuitionEmailBody(form, variant = 0) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const date = trim(form.date)
+  const v = variant % 3
+  const intros = [
+    date ? `Join us on ${date} for a meetup. We'll have real-world talks and community networking.` : "Join us for a meetup. We'll have real-world talks and community networking.",
+    date ? `You're invited — join us on ${date} for a meetup with real-world talks and networking.` : "You're invited — join us for a meetup with real-world talks and networking.",
+    date ? `Save the date: ${date}. We're hosting a meetup with talks and community networking.` : "We're hosting a meetup with talks and community networking.",
+  ]
+  const closings = [
+    'We would love to see you there.',
+    'Hope you can join us.',
+    'Looking forward to seeing you there.',
+  ]
   const lines = []
   lines.push('Hi there,')
   lines.push('')
-  if (date) {
-    lines.push(`Join us on ${date} for a meetup. We'll have real-world talks and community networking.`)
-  } else {
-    lines.push("Join us for a meetup. We'll have real-world talks and community networking.")
-  }
+  lines.push(intros[v])
   lines.push('')
   lines.push('**Why Attend**')
-  const whyBullets = buildIntuitionWhyAttend(form)
+  const whyBullets = buildIntuitionWhyAttend(form, variant)
   whyBullets.forEach((b) => lines.push(`• ${b}`))
   lines.push('')
-  lines.push('We would love to see you there.')
+  lines.push(closings[v])
   return lines.join('\n')
 }
 
@@ -1057,7 +1098,7 @@ export default function App() {
   const [linkedInPost, setLinkedInPost] = useState('')
   const [linkedinVariant, setLinkedinVariant] = useState(0)
   const [outreachVariant, setOutreachVariant] = useState(0)
-  const [intuitionRegenKey, setIntuitionRegenKey] = useState(0)
+  const [intuitionVariant, setIntuitionVariant] = useState(0)
   const [subjectCopied, setSubjectCopied] = useState(false)
   const [copied, setCopied] = useState(false)
   const [linkedInCopied, setLinkedInCopied] = useState(false)
@@ -1180,7 +1221,7 @@ export default function App() {
     setLinkedInPost(buildLinkedInPost(form, nextVariant))
   }
   const handleRegenIntuition = () => {
-    setIntuitionRegenKey((k) => k + 1)
+    setIntuitionVariant((v) => (v + 1) % 3)
   }
   const handleRegenOutreachLinkedIn = () => {
     const nextVariant = (outreachVariant + 1) % 3
@@ -1914,7 +1955,7 @@ export default function App() {
                         </button>
                       </div>
                     </div>
-                    <div className="linkedin-section intuition-email-section" key={intuitionRegenKey}>
+                    <div className="linkedin-section intuition-email-section" key={`intuition-${intuitionVariant}`}>
                       <div className="section-heading-row">
                         <h3 className="linkedin-heading">Intuition Email Copy</h3>
                         <button type="button" onClick={handleRegenIntuition} className="btn-regenerate" title="Regenerate this section">🔄 Regenerate</button>
@@ -1923,7 +1964,7 @@ export default function App() {
                         <h4 className="intuition-subheading">Subject Line</h4>
                         <p className="intuition-subject-hint">Choose one (3–5 options, ~70 characters or less).</p>
                         <ul className="intuition-subject-list">
-                          {buildIntuitionEmailSubjects(form).map((subject, i) => (
+                          {buildIntuitionEmailSubjects(form, intuitionVariant).map((subject, i) => (
                             <li key={i} className="intuition-subject-item">
                               <span className="intuition-subject-text">{subject}</span>
                               <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(subject); setIntuitionSubjectCopiedIndex(i); setTimeout(() => setIntuitionSubjectCopiedIndex(null), 2000) } catch (e) { console.error(e) } }} className="btn-copy btn-copy-sm" aria-pressed={intuitionSubjectCopiedIndex === i}>
@@ -1935,26 +1976,26 @@ export default function App() {
                       </div>
                       <div className="subject-line-section">
                         <h4 className="intuition-subheading">Preview Text</h4>
-                        <pre className="output-text subject-line-text">{buildIntuitionPreviewText(form)}</pre>
-                        <button type="button" onClick={copyIntuition(() => buildIntuitionPreviewText(form), setIntuitionPreviewCopied)} className="btn-copy" aria-pressed={intuitionPreviewCopied}>
+                        <pre className="output-text subject-line-text">{buildIntuitionPreviewText(form, intuitionVariant)}</pre>
+                        <button type="button" onClick={copyIntuition(() => buildIntuitionPreviewText(form, intuitionVariant), setIntuitionPreviewCopied)} className="btn-copy" aria-pressed={intuitionPreviewCopied}>
                           {intuitionPreviewCopied ? 'Copied!' : 'Copy Preview Text'}
                         </button>
                       </div>
                       <div className="subject-line-section">
                         <h4 className="intuition-subheading">Why Attend</h4>
                         <ul className="intuition-why-attend-list">
-                          {buildIntuitionWhyAttend(form).map((bullet, i) => (
+                          {buildIntuitionWhyAttend(form, intuitionVariant).map((bullet, i) => (
                             <li key={i}>{bullet}</li>
                           ))}
                         </ul>
-                        <button type="button" onClick={copyIntuition(() => buildIntuitionWhyAttendText(buildIntuitionWhyAttend(form)), setIntuitionWhyAttendCopied)} className="btn-copy" aria-pressed={intuitionWhyAttendCopied}>
+                        <button type="button" onClick={copyIntuition(() => buildIntuitionWhyAttendText(buildIntuitionWhyAttend(form, intuitionVariant)), setIntuitionWhyAttendCopied)} className="btn-copy" aria-pressed={intuitionWhyAttendCopied}>
                           {intuitionWhyAttendCopied ? 'Copied!' : 'Copy Why Attend'}
                         </button>
                       </div>
                       <div className="subject-line-section">
                         <h4 className="intuition-subheading">Email</h4>
-                        <pre className="output-text subject-line-text">{buildIntuitionEmailBody(form)}</pre>
-                        <button type="button" onClick={copyIntuition(() => buildIntuitionEmailBody(form), setIntuitionBodyCopied)} className="btn-copy" aria-pressed={intuitionBodyCopied}>
+                        <pre className="output-text subject-line-text">{buildIntuitionEmailBody(form, intuitionVariant)}</pre>
+                        <button type="button" onClick={copyIntuition(() => buildIntuitionEmailBody(form, intuitionVariant), setIntuitionBodyCopied)} className="btn-copy" aria-pressed={intuitionBodyCopied}>
                           {intuitionBodyCopied ? 'Copied!' : 'Copy Email'}
                         </button>
                       </div>
