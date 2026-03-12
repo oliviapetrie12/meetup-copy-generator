@@ -755,6 +755,27 @@ function getTalkTheme(talkTitle, talkAbstract) {
   return 'real-world Elastic use cases'
 }
 
+function getIntroTheme(talkTitle, talkAbstract) {
+  const trim = (s) => (typeof s === 'string' ? s.trim() : '')
+  const title = trim(talkTitle)
+  const lower = title.toLowerCase()
+  if (!title) return getTalkTheme(talkTitle, talkAbstract)
+  if (title.length <= 45) return title
+  const mTo = title.match(/\bto\s+(the\s+[^.]{5,55}?)(?:\s*\.|$)/i)
+  if (mTo && mTo[1].trim().length >= 5) return mTo[1].trim()
+  const mIntro = title.match(/introduc(?:e|ing)\s+(?:\w+\s+)*to\s+(.+?)(?:\s*\.|$)/i)
+  if (mIntro && mIntro[1].trim().length < 55) return mIntro[1].trim()
+  const mOn = title.match(/\b(on|about)\s+(.+?)(?:\s*[.—]|$)/i)
+  if (mOn && mOn[2].trim().length >= 8 && mOn[2].trim().length < 50) return mOn[2].trim()
+  if (/\b(streaming|real-time)\s+data\s+.+/i.test(lower)) return 'streaming data architectures'
+  if (/\bkafka\b/i.test(lower)) return 'streaming data and Kafka'
+  if (/\b(mcp|model context protocol)\b/i.test(lower)) return 'the Model Context Protocol (MCP)'
+  const theme = getTalkTheme(talkTitle, talkAbstract)
+  if (theme !== 'real-world Elastic use cases') return theme
+  const words = title.split(/\s+/).slice(0, 5).join(' ')
+  return words.length > 12 ? words.replace(/\s+$/, '') + '…' : title.slice(0, 42)
+}
+
 function buildIntuitionEmailSubjects(form, variant = 0) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const cap = (s, max = MAX_SUBJECT_LENGTH) => (s.length > max ? s.slice(0, max - 1).trim() + (s[max - 1] === ' ' ? '' : '…') : s)
@@ -950,19 +971,27 @@ function buildIntuitionEmailBody(form, variant = 0) {
   const date = trim(form.date)
   const city = getCityForIntuition(form)
   const v = variant % 3
-  const place = city ? ` in ${city}` : ''
-  const when = date ? ` on ${date}` : ''
-  const intros = [
-    date || city
-      ? `Join us${place}${when} for a meetup. We'll have real-world talks and community networking.`
-      : "Join us for a meetup. We'll have real-world talks and community networking.",
-    date || city
-      ? `You're invited — join us${place}${when} for a meetup with real-world talks and networking.`
-      : "You're invited — join us for a meetup with real-world talks and networking.",
-    date || city
-      ? `Save the date${when}. We're hosting a meetup${place} with talks and community networking.`
-      : "We're hosting a meetup with talks and community networking.",
-  ]
+  const theme1 = getIntroTheme(form.speaker1TalkTitle, form.speaker1TalkAbstract)
+  const hasTalk2 = [form.speaker2TalkTitle, form.speaker2TalkAbstract].some((x) => trim(x).length > 0)
+  const theme2 = hasTalk2 ? getIntroTheme(form.speaker2TalkTitle, form.speaker2TalkAbstract) : ''
+  const hasTalk1 = [form.speaker1TalkTitle, form.speaker1TalkAbstract].some((x) => trim(x).length > 0)
+
+  let sentence1 = 'Join us for the next Elastic meetup.'
+  if (date && city) sentence1 = `Join us on ${date} for the next Elastic meetup in ${city}.`
+  else if (date) sentence1 = `Join us on ${date} for the next Elastic meetup.`
+  else if (city) sentence1 = `Join us in ${city} for the next Elastic meetup.`
+
+  let sentence2 = "We'll hear from community speakers sharing insights on practical Elastic use cases."
+  if (hasTalk1 && hasTalk2 && theme2) {
+    sentence2 = `We'll hear from community speakers sharing insights on ${theme1} and ${theme2}.`
+  } else if (hasTalk1) {
+    sentence2 = `We'll hear from community speakers sharing insights on ${theme1}.`
+  }
+
+  const communityName = city ? `the ${city} Elastic community` : 'the local Elastic community'
+  const sentence3 = `We'll wrap up the evening with networking and conversations with ${communityName}.`
+
+  const intro = `${sentence1} ${sentence2} ${sentence3}`
   const closings = [
     'We would love to see you there.',
     'Hope you can join us.',
@@ -971,7 +1000,7 @@ function buildIntuitionEmailBody(form, variant = 0) {
   const lines = []
   lines.push('Hi there,')
   lines.push('')
-  lines.push(intros[v])
+  lines.push(intro)
   lines.push('')
   lines.push('**Why Attend**')
   const whyBullets = buildIntuitionWhyAttend(form, variant)
