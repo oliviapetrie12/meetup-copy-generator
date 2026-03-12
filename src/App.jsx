@@ -1161,7 +1161,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="header">
-        <h1>Elastic Meetup Toolkit</h1>
+        <h1>🧰 Elastic Meetup Toolkit</h1>
         <p className="subtitle">Generate meetup event pages, promo posts, and speaker logistics emails.</p>
       </header>
 
