@@ -425,21 +425,26 @@ function generateKnowBeforeYouGoEmail(form, includeTldr) {
   return lines.join('\n')
 }
 
-function generateSpeakerOutreachSubject(form) {
+const OUTREACH_SUBJECT_VARIANTS = [
+  (chapter) => chapter ? `Potential speaking opportunity with ${chapter}` : 'Potential speaking opportunity with Elastic Meetup',
+  (chapter) => chapter ? `Speaking at ${chapter}?` : 'Speaking at an Elastic meetup?',
+  (chapter) => chapter ? `Invitation: speak at ${chapter}` : 'Invitation: speak at an Elastic meetup',
+]
+
+function generateSpeakerOutreachSubject(form, variant = 0) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const chapter = trim(form.meetupChapterOrCity)
-  if (chapter) return `Potential speaking opportunity with ${chapter}`
-  return 'Potential speaking opportunity with Elastic Meetup'
+  return OUTREACH_SUBJECT_VARIANTS[variant % 3](chapter)
 }
 
-function generateSpeakerOutreachEmail(form) {
+function generateSpeakerOutreachEmail(form, variant = 0) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
+  const v = variant % 3
   const name = trim(form.speakerName) || 'there'
   const sender = trim(form.senderName)
   const why = trim(form.whyReachingOut)
   const personalization = trim(form.personalizationNote)
   const chapter = trim(form.meetupChapterOrCity)
-  const theme = trim(form.eventThemeOrTopic)
   const ask = trim(form.whatAsking)
   const flex = trim(form.flexibilityNote)
 
@@ -468,20 +473,54 @@ function generateSpeakerOutreachEmail(form) {
     lines.push('I thought your experience could make for a great meetup talk for our community.')
   }
   lines.push('')
-  lines.push('We typically host local engineers for a casual evening of technical talks and networking.')
-  const askText = ask || 'Would you be open to speaking at an upcoming meetup?'
-  lines.push(askText.endsWith('.') ? askText : `${askText}.`)
+  const bodyVariants = [
+    () => { lines.push('We typically host local engineers for a casual evening of technical talks and networking.'); return ask || 'Would you be open to speaking at an upcoming meetup?'; },
+    () => { lines.push('We run informal evenings with technical talks and networking.'); return ask || 'Would you be interested in speaking at one?'; },
+    () => { lines.push('Our meetups are casual — local engineers, short talks, and networking.'); return ask || 'Would you consider speaking at an upcoming one?'; },
+  ]
+  const getAsk = bodyVariants[v]
+  const askLine = getAsk()
+  lines.push(askLine.endsWith('.') ? askLine : `${askLine}.`)
   lines.push('')
-  if (flex) lines.push(flex.endsWith('.') ? flex : `${flex}.`)
-  else lines.push('Happy to share more details if you\'re interested.')
+  const signOffs = [
+    () => { if (flex) lines.push(flex.endsWith('.') ? flex : `${flex}.`); else lines.push('Happy to share more details if you\'re interested.'); },
+    () => { if (flex) lines.push(flex.endsWith('.') ? flex : `${flex}.`); else lines.push('Happy to share more if you\'d like.'); },
+    () => { if (flex) lines.push(flex.endsWith('.') ? flex : `${flex}.`); else lines.push('Let me know if you\'d like more info.'); },
+  ]
+  signOffs[v]()
   lines.push('')
   lines.push('Best,')
   if (sender) lines.push(sender)
   return lines.join('\n')
 }
 
-function generateSpeakerOutreachLinkedIn(form) {
+const OUTREACH_LINKEDIN_VARIANTS = [
+  (name, intro, cameAcross, askText, sender) => [
+    `Hi ${name} — ${intro} and ${cameAcross}`,
+    'I thought it could make for a great meetup talk.',
+    askText.endsWith('.') ? askText : `${askText}.`,
+    'Happy to share more details if helpful.',
+    sender ? `— ${sender}` : '',
+  ].filter(Boolean).join(' '),
+  (name, intro, cameAcross, askText, sender) => [
+    `Hi ${name} — ${intro} and ${cameAcross}`,
+    'Seems like a great fit for a meetup talk.',
+    askText.endsWith('.') ? askText : `${askText}.`,
+    'Happy to share more if useful.',
+    sender ? `— ${sender}` : '',
+  ].filter(Boolean).join(' '),
+  (name, intro, cameAcross, askText, sender) => [
+    `Hi ${name} — ${intro} and ${cameAcross}`,
+    'Would make a great session for our community.',
+    askText.endsWith('.') ? askText : `${askText}.`,
+    'Let me know if you\'d like more info.',
+    sender ? `— ${sender}` : '',
+  ].filter(Boolean).join(' '),
+]
+
+function generateSpeakerOutreachLinkedIn(form, variant = 0) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
+  const v = variant % 3
   const name = trim(form.speakerName) || 'there'
   const sender = trim(form.senderName)
   const why = trim(form.whyReachingOut)
@@ -499,14 +538,7 @@ function generateSpeakerOutreachLinkedIn(form) {
       })()
     : 'came across your work.'
   const askText = ask || 'Would you be open to speaking at an upcoming event?'
-  const bits = [
-    `Hi ${name} — ${intro} and ${cameAcross}`,
-    'I thought it could make for a great meetup talk.',
-    askText.endsWith('.') ? askText : `${askText}.`,
-    'Happy to share more details if helpful.',
-  ]
-  if (sender) bits.push(`— ${sender}`)
-  return bits.join(' ')
+  return OUTREACH_LINKEDIN_VARIANTS[v](name, intro, cameAcross, askText, sender)
 }
 
 function parseTime(timeStr) {
@@ -644,8 +676,25 @@ function buildTalkAbstracts(form) {
   return talks.join('\n\n')
 }
 
-function buildLinkedInPost(form) {
+const LINKEDIN_OPENINGS = [
+  (groupName, when) => when ? `🎉 ${groupName} is hosting a meetup ${when}.` : `🎉 ${groupName} is hosting an upcoming meetup.`,
+  (groupName, when) => when ? `You're invited — ${groupName} meetup ${when}.` : `${groupName} has an upcoming meetup.`,
+  (groupName, when) => when ? `Join ${groupName} for a meetup ${when}.` : `Join ${groupName} for our next meetup.`,
+]
+const LINKEDIN_SPEAKERS = [
+  (n1, n2, n3, has2, has3) => has2 && has3 ? `👥 Featuring ${n1}, ${n2}, and ${n3}.` : has2 ? `👥 Featuring ${n1} and ${n2}.` : n1 ? `👥 Featuring ${n1}.` : '',
+  (n1, n2, n3, has2, has3) => has2 && has3 ? `👥 Talks from ${n1}, ${n2}, and ${n3}.` : has2 ? `👥 Talks from ${n1} and ${n2}.` : n1 ? `👥 Hear from ${n1}.` : '',
+  (n1, n2, n3, has2, has3) => has2 && has3 ? `👥 With ${n1}, ${n2}, and ${n3}.` : has2 ? `👥 With ${n1} and ${n2}.` : n1 ? `👥 ${n1} will be speaking.` : '',
+]
+const LINKEDIN_CLOSINGS = [
+  () => 'Hope to see you there! 🙌 #elastic #elasticcommunity #elasticmeetups',
+  () => 'See you there! 🙌 #elastic #elasticcommunity #elasticmeetups',
+  () => 'Can\'t wait! 🙌 #elastic #elasticcommunity #elasticmeetups',
+]
+
+function buildLinkedInPost(form, variant = 0) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
+  const v = variant % 3
   const city = trim(form.chapterOrCity)
   const date = trim(form.date)
   const time = trim(form.eventStartTime)
@@ -653,32 +702,25 @@ function buildLinkedInPost(form) {
   const name1 = trim(form.speaker1Name)
   const name2 = trim(form.speaker2Name)
   const name3 = trim(form.speaker3Name)
-  const hasSpeaker2 = [form.speaker2Name, form.speaker2Title, form.speaker2Company, form.speaker2TalkTitle, form.speaker2TalkAbstract].some((v) => trim(v).length > 0)
-  const hasSpeaker3 = [form.speaker3Name, form.speaker3Title, form.speaker3Company, form.speaker3TalkTitle, form.speaker3TalkAbstract].some((v) => trim(v).length > 0)
-
+  const hasSpeaker2 = [form.speaker2Name, form.speaker2Title, form.speaker2Company, form.speaker2TalkTitle, form.speaker2TalkAbstract].some((x) => trim(x).length > 0)
+  const hasSpeaker3 = [form.speaker3Name, form.speaker3Title, form.speaker3Company, form.speaker3TalkTitle, form.speaker3TalkAbstract].some((x) => trim(x).length > 0)
   const timezone = trim(form.timezone)
-  const parts = []
   const groupName = city
     ? (city.includes('User Group') || city.includes('Elastic') || city.includes('Meetup') ? city : `The Elastic ${city} User Group`)
     : 'Our community'
+  let when = ''
   if (date || time) {
-    let when = [date, time].filter(Boolean).join(' at ')
+    when = [date, time].filter(Boolean).join(' at ')
     const tzDisplay = getTimezoneDisplay(timezone)
     if (tzDisplay) when += ` ${tzDisplay}`
-    parts.push(`🎉 ${groupName} is hosting a meetup ${when}.`)
-  } else {
-    parts.push(`🎉 ${groupName} is hosting an upcoming meetup.`)
   }
+  const parts = []
+  parts.push(LINKEDIN_OPENINGS[v](groupName, when))
   if (venue) parts.push(`📍 ${venue}`)
-  if (name1 && hasSpeaker2 && name2 && hasSpeaker3 && name3) {
-    parts.push(`👥 Featuring ${name1}, ${name2}, and ${name3}.`)
-  } else if (name1 && hasSpeaker2 && name2) {
-    parts.push(`👥 Featuring ${name1} and ${name2}.`)
-  } else if (name1) {
-    parts.push(`👥 Featuring ${name1}.`)
-  }
+  const speakerLine = LINKEDIN_SPEAKERS[v](name1, name2, name3, hasSpeaker2, hasSpeaker3)
+  if (speakerLine) parts.push(speakerLine)
   parts.push('')
-  parts.push('Hope to see you there! 🙌 #elastic #elasticcommunity #elasticmeetups')
+  parts.push(LINKEDIN_CLOSINGS[v]())
   parts.push('')
   parts.push('🔗 RSVP:')
   parts.push('[Insert Meetup Link]')
@@ -982,6 +1024,8 @@ export default function App() {
   const [generatedSubject, setGeneratedSubject] = useState('')
   const [generatedOutreachLinkedIn, setGeneratedOutreachLinkedIn] = useState('')
   const [linkedInPost, setLinkedInPost] = useState('')
+  const [linkedinVariant, setLinkedinVariant] = useState(0)
+  const [outreachVariant, setOutreachVariant] = useState(0)
   const [intuitionRegenKey, setIntuitionRegenKey] = useState(0)
   const [subjectCopied, setSubjectCopied] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -1083,38 +1127,37 @@ export default function App() {
     } else if (generatorType === 'speakerOutreach') {
       const channel = outreachForm.channel || 'linkedin'
       if (channel === 'email') {
-        setGeneratedSubject(generateSpeakerOutreachSubject(outreachForm))
-        setGeneratedCopy(generateSpeakerOutreachEmail(outreachForm))
+        setGeneratedSubject(generateSpeakerOutreachSubject(outreachForm, outreachVariant))
+        setGeneratedCopy(generateSpeakerOutreachEmail(outreachForm, outreachVariant))
         setGeneratedOutreachLinkedIn('')
       } else {
         setGeneratedSubject('')
         setGeneratedCopy('')
-        setGeneratedOutreachLinkedIn(generateSpeakerOutreachLinkedIn(outreachForm))
+        setGeneratedOutreachLinkedIn(generateSpeakerOutreachLinkedIn(outreachForm, outreachVariant))
       }
     } else {
       setGeneratedSubject('')
       setGeneratedCopy(generateMeetupCopy(form))
       setGeneratedOutreachLinkedIn('')
-      setLinkedInPost(buildLinkedInPost(form))
+      setLinkedInPost(buildLinkedInPost(form, linkedinVariant))
     }
   }
 
   const handleRegenLinkedIn = () => {
-    setLinkedInPost(buildLinkedInPost(form))
-  }
-  const handleRegenIntuition = () => {
-    setIntuitionRegenKey((k) => k + 1)
-  }
-  const handleRegenKbyg = () => {
-    setGeneratedSubject(generateKnowBeforeYouGoSubject(kbygForm))
-    setGeneratedCopy(generateKnowBeforeYouGoEmail(kbygForm, kbygIncludeTldr))
+    const nextVariant = (linkedinVariant + 1) % 3
+    setLinkedinVariant(nextVariant)
+    setLinkedInPost(buildLinkedInPost(form, nextVariant))
   }
   const handleRegenOutreachLinkedIn = () => {
-    setGeneratedOutreachLinkedIn(generateSpeakerOutreachLinkedIn(outreachForm))
+    const nextVariant = (outreachVariant + 1) % 3
+    setOutreachVariant(nextVariant)
+    setGeneratedOutreachLinkedIn(generateSpeakerOutreachLinkedIn(outreachForm, nextVariant))
   }
   const handleRegenOutreachEmail = () => {
-    setGeneratedSubject(generateSpeakerOutreachSubject(outreachForm))
-    setGeneratedCopy(generateSpeakerOutreachEmail(outreachForm))
+    const nextVariant = (outreachVariant + 1) % 3
+    setOutreachVariant(nextVariant)
+    setGeneratedSubject(generateSpeakerOutreachSubject(outreachForm, nextVariant))
+    setGeneratedCopy(generateSpeakerOutreachEmail(outreachForm, nextVariant))
   }
 
   const handleCopy = async () => {
@@ -1796,7 +1839,6 @@ export default function App() {
                         <h3 className="subject-line-heading">Subject Line</h3>
                         <pre className="output-text subject-line-text">{generatedSubject}</pre>
                         <div className="output-actions">
-                          <button type="button" onClick={handleRegenKbyg} className="btn-regenerate" title="Regenerate this section">🔄 Regenerate</button>
                           <button type="button" onClick={handleCopySubject} className="btn-copy" aria-pressed={subjectCopied}>
                             {subjectCopied ? 'Copied!' : 'Copy Subject'}
                           </button>
@@ -1806,7 +1848,6 @@ export default function App() {
                     <h3 className="generated-email-heading">Generated Email</h3>
                     <pre className="output-text">{generatedCopy}</pre>
                     <div className="output-actions">
-                      <button type="button" onClick={handleRegenKbyg} className="btn-regenerate" title="Regenerate this section">🔄 Regenerate</button>
                       <button type="button" onClick={handleCopy} className="btn-copy" aria-pressed={copied}>
                         {copied ? 'Copied!' : 'Copy to clipboard'}
                       </button>
@@ -1833,10 +1874,7 @@ export default function App() {
                       </div>
                     </div>
                     <div className="linkedin-section intuition-email-section" key={intuitionRegenKey}>
-                      <div className="section-heading-row">
-                        <h3 className="linkedin-heading">Intuition Email Copy</h3>
-                        <button type="button" onClick={handleRegenIntuition} className="btn-regenerate" title="Regenerate this section">🔄 Regenerate</button>
-                      </div>
+                      <h3 className="linkedin-heading">Intuition Email Copy</h3>
                       <div className="subject-line-section">
                         <h4 className="intuition-subheading">Subject Line</h4>
                         <p className="intuition-subject-hint">Choose one (3–5 options, ~70 characters or less).</p>
