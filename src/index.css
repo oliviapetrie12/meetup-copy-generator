@@ -279,6 +279,60 @@ body {
   padding-bottom: 0;
 }
 
+.channel-selector {
+  display: flex;
+  gap: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.channel-option {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.6rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.channel-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.channel-option span {
+  pointer-events: none;
+}
+
+.channel-option:hover {
+  background: #f3f4f6;
+}
+
+.channel-option-active,
+.channel-option:has(input:checked) {
+  background: #eff6ff;
+  color: #1e40af;
+  font-weight: 600;
+}
+
+.outreach-output-card {
+  margin-bottom: 1rem;
+}
+
+.outreach-char-count {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
 .btn-generate {
   margin-top: 0.5rem;
   padding: 0.65rem 1.25rem;
