@@ -779,6 +779,52 @@ function getIntroTheme(talkTitle, talkAbstract) {
   return words.length > 12 ? words.replace(/\s+$/, '') + '…' : title.slice(0, 42)
 }
 
+const TECHNICAL_HOOKS = [
+  { pattern: /\b(ai[- ]?powered\s+search|ai\s+search)\b/i, phrase: 'AI-powered search' },
+  { pattern: /\b(llm\s+queries?|llm[- ]?powered)\b/i, phrase: 'LLM queries' },
+  { pattern: /\bnatural\s+language\b/i, phrase: 'Natural language' },
+  { pattern: /\bzero[- ]?downtime\b/i, phrase: 'Zero-downtime' },
+  { pattern: /\breindex(ing)?\b/i, phrase: 'reindexing' },
+  { pattern: /\bblue[- ]?green\b/i, phrase: 'Blue-green deployment' },
+  { pattern: /\btime[- ]?series\b/i, phrase: 'Time-series analytics' },
+  { pattern: /\breal[- ]?time\s+(?:analytics|search|data)\b/i, phrase: 'Real-time analytics' },
+  { pattern: /\breal[- ]?time\b/i, phrase: 'Real-time' },
+  { pattern: /\bvector\s+search\b/i, phrase: 'Vector search' },
+  { pattern: /\b(knn|k\-?nn)\b/i, phrase: 'KNN search' },
+  { pattern: /\bobservability\b/i, phrase: 'Observability' },
+  { pattern: /\b(apm|application\s+performance)\b/i, phrase: 'APM' },
+  { pattern: /\bstreaming\s+data\b/i, phrase: 'Streaming data' },
+  { pattern: /\bkafka\b/i, phrase: 'Kafka' },
+  { pattern: /\bml\s+workloads?\b/i, phrase: 'ML workloads' },
+  { pattern: /\bmachine\s+learning\b/i, phrase: 'Machine learning' },
+  { pattern: /\belasticsearch\s+architectures?\b/i, phrase: 'Elasticsearch architectures' },
+  { pattern: /\bproduction\s+(?:use\s+cases?|deployments?)\b/i, phrase: 'Production use cases' },
+]
+
+function getTechnicalHooks(talkTitle, talkAbstract) {
+  const trim = (s) => (typeof s === 'string' ? s.trim() : '')
+  const text = `${trim(talkTitle)} ${trim(talkAbstract)}`.toLowerCase()
+  const seen = new Set()
+  const hooks = []
+  for (const { pattern, phrase } of TECHNICAL_HOOKS) {
+    if (pattern.test(text) && !seen.has(phrase)) {
+      seen.add(phrase)
+      hooks.push(phrase)
+    }
+  }
+  return hooks
+}
+
+function getCombinedHook(hooks, maxLen = 38) {
+  if (!hooks.length) return null
+  if (hooks.length === 1) return hooks[0]
+  const [a, b] = hooks
+  if ((a === 'Zero-downtime' && b === 'reindexing') || (a === 'reindexing' && b === 'Zero-downtime')) return 'Zero-downtime reindexing'
+  if ((a === 'Natural language' && b.includes('Elasticsearch')) || (b === 'Natural language' && a.includes('search'))) return 'Natural language to Elasticsearch'
+  const withPlus = `${a} + ${b}`
+  return withPlus.length <= maxLen ? withPlus : a
+}
+
 const SUBJECT_TOPIC_PHRASES = {
   'search and relevance': 'Search with Elasticsearch',
   'observability and monitoring': 'Observability and monitoring',
@@ -835,14 +881,30 @@ function buildIntuitionEmailSubjects(form, variant = 0) {
   const title = trim(form.eventTitle)
   const date = trim(form.date)
   const city = getCityForIntuition(form)
-  const theme2 = trim(form.speaker2TalkTitle) ? getTalkTheme(form.speaker2TalkTitle, form.speaker2TalkAbstract) : ''
+  const hooks1 = getTechnicalHooks(form.speaker1TalkTitle, form.speaker1TalkAbstract)
+  const hooks2 = getTechnicalHooks(form.speaker2TalkTitle, form.speaker2TalkAbstract)
+  const allHooks = [...new Set([...hooks1, ...hooks2])]
+  const hook = getCombinedHook(allHooks) || (allHooks[0] || null)
   const topic1 = getSubjectTopic(form.speaker1TalkTitle, form.speaker1TalkAbstract)
-  const topic2 = theme2 ? getSubjectTopic(form.speaker2TalkTitle, form.speaker2TalkAbstract) : ''
+  const topic2 = trim(form.speaker2TalkTitle) ? getSubjectTopic(form.speaker2TalkTitle, form.speaker2TalkAbstract) : ''
   const topic = topic1 || topic2 || 'Real-world use cases'
   const topicNoSuffix = topic.replace(/\s+with Elastic$/i, '').trim() || topic
   const addWithElastic = (t) => (/\s+with Elastic$/i.test(t) ? t : `${t} with Elastic`)
-
   const options = []
+
+  if (hook) {
+    options.push(capSubject(`${hook} with Elasticsearch — ${city || 'Elastic Meetup'}`))
+    options.push(capSubject(`${hook}: Real-world Elasticsearch lessons`))
+    if (city) {
+      options.push(capSubject(`From ${hook} to Elasticsearch: ${city} Meetup`))
+      options.push(capSubject(`Building ${hook} with Elasticsearch — ${city}`))
+      options.push(capSubject(`${hook} — ${city} Elastic Meetup`))
+      if (allHooks.length >= 2) options.push(capSubject(`${getCombinedHook(allHooks.slice(0, 2), 32)} — ${city}`))
+    } else {
+      options.push(capSubject(`From ${hook} to Elasticsearch: Elastic Meetup`))
+      options.push(capSubject(`Building ${hook} with Elasticsearch`))
+    }
+  }
 
   if (city) {
     options.push(capSubject(`${city} Elastic Meetup: ${topic}`))
@@ -850,14 +912,14 @@ function buildIntuitionEmailSubjects(form, variant = 0) {
     options.push(capSubject(`How teams use ${topicNoSuffix} — ${city} Meetup`))
     if (date) {
       options.push(capSubject(`${city} Elastic Meetup on ${date}: ${topic}`))
-      options.push(capSubject(`${city} on ${date}: ${addWithElastic(topicNoSuffix)}`))
+      options.push(capSubject(`${city} on ${date}: ${hook || addWithElastic(topicNoSuffix)}`))
     }
-    options.push(capSubject(`Real-world ${topicNoSuffix} — ${city} Elastic Meetup`))
+    if (hook) options.push(capSubject(`${hook} with Elasticsearch — ${city}`))
   }
 
   if (date && !city) {
     options.push(capSubject(`Elastic Meetup on ${date}: ${topic}`))
-    options.push(capSubject(`${addWithElastic(topicNoSuffix)} — ${date}`))
+    options.push(capSubject(`${hook ? hook + ' with Elasticsearch' : addWithElastic(topicNoSuffix)} — ${date}`))
   }
 
   const realWorldLine = topic === 'Real-world use cases' ? 'Real-world Elastic use cases' : `Real-world ${topicNoSuffix} with Elastic`
@@ -873,7 +935,7 @@ function buildIntuitionEmailSubjects(form, variant = 0) {
   const seen = new Set()
   const dedupe = options.filter((o) => {
     if (!o || o.length > MAX_SUBJECT_LENGTH) return false
-    const k = o.slice(0, 55)
+    const k = o.slice(0, 52)
     if (seen.has(k)) return false
     seen.add(k)
     return true
