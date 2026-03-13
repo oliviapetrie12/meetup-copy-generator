@@ -235,6 +235,7 @@ const INITIAL_STATE = {
   intuitionWhyAttend: '',
   intuitionKeyTakeaway: '',
   eventPageSectionEmojis: true,
+  eventPageInviteSpeakers: false,
 }
 
 const GENERATOR_TYPES = [
@@ -1462,6 +1463,15 @@ function generateMeetupCopy(form) {
     body: buildAgenda(form),
   })
 
+  const useEmojis = form.eventPageSectionEmojis !== false
+  if (form.eventPageInviteSpeakers) {
+    const inviteTitle = (useEmojis ? '⚡ ' : '') + 'Are you interested in presenting your Elastic use case?'
+    sections.push({
+      title: inviteTitle,
+      body: "We welcome 5–10 minute lightning talks, 45-minute deep dives, and everything in between.\n\nIf you're interested, please send us an email at meetups@elastic.co.",
+    })
+  }
+
   if (hasSpeaker1 || hasSpeaker2 || hasSpeaker3) {
     sections.push({
       title: 'Talk Abstracts',
@@ -1473,7 +1483,6 @@ function generateMeetupCopy(form) {
     sections.push({ title: 'Host / Sponsor', body: trim(form.hostOrSponsor) })
   }
 
-  const useEmojis = form.eventPageSectionEmojis !== false
   const sectionHeader = (title) => {
     const withEmoji = {
       'When': '📅 Date and Time',
@@ -1883,7 +1892,17 @@ export default function App() {
               />
               <span>Add section emojis</span>
             </label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={form.eventPageInviteSpeakers === true}
+                onChange={(e) => setForm((prev) => ({ ...prev, eventPageInviteSpeakers: e.target.checked }))}
+                aria-label="Invite speakers to present"
+              />
+              <span>Invite speakers to present</span>
+            </label>
             <span className="form-hint">When enabled, event page sections show emojis (e.g. 📅 Date and Time, 📍 Location).</span>
+            <span className="form-hint">"Invite speakers to present" adds a call-for-speakers section after the Agenda.</span>
 
             <fieldset className="form-fieldset">
               <legend>Speaker 1</legend>
