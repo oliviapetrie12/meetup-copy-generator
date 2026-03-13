@@ -234,6 +234,7 @@ const INITIAL_STATE = {
   intuitionAudience: '',
   intuitionWhyAttend: '',
   intuitionKeyTakeaway: '',
+  eventPageSectionEmojis: true,
 }
 
 const GENERATOR_TYPES = [
@@ -1472,16 +1473,29 @@ function generateMeetupCopy(form) {
     sections.push({ title: 'Host / Sponsor', body: trim(form.hostOrSponsor) })
   }
 
+  const useEmojis = form.eventPageSectionEmojis !== false
   const sectionHeader = (title) => {
     const withEmoji = {
-      'When': '📅 Date & Time',
+      'When': '📅 Date and Time',
       'Where': '📍 Location',
       'Agenda': '📝 Agenda',
-      'Talk Abstracts': '💭 Talk Abstracts',
-      'Arrival': '🪪 Arrival Instructions',
+      'Talk Abstracts': '⚡ Lightning Talk',
+      'Arrival': '🪧 Arrival Instructions',
       'Parking': '🚗 Parking',
+      'RSVP': '📌 RSVP',
+      'Host / Sponsor': '🏢 Host / Sponsor',
     }
-    const display = withEmoji[title] || title
+    const plain = {
+      'When': 'Date and Time',
+      'Where': 'Location',
+      'Agenda': 'Agenda',
+      'Talk Abstracts': 'Lightning Talk',
+      'Arrival': 'Arrival Instructions',
+      'Parking': 'Parking',
+      'RSVP': 'RSVP',
+      'Host / Sponsor': 'Host / Sponsor',
+    }
+    const display = useEmojis ? (withEmoji[title] || title) : (plain[title] || title)
     return `**${display}**`
   }
 
@@ -1859,6 +1873,17 @@ export default function App() {
                 placeholder="e.g. 123 Main St, Seattle, WA"
               />
             </label>
+
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={form.eventPageSectionEmojis !== false}
+                onChange={(e) => setForm((prev) => ({ ...prev, eventPageSectionEmojis: e.target.checked }))}
+                aria-label="Add section emojis to event page copy"
+              />
+              <span>Add section emojis</span>
+            </label>
+            <span className="form-hint">When enabled, event page sections show emojis (e.g. 📅 Date and Time, 📍 Location).</span>
 
             <fieldset className="form-fieldset">
               <legend>Speaker 1</legend>
