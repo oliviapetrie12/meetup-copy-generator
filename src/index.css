@@ -519,6 +519,16 @@ body {
   color: #1a1a1a;
 }
 
+.meetup-page-preview {
+  font-family: system-ui, -apple-system, sans-serif;
+  padding: 1rem;
+  background: #fafafa;
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  max-height: 28rem;
+  overflow-y: auto;
+}
+
 .output-placeholder {
   margin: 0;
   color: #888;

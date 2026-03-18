@@ -204,6 +204,38 @@ function formatDateForLinkedIn(dateStr) {
   return s
 }
 
+function formatDateWithOrdinal(dateStr) {
+  const s = (dateStr || '').trim()
+  if (!s) return ''
+  let d
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) d = new Date(s + 'T12:00:00')
+  else {
+    const parsed = Date.parse(s)
+    if (!Number.isNaN(parsed)) d = new Date(parsed)
+  }
+  if (d && !Number.isNaN(d.getTime())) {
+    const dayName = DAY_NAMES[d.getDay()]
+    const month = MONTH_NAMES[d.getMonth()]
+    const dayNum = d.getDate()
+    return `${dayName}, ${month} ${ordinal(dayNum)}`
+  }
+  return s
+}
+
+function normalizeElastiFlow(s) {
+  if (!s || typeof s !== 'string') return s
+  return s.replace(/\bElastiflow\b/gi, 'ElastiFlow')
+}
+
+function escapeHtml(s) {
+  if (s == null) return ''
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
 const INITIAL_STATE = {
   chapterOrCity: '',
   eventTitle: '',
@@ -580,21 +612,43 @@ function generateSpeakerOutreachLinkedIn(form, variant = 0) {
 }
 
 function parseTime(timeStr) {
-  const s = String(timeStr).trim()
-  const match = s.match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/i)
-  if (!match) return null
-  let h = parseInt(match[1], 10)
-  const m = parseInt(match[2], 10)
-  const ampm = (match[3] || '').toLowerCase()
-  if (ampm === 'pm' && h !== 12) h += 12
-  if (ampm === 'am' && h === 12) h = 0
-  if (ampm === '' && h <= 12) return null
-  return h * 60 + m
+  const s = String(timeStr).trim().replace(/\s+/g, ' ')
+  let match = s.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/i)
+  if (match) {
+    let h = parseInt(match[1], 10)
+    const m = parseInt(match[2], 10)
+    if (m >= 60 || h > 12) return null
+    const ap = match[3].toLowerCase()
+    if (ap === 'pm' && h !== 12) h += 12
+    if (ap === 'am' && h === 12) h = 0
+    return h * 60 + m
+  }
+  match = s.match(/^(\d{1,2}):(\d{2})(am|pm)$/i)
+  if (match) {
+    let h = parseInt(match[1], 10)
+    const m = parseInt(match[2], 10)
+    if (m >= 60 || h > 12) return null
+    const ap = match[3].toLowerCase()
+    if (ap === 'pm' && h !== 12) h += 12
+    if (ap === 'am' && h === 12) h = 0
+    return h * 60 + m
+  }
+  match = s.match(/^(\d{1,2}):(\d{2})$/)
+  if (match) {
+    const h = parseInt(match[1], 10)
+    const m = parseInt(match[2], 10)
+    if (h < 24 && m < 60) return h * 60 + m
+  }
+  return null
 }
 
 function formatTime(minutesFromMidnight) {
-  const h = Math.floor(minutesFromMidnight / 60) % 24
-  const m = minutesFromMidnight % 60
+  let t = Math.floor(Number(minutesFromMidnight))
+  if (!Number.isFinite(t)) t = 0
+  t = ((t % (24 * 60)) + (24 * 60)) % (24 * 60)
+  const h = Math.floor(t / 60)
+  const m = t % 60
+  if (m < 0 || m > 59) return `${h % 12 || 12}:00 ${h >= 12 ? 'PM' : 'AM'}`
   const ap = h >= 12 ? 'PM' : 'AM'
   const h12 = h % 12 || 12
   return `${h12}:${String(m).padStart(2, '0')} ${ap}`
@@ -602,6 +656,17 @@ function formatTime(minutesFromMidnight) {
 
 function addMinutes(minutesFromMidnight, delta) {
   return (minutesFromMidnight + delta) % (24 * 60)
+}
+
+/** Agenda row: "Name - Talk title" (12h times on separate prefix). Returns '' if nothing to show — no placeholders. */
+function agendaSpeakerLine(name, talkTitle) {
+  const trim = (s) => (typeof s === 'string' ? s.trim() : '')
+  const n = trim(name)
+  const t = trim(talkTitle)
+  if (n && t) return `${n} - ${t}`
+  if (n) return n
+  if (t) return t
+  return ''
 }
 
 function buildAgenda(form) {
@@ -614,54 +679,31 @@ function buildAgenda(form) {
       .some((v) => trim(v).length > 0)
 
   const startMins = parseTime(form.eventStartTime)
-  const timeStr = (mins) => (startMins != null ? formatTime(addMinutes(startMins, mins)) : '')
+  const at = (offsetMins) => (startMins != null ? formatTime(addMinutes(startMins, offsetMins)) : null)
 
   const lines = []
-  const prefix = (t) => (t ? `${t} – ` : '')
-
-  if (hasSpeaker3) {
-    // Three-speaker: 0, 15, 20, 50, 80, 110, 120
-    const t0 = timeStr(0)
-    const t15 = timeStr(15)
-    const t20 = timeStr(20)
-    const t50 = timeStr(50)
-    const t80 = timeStr(80)
-    const t110 = timeStr(110)
-    const t120 = timeStr(120)
-    lines.push(`${prefix(t0)}Doors open / event start`)
-    lines.push(`${prefix(t15)}Welcome and introductions`)
-    lines.push(`${prefix(t20)}Speaker 1${form.speaker1TalkTitle ? `: ${trim(form.speaker1TalkTitle)}` : ''}`)
-    lines.push(`${prefix(t50)}Speaker 2${form.speaker2TalkTitle ? `: ${trim(form.speaker2TalkTitle)}` : ''}`)
-    lines.push(`${prefix(t80)}Speaker 3${form.speaker3TalkTitle ? `: ${trim(form.speaker3TalkTitle)}` : ''}`)
-    lines.push(`${prefix(t110)}Networking`)
-    lines.push(`${prefix(t120)}Event concludes`)
-  } else if (hasSpeaker2) {
-    // Two-speaker: 0, 15, 20, 50, 80, 120
-    const t0 = timeStr(0)
-    const t15 = timeStr(15)
-    const t20 = timeStr(20)
-    const t50 = timeStr(50)
-    const t80 = timeStr(80)
-    const t120 = timeStr(120)
-    lines.push(`${prefix(t0)}Doors open / event start`)
-    lines.push(`${prefix(t15)}Welcome and introductions`)
-    lines.push(`${prefix(t20)}Speaker 1${form.speaker1TalkTitle ? `: ${trim(form.speaker1TalkTitle)}` : ''}`)
-    lines.push(`${prefix(t50)}Speaker 2${form.speaker2TalkTitle ? `: ${trim(form.speaker2TalkTitle)}` : ''}`)
-    lines.push(`${prefix(t80)}Networking`)
-    lines.push(`${prefix(t120)}Event concludes`)
-  } else {
-    // One-speaker: 0, 15, 20, 80, 120
-    const t0 = timeStr(0)
-    const t15 = timeStr(15)
-    const t20 = timeStr(20)
-    const t80 = timeStr(80)
-    const t120 = timeStr(120)
-    lines.push(`${prefix(t0)}Doors open / event start`)
-    lines.push(`${prefix(t15)}Welcome and introductions`)
-    lines.push(`${prefix(t20)}Talk${form.speaker1TalkTitle ? `: ${trim(form.speaker1TalkTitle)}` : ''}`)
-    lines.push(`${prefix(t80)}Networking`)
-    lines.push(`${prefix(t120)}Event concludes`)
+  const pushTimed = (offsetMins, text) => {
+    const clock = at(offsetMins)
+    if (clock) lines.push(`${clock} ${text}`)
+    else lines.push(text)
   }
+
+  pushTimed(0, 'Doors open / mingle')
+
+  const speaker1Line = agendaSpeakerLine(form.speaker1Name, form.speaker1TalkTitle)
+  if (speaker1Line) pushTimed(30, speaker1Line)
+
+  if (hasSpeaker2) {
+    const speaker2Line = agendaSpeakerLine(form.speaker2Name, form.speaker2TalkTitle)
+    if (speaker2Line) pushTimed(60, speaker2Line)
+  }
+
+  if (hasSpeaker3 && hasSpeaker2) {
+    const speaker3Line = agendaSpeakerLine(form.speaker3Name, form.speaker3TalkTitle)
+    if (speaker3Line) pushTimed(90, speaker3Line)
+  }
+
+  pushTimed(120, 'Event concludes')
 
   return lines.join('\n')
 }
@@ -684,13 +726,22 @@ function buildTalkAbstracts(form) {
   ].some((v) => trim(v).length > 0)
 
   const formatTalk = (name, title, company, talkTitle, abstract) => {
-    const speakerLine = [name, title, company].map(trim).filter(Boolean).join(', ')
     const parts = []
-    if (trim(talkTitle)) parts.push(trim(talkTitle))
+    if (trim(talkTitle)) parts.push(normalizeElastiFlow(trim(talkTitle)))
+    const n = trim(name)
+    const t = trim(title)
+    const c = trim(company)
+    let speakerLine = ''
+    if (n && t && c) speakerLine = `${n}, ${t} at ${normalizeElastiFlow(c)}`
+    else if (n && c) speakerLine = `${n}, ${normalizeElastiFlow(c)}`
+    else if (n && t) speakerLine = `${n}, ${t}`
+    else if (n) speakerLine = normalizeElastiFlow(n)
+    else if (c) speakerLine = normalizeElastiFlow(c)
+    else if (t) speakerLine = t
     if (speakerLine) parts.push(speakerLine)
     if (trim(abstract)) {
       if (parts.length) parts.push('')
-      parts.push(trim(abstract))
+      parts.push(normalizeElastiFlow(trim(abstract)))
     }
     return parts.join('\n')
   }
@@ -1379,7 +1430,7 @@ function formatSpeakerForEvent(name, title, company) {
 function buildIntro(form) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const dateRaw = trim(form.date)
-  const date = dateRaw ? (formatDateForLinkedIn(dateRaw) || dateRaw) : ''
+  const date = dateRaw ? (formatDateWithOrdinal(dateRaw) || dateRaw) : ''
   const s1 = formatSpeakerForEvent(form.speaker1Name, form.speaker1Title, form.speaker1Company)
   const s2 = formatSpeakerForEvent(form.speaker2Name, form.speaker2Title, form.speaker2Company)
   const s3 = formatSpeakerForEvent(form.speaker3Name, form.speaker3Title, form.speaker3Company)
@@ -1400,7 +1451,7 @@ function buildIntro(form) {
     presentations = 'presentations'
   }
 
-  return `${groupName} is hosting a meetup${when}. We'll have ${presentations}, followed by food, refreshments, and networking.`
+  return normalizeElastiFlow(`${groupName} is hosting a meetup${when}. We'll have ${presentations}, followed by food, refreshments, and networking.`)
 }
 
 function generateMeetupCopy(form) {
@@ -1430,37 +1481,46 @@ function generateMeetupCopy(form) {
 
   const sections = []
 
-  if (has(form.eventTitle)) {
-    sections.push({ title: null, body: trim(form.eventTitle) })
+  const buildWhenBody = () => {
+    const dateRaw = trim(form.date)
+    const startMins = parseTime(form.eventStartTime)
+    const tzDisplay = getTimezoneDisplay(form.timezone)
+    const parts = []
+    if (dateRaw && startMins != null) {
+      parts.push(`${formatDateWithOrdinal(dateRaw) || dateRaw} at ${formatTime(startMins)}`)
+    } else if (dateRaw) {
+      parts.push(formatDateWithOrdinal(dateRaw) || dateRaw)
+    } else if (startMins != null) {
+      parts.push(formatTime(startMins))
+    }
+    if (tzDisplay && parts.length) parts[0] = `${parts[0]} ${tzDisplay}`
+    return parts.join('\n')
   }
 
   if (has(form.date) || has(form.eventStartTime)) {
-    let when = [form.date, form.eventStartTime].map(trim).filter(Boolean).join(' at ')
-    const tzDisplay = getTimezoneDisplay(form.timezone)
-    if (tzDisplay) when += ` ${tzDisplay}`
-    sections.push({ title: 'When', body: when })
+    sections.push({ title: 'When', body: normalizeElastiFlow(buildWhenBody()) })
   }
 
   if (has(form.venueName) || has(form.venueAddress)) {
-    const where = [form.venueName, form.venueAddress].map(trim).filter(Boolean).join('\n')
+    const where = [form.venueName, form.venueAddress].map(trim).filter(Boolean).map(normalizeElastiFlow).join('\n')
     sections.push({ title: 'Where', body: where })
   }
 
   if (has(form.rsvpInstructions)) {
-    sections.push({ title: 'RSVP', body: trim(form.rsvpInstructions) })
+    sections.push({ title: 'RSVP', body: normalizeElastiFlow(trim(form.rsvpInstructions)) })
   }
 
   if (has(form.arrivalInstructions)) {
-    sections.push({ title: 'Arrival', body: trim(form.arrivalInstructions) })
+    sections.push({ title: 'Arrival', body: normalizeElastiFlow(trim(form.arrivalInstructions)) })
   }
 
   if (has(form.parkingNotes)) {
-    sections.push({ title: 'Parking', body: trim(form.parkingNotes) })
+    sections.push({ title: 'Parking', body: normalizeElastiFlow(trim(form.parkingNotes)) })
   }
 
   sections.push({
     title: 'Agenda',
-    body: buildAgenda(form),
+    body: normalizeElastiFlow(buildAgenda(form)),
   })
 
   const useEmojis = form.eventPageSectionEmojis !== false
@@ -1480,41 +1540,63 @@ function generateMeetupCopy(form) {
   }
 
   if (has(form.hostOrSponsor)) {
-    sections.push({ title: 'Host / Sponsor', body: trim(form.hostOrSponsor) })
+    sections.push({ title: 'Host / Sponsor', body: normalizeElastiFlow(trim(form.hostOrSponsor)) })
   }
 
-  const sectionHeader = (title) => {
-    const withEmoji = {
-      'When': '📅 Date and Time',
-      'Where': '📍 Location',
-      'Agenda': '📝 Agenda',
-      'Talk Abstracts': '⚡ Lightning Talk',
-      'Arrival': '🪧 Arrival Instructions',
-      'Parking': '🚗 Parking',
-      'RSVP': '📌 RSVP',
-      'Host / Sponsor': '🏢 Host / Sponsor',
-    }
-    const plain = {
-      'When': 'Date and Time',
-      'Where': 'Location',
-      'Agenda': 'Agenda',
-      'Talk Abstracts': 'Lightning Talk',
-      'Arrival': 'Arrival Instructions',
-      'Parking': 'Parking',
-      'RSVP': 'RSVP',
-      'Host / Sponsor': 'Host / Sponsor',
-    }
-    const display = useEmojis ? (withEmoji[title] || title) : (plain[title] || title)
-    return `**${display}**`
+  const withEmoji = {
+    'When': '📅 Date and Time',
+    'Where': '📍 Location',
+    'Agenda': '📝 Agenda',
+    'Talk Abstracts': '💬 Talk Abstracts',
+    'Arrival': '🪧 Arrival Instructions',
+    'Parking': '🚗 Parking',
+    'RSVP': '📌 RSVP',
+    'Host / Sponsor': '🏢 Host / Sponsor',
+  }
+  const plainHeader = {
+    'When': 'Date and Time',
+    'Where': 'Location',
+    'Agenda': 'Agenda',
+    'Talk Abstracts': 'Talk Abstracts',
+    'Arrival': 'Arrival Instructions',
+    'Parking': 'Parking',
+    'RSVP': 'RSVP',
+    'Host / Sponsor': 'Host / Sponsor',
   }
 
-  const lines = []
-  lines.push(buildIntro(form), '')
+  const sectionLabel = (title) => (useEmojis ? (withEmoji[title] || title) : (plainHeader[title] || title))
+
+  const intro = buildIntro(form)
+  const eventTitle = has(form.eventTitle) ? normalizeElastiFlow(trim(form.eventTitle)) : ''
+
+  const plainLines = [intro, '']
+  if (eventTitle) {
+    plainLines.push(eventTitle, '')
+  }
   for (const { title, body } of sections) {
-    if (title) lines.push(sectionHeader(title), body, '')
-    else lines.push(body, '')
+    if (title) {
+      plainLines.push(sectionLabel(title), body, '')
+    } else {
+      plainLines.push(body, '')
+    }
   }
-  return lines.join('\n').trim()
+
+  const htmlParts = [`<p>${escapeHtml(intro).replace(/\n/g, '<br>')}</p>`]
+  if (eventTitle) {
+    htmlParts.push(`<h2 style="font-size:1.25em;margin:1em 0 0.5em;font-weight:600;">${escapeHtml(eventTitle)}</h2>`)
+  }
+  for (const { title, body } of sections) {
+    if (!title) continue
+    const label = sectionLabel(title)
+    htmlParts.push(
+      `<h3 style="font-size:1.05em;margin:1em 0 0.35em;font-weight:700;">${escapeHtml(label)}</h3>`,
+      `<p style="margin:0 0 0.75em;line-height:1.5;white-space:pre-wrap;">${escapeHtml(body).replace(/\n/g, '<br>')}</p>`,
+    )
+  }
+
+  const html = `<div class="meetup-page-generated" style="font-family:system-ui,sans-serif;">${htmlParts.join('')}</div>`
+
+  return { plain: plainLines.join('\n').trim(), html }
 }
 
 export default function App() {
@@ -1524,6 +1606,7 @@ export default function App() {
   const [kbygIncludeTldr, setKbygIncludeTldr] = useState(true)
   const [outreachForm, setOutreachForm] = useState(SPEAKER_OUTREACH_INITIAL_STATE)
   const [generatedCopy, setGeneratedCopy] = useState('')
+  const [meetupPageHtml, setMeetupPageHtml] = useState('')
   const [generatedSubject, setGeneratedSubject] = useState('')
   const [generatedOutreachLinkedIn, setGeneratedOutreachLinkedIn] = useState('')
   const [linkedInPost, setLinkedInPost] = useState('')
@@ -1626,21 +1709,26 @@ export default function App() {
     if (generatorType === 'knowBeforeYouGo') {
       setGeneratedSubject(generateKnowBeforeYouGoSubject(kbygForm))
       setGeneratedCopy(generateKnowBeforeYouGoEmail(kbygForm, kbygIncludeTldr))
+      setMeetupPageHtml('')
       setGeneratedOutreachLinkedIn('')
     } else if (generatorType === 'speakerOutreach') {
       const channel = outreachForm.channel || 'linkedin'
       if (channel === 'email') {
         setGeneratedSubject(generateSpeakerOutreachSubject(outreachForm, outreachVariant))
         setGeneratedCopy(generateSpeakerOutreachEmail(outreachForm, outreachVariant))
+        setMeetupPageHtml('')
         setGeneratedOutreachLinkedIn('')
       } else {
         setGeneratedSubject('')
         setGeneratedCopy('')
+        setMeetupPageHtml('')
         setGeneratedOutreachLinkedIn(generateSpeakerOutreachLinkedIn(outreachForm, outreachVariant))
       }
     } else {
       setGeneratedSubject('')
-      setGeneratedCopy(generateMeetupCopy(form))
+      const page = generateMeetupCopy(form)
+      setGeneratedCopy(page.plain)
+      setMeetupPageHtml(page.html)
       setGeneratedOutreachLinkedIn('')
       setLinkedInPost(buildLinkedInPost(form, linkedinVariant))
     }
@@ -1669,7 +1757,20 @@ export default function App() {
   const handleCopy = async () => {
     if (!generatedCopy) return
     try {
-      await navigator.clipboard.writeText(generatedCopy)
+      if (generatorType === 'eventPromotion' && meetupPageHtml && typeof ClipboardItem !== 'undefined') {
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({
+              'text/html': new Blob([meetupPageHtml], { type: 'text/html' }),
+              'text/plain': new Blob([generatedCopy], { type: 'text/plain' }),
+            }),
+          ])
+        } catch {
+          await navigator.clipboard.writeText(generatedCopy)
+        }
+      } else {
+        await navigator.clipboard.writeText(generatedCopy)
+      }
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {
@@ -1688,6 +1789,7 @@ export default function App() {
       setShowSpeaker3(false)
     }
     setGeneratedCopy('')
+    setMeetupPageHtml('')
     setGeneratedSubject('')
     setGeneratedOutreachLinkedIn('')
     setLinkedInPost('')
@@ -1760,6 +1862,7 @@ export default function App() {
                   onClick={() => {
                     setGeneratorType(card.value)
                     setGeneratedCopy('')
+                    setMeetupPageHtml('')
                     setGeneratedSubject('')
                     setGeneratedOutreachLinkedIn('')
                     setLinkedInPost('')
@@ -1897,12 +2000,12 @@ export default function App() {
                 type="checkbox"
                 checked={form.eventPageInviteSpeakers === true}
                 onChange={(e) => setForm((prev) => ({ ...prev, eventPageInviteSpeakers: e.target.checked }))}
-                aria-label="Invite speakers to present"
+                aria-label="Add call for speakers section"
               />
-              <span>Invite speakers to present</span>
+              <span>Add call for speakers section</span>
             </label>
             <span className="form-hint">When enabled, event page sections show emojis (e.g. 📅 Date and Time, 📍 Location).</span>
-            <span className="form-hint">"Invite speakers to present" adds a call-for-speakers section after the Agenda.</span>
+            <span className="form-hint">When enabled, adds a call-for-speakers section after the Agenda.</span>
 
             <fieldset className="form-fieldset">
               <legend>Speaker 1</legend>
@@ -2391,10 +2494,15 @@ export default function App() {
                 {generatorType === 'eventPromotion' && (
                   <>
                     <h3 className="generated-email-heading">Meetup Event Page Copy</h3>
-                    <pre className="output-text">{generatedCopy}</pre>
+                    <p className="form-hint" style={{ marginTop: 0 }}>Preview below. Copy pastes HTML with bold headings into editors that support rich paste (e.g. Meetup).</p>
+                    {meetupPageHtml ? (
+                      <div className="meetup-page-preview output-text" dangerouslySetInnerHTML={{ __html: meetupPageHtml }} />
+                    ) : (
+                      <pre className="output-text">{generatedCopy}</pre>
+                    )}
                     <div className="output-actions">
                       <button type="button" onClick={handleCopy} className="btn-copy" aria-pressed={copied}>
-                        {copied ? 'Copied!' : 'Copy to clipboard'}
+                        {copied ? 'Copied!' : 'Copy for Meetup (HTML + plain text)'}
                       </button>
                     </div>
                     <div className="linkedin-section">
