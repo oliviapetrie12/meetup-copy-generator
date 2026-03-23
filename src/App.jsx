@@ -1,4 +1,66 @@
 import { useState, useRef, useEffect } from 'react'
+import QRCodeStyling from 'qr-code-styling'
+import elasticLogo from './logo.png'
+
+function SearchableSelect({ value, onChange, options, placeholder = 'Type to search…', id }) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState(value)
+  const containerRef = useRef(null)
+
+  // Keep query in sync when parent resets the value
+  useEffect(() => { setQuery(value) }, [value])
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const filtered = query.trim()
+    ? options.filter(o => o.toLowerCase().includes(query.toLowerCase()))
+    : options
+
+  const handleInput = (e) => {
+    setQuery(e.target.value)
+    onChange(e.target.value)
+    setOpen(true)
+  }
+
+  const handleSelect = (opt) => {
+    setQuery(opt)
+    onChange(opt)
+    setOpen(false)
+  }
+
+  return (
+    <div ref={containerRef} className="ss-wrap" id={id}>
+      <input
+        type="text"
+        className="ss-input"
+        value={query}
+        onChange={handleInput}
+        onFocus={() => setOpen(true)}
+        placeholder={placeholder}
+        autoComplete="off"
+      />
+      {open && (
+        <ul className="ss-list">
+          {filtered.length > 0
+            ? filtered.map(o => (
+                <li key={o} className={`ss-option${o === value ? ' ss-option-active' : ''}`} onMouseDown={() => handleSelect(o)}>
+                  {o}
+                </li>
+              ))
+            : <li className="ss-option ss-option-empty">No matches — press Enter to use "{query}"</li>
+          }
+        </ul>
+      )}
+    </div>
+  )
+}
 
 const USER_GROUPS = [
   'Argentina Elastic User Group',
@@ -274,6 +336,8 @@ const GENERATOR_TYPES = [
   { value: 'eventPromotion', label: 'Event Promotion' },
   { value: 'knowBeforeYouGo', label: 'Meetup Know Before You Go' },
   { value: 'speakerOutreach', label: 'Speaker Outreach' },
+  { value: 'urlQrGenerator', label: 'URL with UTM Parameters' },
+  { value: 'qrCodeGenerator', label: 'QR Code Generator' },
 ]
 
 const GENERATOR_CARDS = [
@@ -292,6 +356,32 @@ const GENERATOR_CARDS = [
     title: '👤 Speaker Outreach',
     description: 'Generate a speaker outreach email and LinkedIn message.',
   },
+  {
+    value: 'urlQrGenerator',
+    title: '🔗 UTM URL Builder',
+    description: 'Build a UTM-tracked URL with source, medium, campaign, content, and term parameters. Shorten the link or turn it into a QR code instantly.',
+  },
+  {
+    value: 'qrCodeGenerator',
+    title: '◉ QR Code Generator',
+    description: 'Generate a branded QR code with custom colours, dot and eye shapes, and the Elastic logo centred. Download as a high-res PNG.',
+  },
+]
+
+const DOT_STYLES = [
+  { value: 'square',         label: 'Square',   icon: '■' },
+  { value: 'dots',           label: 'Dots',     icon: '●' },
+  { value: 'rounded',        label: 'Rounded',  icon: '▢' },
+  { value: 'extra-rounded',  label: 'Leaf',     icon: '◉' },
+  { value: 'classy',         label: 'Classy',   icon: '◆' },
+  { value: 'classy-rounded', label: 'Classy+',  icon: '◈' },
+]
+
+const EYE_STYLES = [
+  { value: '',               label: 'Auto',     icon: '–' },
+  { value: 'dot',            label: 'Circle',   icon: '●' },
+  { value: 'extra-rounded',  label: 'Rounded',  icon: '◉' },
+  { value: 'square',         label: 'Square',   icon: '■' },
 ]
 
 const KBYG_INITIAL_STATE = {
@@ -336,6 +426,66 @@ const SPEAKER_OUTREACH_INITIAL_STATE = {
   whatAsking: '',
   flexibilityNote: '',
   senderName: '',
+}
+
+const UTM_SOURCE_OPTIONS = [
+  'linktree',
+  'luma',
+  'meetup',
+  'speaker',
+]
+
+const UTM_MEDIUM_OPTIONS = [
+  'ahmedabad',
+  'amsterdam',
+  'austin',
+  'bangalore',
+  'barcelona',
+  'brisbane',
+  'canberra',
+  'chennai',
+  'chicago',
+  'dallas',
+  'denver',
+  'dublin',
+  'hyderabad',
+  'johannesburg',
+  'kochi',
+  'london',
+  'melbourne',
+  'mumbai',
+  'new-delhi',
+  'paris',
+  'pune',
+  'rouen',
+  'sao-paulo',
+  'seattle',
+  'singapore',
+  'sydney',
+  'tokyo',
+]
+
+const UTM_CAMPAIGN_OPTIONS = [
+  'hyperscalers',
+  'meetup-followup-cm',
+]
+
+const URL_QR_INITIAL_STATE = {
+  baseUrl: '',
+  utmSource: '',
+  utmMedium: '',
+  utmCampaign: '',
+  utmContent: '',
+  utmTerm: '',
+}
+
+const QR_INITIAL_STATE = {
+  qrLink: '',
+  qrColor: '#000000',
+  qrBgColor: '#FFFFFF',
+  qrTransparent: false,
+  qrDotStyle: 'square',
+  qrEyeStyle: '',
 }
 
 function generateKnowBeforeYouGoSubject(form) {
@@ -1599,12 +1749,32 @@ function generateMeetupCopy(form) {
   return { plain: plainLines.join('\n').trim(), html }
 }
 
+function buildUrlWithUtm(form) {
+  const { baseUrl, utmSource, utmMedium, utmCampaign, utmContent, utmTerm } = form
+  if (!baseUrl) return ''
+  const params = new URLSearchParams()
+  if (utmSource) params.append('utm_source', utmSource)
+  if (utmMedium) params.append('utm_medium', utmMedium)
+  if (utmCampaign) params.append('utm_campaign', utmCampaign)
+  if (utmContent) params.append('utm_content', utmContent)
+  if (utmTerm) params.append('utm_term', utmTerm)
+  return `${baseUrl}?${params.toString()}`
+}
+
 export default function App() {
   const [generatorType, setGeneratorType] = useState('eventPromotion')
   const [form, setForm] = useState(INITIAL_STATE)
   const [kbygForm, setKbygForm] = useState(KBYG_INITIAL_STATE)
   const [kbygIncludeTldr, setKbygIncludeTldr] = useState(true)
   const [outreachForm, setOutreachForm] = useState(SPEAKER_OUTREACH_INITIAL_STATE)
+  const [urlQrForm, setUrlQrForm] = useState(URL_QR_INITIAL_STATE)
+  const [qrForm, setQrForm] = useState(QR_INITIAL_STATE)
+  const [generatedQr, setGeneratedQr] = useState(false)
+  const [qrCopied, setQrCopied] = useState(false)
+  const qrContainerRef = useRef(null)
+  const qrCodeRef = useRef(null)
+  const qrOptionsRef = useRef(null)
+  const [shortenCopied, setShortenCopied] = useState(false)
   const [generatedCopy, setGeneratedCopy] = useState('')
   const [meetupPageHtml, setMeetupPageHtml] = useState('')
   const [generatedSubject, setGeneratedSubject] = useState('')
@@ -1646,6 +1816,36 @@ export default function App() {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  useEffect(() => {
+    if (!generatedQr) {
+      qrCodeRef.current = null
+      return
+    }
+    if (!qrContainerRef.current) return
+    const opts = {
+      width: 256,
+      height: 256,
+      data: qrForm.qrLink,
+      dotsOptions: { color: qrForm.qrColor, type: qrForm.qrDotStyle },
+      backgroundOptions: { color: qrForm.qrTransparent ? 'transparent' : qrForm.qrBgColor },
+      ...(qrForm.qrEyeStyle ? {
+        cornersSquareOptions: { type: qrForm.qrEyeStyle, color: qrForm.qrColor },
+        cornersDotOptions: { type: qrForm.qrEyeStyle === 'dot' ? 'dot' : 'square', color: qrForm.qrColor },
+      } : {}),
+      image: elasticLogo,
+      imageOptions: { crossOrigin: 'anonymous', margin: 5, imageSize: 0.3 },
+      qrOptions: { errorCorrectionLevel: 'H' },
+    }
+    qrOptionsRef.current = opts
+    if (!qrCodeRef.current) {
+      qrCodeRef.current = new QRCodeStyling(opts)
+      qrContainerRef.current.innerHTML = ''
+      qrCodeRef.current.append(qrContainerRef.current)
+    } else {
+      qrCodeRef.current.update(opts)
+    }
+  }, [generatedQr, qrForm])
 
   const selectGroup = (name) => {
     setForm((prev) => ({ ...prev, chapterOrCity: name }))
@@ -1705,6 +1905,34 @@ export default function App() {
   const updateOutreach = (key) => (e) =>
     setOutreachForm((prev) => ({ ...prev, [key]: e.target.value }))
 
+  const updateUrlQr = (key) => (e) =>
+    setUrlQrForm((prev) => ({ ...prev, [key]: e.target.value }))
+
+  const updateQr = (key) => (e) => {
+    const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value
+    setQrForm((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const handleGenerateQr = (e) => {
+    e.preventDefault()
+    if (qrForm.qrLink) setGeneratedQr(true)
+  }
+
+  const handleCreateQrFromUrl = () => {
+    setQrForm(prev => ({ ...prev, qrLink: generatedCopy }))
+    setGeneratedQr(false)
+    setGeneratorType('qrCodeGenerator')
+    setGeneratedCopy('')
+  }
+
+  const handleShortenLink = () => {
+    navigator.clipboard.writeText(generatedCopy).then(() => {
+      setShortenCopied(true)
+      setTimeout(() => setShortenCopied(false), 2000)
+    }).catch(() => {})
+    window.open('https://links.app.elstc.co', '_blank', 'noopener,noreferrer')
+  }
+
   const handleGenerate = () => {
     if (generatorType === 'knowBeforeYouGo') {
       setGeneratedSubject(generateKnowBeforeYouGoSubject(kbygForm))
@@ -1724,6 +1952,14 @@ export default function App() {
         setMeetupPageHtml('')
         setGeneratedOutreachLinkedIn(generateSpeakerOutreachLinkedIn(outreachForm, outreachVariant))
       }
+    } else if (generatorType === 'urlQrGenerator') {
+      const finalUrl = buildUrlWithUtm(urlQrForm)
+      setGeneratedCopy(finalUrl)
+      setGeneratedSubject('')
+      setMeetupPageHtml('')
+      setGeneratedOutreachLinkedIn('')
+    } else if (generatorType === 'qrCodeGenerator') {
+      if (qrForm.qrLink) setGeneratedQr(true)
     } else {
       setGeneratedSubject('')
       const page = generateMeetupCopy(form)
@@ -1783,6 +2019,11 @@ export default function App() {
       setKbygForm(KBYG_INITIAL_STATE)
     } else if (generatorType === 'speakerOutreach') {
       setOutreachForm(SPEAKER_OUTREACH_INITIAL_STATE)
+    } else if (generatorType === 'urlQrGenerator') {
+      setUrlQrForm(URL_QR_INITIAL_STATE)
+    } else if (generatorType === 'qrCodeGenerator') {
+      setQrForm(QR_INITIAL_STATE)
+      setGeneratedQr(false)
     } else {
       setForm(INITIAL_STATE)
       setShowSpeaker2(false)
@@ -1844,38 +2085,45 @@ export default function App() {
   return (
     <div className="app">
       <header className="header">
-        <h1><span className="header-emoji" role="img" aria-hidden="true">🧰</span> Elastic DevRel Programs Toolkit</h1>
-        <p className="subtitle">Generate meetup event pages, promo posts, and speaker logistics emails.</p>
+        <h1><span className="header-emoji" role="img" aria-hidden="true">🧰</span> Elastic DevRel (Programs) Toolkit</h1>
+        <p className="subtitle">Generate event copy, speaker emails, UTM-tracked links, and branded QR codes — everything you need to run a meetup.</p>
       </header>
 
-      <div className="layout">
+      <div className="app-body">
+        <nav className="sidebar" aria-label="Generator navigation">
+          <div className="sidebar-heading">Generators</div>
+          {GENERATOR_CARDS.map((card) => {
+            const [icon, ...rest] = card.title.split(' ')
+            const label = rest.join(' ')
+            return (
+              <button
+                key={card.value}
+                type="button"
+                className={`sidebar-item ${generatorType === card.value ? 'sidebar-item-active' : ''}`}
+                onClick={() => {
+                  setGeneratorType(card.value)
+                  setGeneratedCopy('')
+                  setMeetupPageHtml('')
+                  setGeneratedSubject('')
+                  setGeneratedOutreachLinkedIn('')
+                  setLinkedInPost('')
+                }}
+                aria-pressed={generatorType === card.value}
+                title={card.title}
+              >
+                <span className="sidebar-icon">{icon}</span>
+                <span className="sidebar-item-text">
+                  <span className="sidebar-label-text">{label}</span>
+                  <span className="sidebar-item-desc">{card.description}</span>
+                </span>
+              </button>
+            )
+          })}
+        </nav>
+        <div className="app-content">
+        <div className="layout">
         <>
         <aside className="form-panel">
-          <section className="generator-chooser" aria-label="Choose a generator">
-            <h2 className="generator-chooser-heading">Choose a Generator</h2>
-            <div className="generator-cards">
-              {GENERATOR_CARDS.map((card) => (
-                <button
-                  key={card.value}
-                  type="button"
-                  className={`generator-card ${generatorType === card.value ? 'generator-card-active' : ''}`}
-                  onClick={() => {
-                    setGeneratorType(card.value)
-                    setGeneratedCopy('')
-                    setMeetupPageHtml('')
-                    setGeneratedSubject('')
-                    setGeneratedOutreachLinkedIn('')
-                    setLinkedInPost('')
-                  }}
-                  aria-pressed={generatorType === card.value}
-                  aria-label={`Select ${card.title} generator`}
-                >
-                  <span className="generator-card-title">{card.title}</span>
-                  <span className="generator-card-description">{card.description}</span>
-                </button>
-              ))}
-            </div>
-          </section>
 
           {generatorType === 'eventPromotion' && (
           <form
@@ -2396,26 +2644,163 @@ export default function App() {
             <button type="button" onClick={handleReset} className="btn-reset">🔄 Reset Form</button>
           </form>
           )}
+
+          {generatorType === 'urlQrGenerator' && (
+            <form
+              onSubmit={(e) => { e.preventDefault(); handleGenerate() }}
+              className="form"
+            >
+              <fieldset className="form-fieldset">
+                <legend>Destination</legend>
+                <label>
+                  Base URL *
+                  <input
+                    type="text"
+                    value={urlQrForm.baseUrl}
+                    onChange={updateUrlQr('baseUrl')}
+                    placeholder="e.g. https://example.com/event"
+                    required
+                  />
+                </label>
+              </fieldset>
+              <fieldset className="form-fieldset">
+                <legend>UTM Parameters</legend>
+                <label>
+                  UTM Source
+                  <SearchableSelect
+                    value={urlQrForm.utmSource}
+                    onChange={(v) => setUrlQrForm(prev => ({ ...prev, utmSource: v }))}
+                    options={UTM_SOURCE_OPTIONS}
+                    placeholder="Type to search or enter custom…"
+                  />
+                </label>
+                <label>
+                  UTM Medium
+                  <SearchableSelect
+                    value={urlQrForm.utmMedium}
+                    onChange={(v) => setUrlQrForm(prev => ({ ...prev, utmMedium: v }))}
+                    options={UTM_MEDIUM_OPTIONS}
+                    placeholder="Type to search or enter custom…"
+                  />
+                </label>
+                <label>
+                  UTM Campaign
+                  <SearchableSelect
+                    value={urlQrForm.utmCampaign}
+                    onChange={(v) => setUrlQrForm(prev => ({ ...prev, utmCampaign: v }))}
+                    options={UTM_CAMPAIGN_OPTIONS}
+                    placeholder="Type to search or enter custom…"
+                  />
+                </label>
+                <label>
+                  UTM Content
+                  <input type="text" value={urlQrForm.utmContent} onChange={updateUrlQr('utmContent')} placeholder="e.g. email" />
+                </label>
+                <label>
+                  UTM Term
+                  <input type="text" value={urlQrForm.utmTerm} onChange={updateUrlQr('utmTerm')} placeholder="e.g. elastic" />
+                </label>
+              </fieldset>
+              <button type="submit" className="btn-generate">Generate URL</button>
+              <button type="button" onClick={handleReset} className="btn-reset">🔄 Reset Form</button>
+            </form>
+          )}
+
+          {generatorType === 'qrCodeGenerator' && (
+            <form
+              onSubmit={(e) => { e.preventDefault(); handleGenerate() }}
+              className="form"
+            >
+              <fieldset className="form-fieldset">
+                <legend>Link</legend>
+                <label>
+                  Link to encode *
+                  <input
+                    type="text"
+                    value={qrForm.qrLink}
+                    onChange={updateQr('qrLink')}
+                    placeholder="e.g. https://example.com/event"
+                    required
+                  />
+                </label>
+              </fieldset>
+              <fieldset className="form-fieldset">
+                <legend>Appearance</legend>
+                <div className="qr-color-row">
+                  <label>
+                    QR Code Colour
+                    <div className="qr-color-input-group">
+                      <input type="color" value={qrForm.qrColor} onChange={updateQr('qrColor')} className="qr-color-swatch" />
+                      <input type="text" value={qrForm.qrColor} onChange={updateQr('qrColor')} placeholder="#000000" maxLength="7" className="qr-color-hex" />
+                    </div>
+                  </label>
+                  <label className={qrForm.qrTransparent ? 'qr-color-label-disabled' : ''}>
+                    Background Colour
+                    <div className="qr-color-input-group">
+                      <input type="color" value={qrForm.qrTransparent ? '#ffffff' : qrForm.qrBgColor} onChange={updateQr('qrBgColor')} className="qr-color-swatch" disabled={qrForm.qrTransparent} />
+                      <input type="text" value={qrForm.qrTransparent ? 'transparent' : qrForm.qrBgColor} onChange={updateQr('qrBgColor')} placeholder="#FFFFFF" maxLength="7" className="qr-color-hex" disabled={qrForm.qrTransparent} />
+                    </div>
+                  </label>
+                </div>
+                <label className="qr-transparent-label">
+                  <input type="checkbox" checked={qrForm.qrTransparent} onChange={updateQr('qrTransparent')} className="qr-transparent-checkbox" />
+                  Transparent background
+                </label>
+                <div className="qr-shape-row">
+                  <div className="qr-shape-group">
+                    <span className="qr-shape-label">Dot shape</span>
+                    <div className="qr-shape-picker">
+                      {DOT_STYLES.map(s => (
+                        <button
+                          key={s.value}
+                          type="button"
+                          title={s.label}
+                          className={`qr-shape-btn${qrForm.qrDotStyle === s.value ? ' qr-shape-btn-active' : ''}`}
+                          onClick={() => setQrForm(prev => ({ ...prev, qrDotStyle: s.value }))}
+                        >
+                          <span className="qr-shape-icon">{s.icon}</span>
+                          <span className="qr-shape-name">{s.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="qr-shape-group">
+                    <span className="qr-shape-label">Eye shape</span>
+                    <div className="qr-shape-picker">
+                      {EYE_STYLES.map(s => (
+                        <button
+                          key={s.value}
+                          type="button"
+                          title={s.label}
+                          className={`qr-shape-btn${qrForm.qrEyeStyle === s.value ? ' qr-shape-btn-active' : ''}`}
+                          onClick={() => setQrForm(prev => ({ ...prev, qrEyeStyle: s.value }))}
+                        >
+                          <span className="qr-shape-icon">{s.icon}</span>
+                          <span className="qr-shape-name">{s.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </fieldset>
+              <button type="submit" className="btn-generate">Generate QR Code</button>
+              <button type="button" onClick={handleReset} className="btn-reset">🔄 Reset Form</button>
+            </form>
+          )}
         </aside>
 
         <main className="output-panel">
           <div className="output-header">
             <h2>
-              {generatorType === 'knowBeforeYouGo' ? 'Generated email' : generatorType === 'speakerOutreach' ? 'Speaker Outreach' : 'Generated copy'}
+              {generatorType === 'knowBeforeYouGo' ? 'Generated email'
+                : generatorType === 'speakerOutreach' ? 'Speaker Outreach'
+                : generatorType === 'urlQrGenerator' ? 'Generated URL'
+                : generatorType === 'qrCodeGenerator' ? 'QR Code'
+                : 'Generated copy'}
             </h2>
-            {generatedCopy && generatorType !== 'speakerOutreach' && (
-              <button
-                type="button"
-                onClick={handleCopy}
-                className="btn-copy"
-                aria-pressed={copied}
-              >
-                {copied ? 'Copied!' : 'Copy to clipboard'}
-              </button>
-            )}
           </div>
           <div className="output-content">
-            {generatedCopy || (generatorType === 'speakerOutreach' && (generatedSubject || generatedOutreachLinkedIn)) ? (
+            {generatedCopy || (generatorType === 'qrCodeGenerator' && generatedQr) || (generatorType === 'speakerOutreach' && (generatedSubject || generatedOutreachLinkedIn)) ? (
               <>
                 {generatorType === 'speakerOutreach' && (
                   <div className="outreach-output-wrapper">
@@ -2562,6 +2947,69 @@ export default function App() {
                     </div>
                   </>
                 )}
+                {generatorType === 'urlQrGenerator' && generatedCopy && (
+                  <div className="url-output-section">
+                    <pre className="output-text url-output-text">{generatedCopy}</pre>
+                    <div className="output-actions url-output-actions">
+                      <button type="button" onClick={handleCopy} className="btn-copy" aria-pressed={copied}>
+                        {copied ? 'Copied!' : 'Copy URL'}
+                      </button>
+                      <button type="button" onClick={handleCreateQrFromUrl} className="btn-action">
+                        ◉ Create QR Code
+                      </button>
+                      <button type="button" onClick={handleShortenLink} className="btn-action">
+                        {shortenCopied ? '✓ Copied & Opening…' : '✂️ Shorten Link'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {generatorType === 'qrCodeGenerator' && generatedQr && (
+                  <div className="qr-standalone-output">
+                    <div
+                      className="qr-preview-container"
+                      style={{ background: qrForm.qrTransparent ? 'repeating-conic-gradient(#e0e0e0 0% 25%, #fff 0% 50%) 0 0 / 16px 16px' : qrForm.qrBgColor }}
+                    >
+                      <div ref={qrContainerRef} className="qr-canvas-wrapper" />
+                    </div>
+                    <p className="qr-encoded-url">{qrForm.qrLink}</p>
+                    <div className="output-actions">
+                      <button
+                        type="button"
+                        className="btn-copy"
+                        aria-pressed={qrCopied}
+                        onClick={async () => {
+                          if (!qrOptionsRef.current) return
+                          try {
+                            const hiRes = new QRCodeStyling({ ...qrOptionsRef.current, width: 1024, height: 1024 })
+                            const blob = await hiRes.getRawData('png')
+                            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+                            setQrCopied(true)
+                            setTimeout(() => setQrCopied(false), 2000)
+                          } catch (err) {
+                            console.error('Copy failed', err)
+                          }
+                        }}
+                      >
+                        {qrCopied ? 'Copied!' : 'Copy Image'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-copy"
+                        onClick={async () => {
+                          if (!qrOptionsRef.current) return
+                          try {
+                            const hiRes = new QRCodeStyling({ ...qrOptionsRef.current, width: 1024, height: 1024 })
+                            await hiRes.download({ name: 'elastic-qr-code', extension: 'png' })
+                          } catch (err) {
+                            console.error('Download failed', err)
+                          }
+                        }}
+                      >
+                        Download PNG
+                      </button>
+                    </div>
+                  </div>
+                )}
               </>
             ) : (
               <p className="output-placeholder">
@@ -2569,12 +3017,18 @@ export default function App() {
                   ? 'Fill in the form and click "Generate Email" to create the Know Before You Go logistics email.'
                   : generatorType === 'speakerOutreach'
                     ? 'Fill in the form and click "Generate" to create the subject line, outreach email, and LinkedIn message.'
-                    : 'Fill in the form and click "Generate Meetup Copy" to see the event description here. Use the buttons below to add optional Speaker 2 or Speaker 3.'}
+                    : generatorType === 'urlQrGenerator'
+                      ? 'Fill in the URL and UTM parameters, then click "Generate URL" to create your tracking link.'
+                      : generatorType === 'qrCodeGenerator'
+                        ? 'Enter a link and choose colours, then click "Generate QR Code" to create your branded QR code.'
+                        : 'Fill in the form and click "Generate Meetup Copy" to see the event description here. Use the buttons below to add optional Speaker 2 or Speaker 3.'}
               </p>
             )}
           </div>
         </main>
         </>
+      </div>
+      </div>
       </div>
     </div>
   )
