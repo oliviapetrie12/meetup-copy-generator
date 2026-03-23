@@ -1,6 +1,5 @@
 {
   "name": "meetup-page-generator",
-  "description": "Elastic DevRel Programs Toolkit",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -10,6 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "qr-code-styling": "^1.9.2",
+    "qrcode.react": "^4.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
