@@ -1,5 +1,6 @@
 {
   "name": "meetup-page-generator",
+  "description": "Elastic DevRel Programs Toolkit",
   "private": true,
   "version": "0.0.0",
   "type": "module",
