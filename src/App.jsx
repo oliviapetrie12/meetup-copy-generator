@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import QRCodeStyling from 'qr-code-styling'
+import QRCodeStyling from "qr-code-styling"
 import elasticLogo from './logo.png'
 
 function SearchableSelect({ value, onChange, options, placeholder = 'Type to search…', id }) {
@@ -298,6 +298,56 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;')
 }
 
+function emailTextToHtml(text) {
+  const lines = String(text || '').split('\n')
+  const parts = []
+  let paragraph = []
+  let listItems = []
+
+  const flushParagraph = () => {
+    if (!paragraph.length) return
+    parts.push(`<p style="margin:0 0 0.75em;line-height:1.5;">${paragraph.map((s) => escapeHtml(s)).join('<br>')}</p>`)
+    paragraph = []
+  }
+  const flushList = () => {
+    if (!listItems.length) return
+    parts.push(`<ul style="margin:0 0 0.75em 1.2em;padding:0;">${listItems.map((i) => `<li>${escapeHtml(i)}</li>`).join('')}</ul>`)
+    listItems = []
+  }
+
+  for (const raw of lines) {
+    const line = raw.trimEnd()
+    const bulletMatch = line.match(/^\s*[-•]\s+(.+)$/)
+    const boldHeader = line.match(/^\*\*(.+)\*\*$/)
+
+    if (!line.trim()) {
+      flushParagraph()
+      flushList()
+      continue
+    }
+
+    if (bulletMatch) {
+      flushParagraph()
+      listItems.push(bulletMatch[1].trim())
+      continue
+    }
+
+    if (boldHeader) {
+      flushParagraph()
+      flushList()
+      parts.push(`<p style="margin:0.75em 0 0.35em;line-height:1.4;"><strong>${escapeHtml(boldHeader[1].trim())}</strong></p>`)
+      continue
+    }
+
+    flushList()
+    paragraph.push(line)
+  }
+
+  flushParagraph()
+  flushList()
+  return `<div style="font-family:system-ui,-apple-system,sans-serif;">${parts.join('')}</div>`
+}
+
 const INITIAL_STATE = {
   chapterOrCity: '',
   eventTitle: '',
@@ -551,7 +601,7 @@ function generateKnowBeforeYouGoEmail(form, includeTldr) {
     }
 
     lines.push(sectionTitle('TL;DR'))
-    bullets.slice(0, 5).forEach((b) => lines.push(`• ${b}`))
+    bullets.slice(0, 5).forEach((b) => lines.push(`- ${b}`))
     lines.push('')
   }
 
@@ -578,8 +628,8 @@ function generateKnowBeforeYouGoEmail(form, includeTldr) {
 
   if (has(form.meetupLink) || has(form.lumaLink)) {
     lines.push(sectionTitle('Event Page'))
-    if (has(form.meetupLink)) lines.push(`• Meetup: ${trim(form.meetupLink)}`)
-    if (has(form.lumaLink)) lines.push(`• Luma: ${trim(form.lumaLink)}`)
+    if (has(form.meetupLink)) lines.push(`- Meetup: ${trim(form.meetupLink)}`)
+    if (has(form.lumaLink)) lines.push(`- Luma: ${trim(form.lumaLink)}`)
     lines.push('')
   }
 
@@ -594,9 +644,9 @@ function generateKnowBeforeYouGoEmail(form, includeTldr) {
       if (name && info) main = `${name} (${info})`
       else if (name) main = name
       else if (info) main = info
-      if (main && role) lines.push(`• ${main} – ${role}`)
-      else if (main) lines.push(`• ${main}`)
-      else if (role) lines.push(`• ${role}`)
+      if (main && role) lines.push(`- ${main} – ${role}`)
+      else if (main) lines.push(`- ${main}`)
+      else if (role) lines.push(`- ${role}`)
     })
     lines.push('')
   }
@@ -610,29 +660,29 @@ function generateKnowBeforeYouGoEmail(form, includeTldr) {
 
   if (has(form.foodDetails) || has(form.drinkDetails)) {
     lines.push(sectionTitle('Food & Refreshments'))
-    if (has(form.foodDetails)) lines.push(`• ${trim(form.foodDetails)}`)
-    if (has(form.drinkDetails)) lines.push(`• ${trim(form.drinkDetails)}`)
+    if (has(form.foodDetails)) lines.push(`- ${trim(form.foodDetails)}`)
+    if (has(form.drinkDetails)) lines.push(`- ${trim(form.drinkDetails)}`)
     lines.push('')
   }
 
   if (has(form.setupNotes) || has(form.swagNotes)) {
     lines.push(sectionTitle('Setup'))
-    if (has(form.setupNotes)) lines.push(`• ${trim(form.setupNotes)}`)
-    if (has(form.swagNotes)) lines.push(`• ${trim(form.swagNotes)}`)
+    if (has(form.setupNotes)) lines.push(`- ${trim(form.setupNotes)}`)
+    if (has(form.swagNotes)) lines.push(`- ${trim(form.swagNotes)}`)
     lines.push('')
   }
 
   if (has(form.avNotes)) {
     lines.push(sectionTitle('AV'))
     const avBullets = trim(form.avNotes).split(/\n+/).map((s) => s.trim()).filter(Boolean)
-    avBullets.forEach((b) => lines.push(`• ${b}`))
+    avBullets.forEach((b) => lines.push(`- ${b}`))
     lines.push('')
   }
 
   if (has(form.internalAgenda)) {
     lines.push(sectionTitle('Internal Agenda'))
     const agendaBullets = trim(form.internalAgenda).split(/\n+/).map((s) => s.trim()).filter(Boolean)
-    agendaBullets.forEach((b) => lines.push(`• ${b}`))
+    agendaBullets.forEach((b) => lines.push(`- ${b}`))
     lines.push('')
   }
 
@@ -1501,7 +1551,7 @@ function buildIntuitionWhyAttend(form, variant = 0) {
 }
 
 function buildIntuitionWhyAttendText(bullets) {
-  return bullets.map((b) => `• ${b}`).join('\n')
+  return bullets.map((b) => `- ${b}`).join('\n')
 }
 
 function buildIntuitionEmailBody(form, variant = 0) {
@@ -1564,7 +1614,7 @@ function buildIntuitionEmailBody(form, variant = 0) {
   lines.push('')
   lines.push('**Why Attend**')
   const whyBullets = buildIntuitionWhyAttend(form, variant)
-  whyBullets.forEach((b) => lines.push(`• ${b}`))
+  whyBullets.forEach((b) => lines.push(`- ${b}`))
   lines.push('')
   lines.push(closings[v])
   return lines.join('\n')
@@ -1778,6 +1828,7 @@ export default function App() {
   const [shortenCopied, setShortenCopied] = useState(false)
   const [generatedCopy, setGeneratedCopy] = useState('')
   const [meetupPageHtml, setMeetupPageHtml] = useState('')
+  const [kbygEmailHtml, setKbygEmailHtml] = useState('')
   const [generatedSubject, setGeneratedSubject] = useState('')
   const [generatedOutreachLinkedIn, setGeneratedOutreachLinkedIn] = useState('')
   const [linkedInPost, setLinkedInPost] = useState('')
@@ -1924,6 +1975,7 @@ export default function App() {
     setGeneratedQr(false)
     setGeneratorType('qrCodeGenerator')
     setGeneratedCopy('')
+    setKbygEmailHtml('')
   }
 
   const handleShortenLink = () => {
@@ -1937,7 +1989,9 @@ export default function App() {
   const handleGenerate = () => {
     if (generatorType === 'knowBeforeYouGo') {
       setGeneratedSubject(generateKnowBeforeYouGoSubject(kbygForm))
-      setGeneratedCopy(generateKnowBeforeYouGoEmail(kbygForm, kbygIncludeTldr))
+      const emailText = generateKnowBeforeYouGoEmail(kbygForm, kbygIncludeTldr)
+      setGeneratedCopy(emailText)
+      setKbygEmailHtml(emailTextToHtml(emailText))
       setMeetupPageHtml('')
       setGeneratedOutreachLinkedIn('')
     } else if (generatorType === 'speakerOutreach') {
@@ -1946,11 +2000,13 @@ export default function App() {
         setGeneratedSubject(generateSpeakerOutreachSubject(outreachForm, outreachVariant))
         setGeneratedCopy(generateSpeakerOutreachEmail(outreachForm, outreachVariant))
         setMeetupPageHtml('')
+        setKbygEmailHtml('')
         setGeneratedOutreachLinkedIn('')
       } else {
         setGeneratedSubject('')
         setGeneratedCopy('')
         setMeetupPageHtml('')
+        setKbygEmailHtml('')
         setGeneratedOutreachLinkedIn(generateSpeakerOutreachLinkedIn(outreachForm, outreachVariant))
       }
     } else if (generatorType === 'urlQrGenerator') {
@@ -1958,6 +2014,7 @@ export default function App() {
       setGeneratedCopy(finalUrl)
       setGeneratedSubject('')
       setMeetupPageHtml('')
+      setKbygEmailHtml('')
       setGeneratedOutreachLinkedIn('')
     } else if (generatorType === 'qrCodeGenerator') {
       if (qrForm.qrLink) setGeneratedQr(true)
@@ -1966,6 +2023,7 @@ export default function App() {
       const page = generateMeetupCopy(form)
       setGeneratedCopy(page.plain)
       setMeetupPageHtml(page.html)
+      setKbygEmailHtml('')
       setGeneratedOutreachLinkedIn('')
       setLinkedInPost(buildLinkedInPost(form, linkedinVariant))
     }
@@ -2005,6 +2063,17 @@ export default function App() {
         } catch {
           await navigator.clipboard.writeText(generatedCopy)
         }
+      } else if (generatorType === 'knowBeforeYouGo' && kbygEmailHtml && typeof ClipboardItem !== 'undefined') {
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({
+              'text/html': new Blob([kbygEmailHtml], { type: 'text/html' }),
+              'text/plain': new Blob([generatedCopy], { type: 'text/plain' }),
+            }),
+          ])
+        } catch {
+          await navigator.clipboard.writeText(generatedCopy)
+        }
       } else {
         await navigator.clipboard.writeText(generatedCopy)
       }
@@ -2032,6 +2101,7 @@ export default function App() {
     }
     setGeneratedCopy('')
     setMeetupPageHtml('')
+    setKbygEmailHtml('')
     setGeneratedSubject('')
     setGeneratedOutreachLinkedIn('')
     setLinkedInPost('')
@@ -2071,11 +2141,25 @@ export default function App() {
     }
   }
 
-  const copyIntuition = (getText, setCopiedState) => async () => {
+  const copyIntuition = (getText, setCopiedState, getHtml) => async () => {
     const text = getText()
     if (!text) return
     try {
-      await navigator.clipboard.writeText(text)
+      const html = typeof getHtml === 'function' ? getHtml() : ''
+      if (html && typeof ClipboardItem !== 'undefined') {
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({
+              'text/html': new Blob([html], { type: 'text/html' }),
+              'text/plain': new Blob([text], { type: 'text/plain' }),
+            }),
+          ])
+        } catch {
+          await navigator.clipboard.writeText(text)
+        }
+      } else {
+        await navigator.clipboard.writeText(text)
+      }
       setCopiedState(true)
       setTimeout(() => setCopiedState(false), 2000)
     } catch (err) {
@@ -2105,6 +2189,7 @@ export default function App() {
                   setGeneratorType(card.value)
                   setGeneratedCopy('')
                   setMeetupPageHtml('')
+                  setKbygEmailHtml('')
                   setGeneratedSubject('')
                   setGeneratedOutreachLinkedIn('')
                   setLinkedInPost('')
@@ -2607,11 +2692,11 @@ export default function App() {
               <legend>Channel</legend>
               <div className="channel-selector" role="group" aria-label="Outreach channel">
                 <label className={`channel-option ${outreachForm.channel === 'linkedin' ? 'channel-option-active' : ''}`}>
-                  <input type="radio" name="outreachChannel" value="linkedin" checked={outreachForm.channel === 'linkedin'} onChange={() => { setOutreachForm((p) => ({ ...p, channel: 'linkedin' })); setGeneratedSubject(''); setGeneratedCopy(''); setGeneratedOutreachLinkedIn(''); setLinkedInPost(''); }} />
+                  <input type="radio" name="outreachChannel" value="linkedin" checked={outreachForm.channel === 'linkedin'} onChange={() => { setOutreachForm((p) => ({ ...p, channel: 'linkedin' })); setGeneratedSubject(''); setGeneratedCopy(''); setKbygEmailHtml(''); setGeneratedOutreachLinkedIn(''); setLinkedInPost(''); }} />
                   <span>💬 LinkedIn Message</span>
                 </label>
                 <label className={`channel-option ${outreachForm.channel === 'email' ? 'channel-option-active' : ''}`}>
-                  <input type="radio" name="outreachChannel" value="email" checked={outreachForm.channel === 'email'} onChange={() => { setOutreachForm((p) => ({ ...p, channel: 'email' })); setGeneratedSubject(''); setGeneratedCopy(''); setGeneratedOutreachLinkedIn(''); setLinkedInPost(''); }} />
+                  <input type="radio" name="outreachChannel" value="email" checked={outreachForm.channel === 'email'} onChange={() => { setOutreachForm((p) => ({ ...p, channel: 'email' })); setGeneratedSubject(''); setGeneratedCopy(''); setKbygEmailHtml(''); setGeneratedOutreachLinkedIn(''); setLinkedInPost(''); }} />
                   <span>📧 Email</span>
                 </label>
               </div>
@@ -2869,7 +2954,11 @@ export default function App() {
                       </div>
                     )}
                     <h3 className="generated-email-heading">Generated Email</h3>
-                    <pre className="output-text">{generatedCopy}</pre>
+                    {kbygEmailHtml ? (
+                      <div className="meetup-page-preview output-text" dangerouslySetInnerHTML={{ __html: kbygEmailHtml }} />
+                    ) : (
+                      <pre className="output-text">{generatedCopy}</pre>
+                    )}
                     <div className="output-actions">
                       <button type="button" onClick={handleCopy} className="btn-copy" aria-pressed={copied}>
                         {copied ? 'Copied!' : 'Copy to clipboard'}
@@ -2934,14 +3023,32 @@ export default function App() {
                             <li key={i}>{bullet}</li>
                           ))}
                         </ul>
-                        <button type="button" onClick={copyIntuition(() => buildIntuitionWhyAttendText(buildIntuitionWhyAttend(form, emailBodyVariant)), setIntuitionWhyAttendCopied)} className="btn-copy" aria-pressed={intuitionWhyAttendCopied}>
+                        <button
+                          type="button"
+                          onClick={copyIntuition(
+                            () => buildIntuitionWhyAttendText(buildIntuitionWhyAttend(form, emailBodyVariant)),
+                            setIntuitionWhyAttendCopied,
+                            () => `<div style="font-family:system-ui,-apple-system,sans-serif;"><ul>${buildIntuitionWhyAttend(form, emailBodyVariant).map((b) => `<li>${escapeHtml(b)}</li>`).join('')}</ul></div>`,
+                          )}
+                          className="btn-copy"
+                          aria-pressed={intuitionWhyAttendCopied}
+                        >
                           {intuitionWhyAttendCopied ? 'Copied!' : 'Copy Why Attend'}
                         </button>
                       </div>
                       <div className="subject-line-section">
                         <h4 className="intuition-subheading">Email</h4>
-                        <pre className="output-text subject-line-text">{buildIntuitionEmailBody(form, emailBodyVariant)}</pre>
-                        <button type="button" onClick={copyIntuition(() => buildIntuitionEmailBody(form, emailBodyVariant), setIntuitionBodyCopied)} className="btn-copy" aria-pressed={intuitionBodyCopied}>
+                        <div className="meetup-page-preview output-text subject-line-text" dangerouslySetInnerHTML={{ __html: emailTextToHtml(buildIntuitionEmailBody(form, emailBodyVariant)) }} />
+                        <button
+                          type="button"
+                          onClick={copyIntuition(
+                            () => buildIntuitionEmailBody(form, emailBodyVariant),
+                            setIntuitionBodyCopied,
+                            () => emailTextToHtml(buildIntuitionEmailBody(form, emailBodyVariant)),
+                          )}
+                          className="btn-copy"
+                          aria-pressed={intuitionBodyCopied}
+                        >
                           {intuitionBodyCopied ? 'Copied!' : 'Copy Email'}
                         </button>
                       </div>
