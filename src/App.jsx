@@ -499,6 +499,7 @@ function generateKnowBeforeYouGoSubject(form) {
 function generateKnowBeforeYouGoEmail(form, includeTldr) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const has = (s) => trim(s).length > 0
+  const sectionTitle = (title) => `**${title}**`
 
   const lines = []
 
@@ -549,7 +550,7 @@ function generateKnowBeforeYouGoEmail(form, includeTldr) {
       add(agendaLines.length > 0, agendaLines.length > 0 ? `Agenda: ${agendaLines[0]}${agendaLines.length > 1 ? ' … (see full agenda below)' : ''}` : null)
     }
 
-    lines.push('TL;DR')
+    lines.push(sectionTitle('TL;DR'))
     bullets.slice(0, 5).forEach((b) => lines.push(`• ${b}`))
     lines.push('')
   }
@@ -568,7 +569,7 @@ function generateKnowBeforeYouGoEmail(form, includeTldr) {
   lines.push('')
 
   if (has(form.eventDate) || has(form.eventTime)) {
-    lines.push('Date and Time')
+    lines.push(sectionTitle('Date and Time'))
     const when = [trim(form.eventDate), trim(form.eventTime)].filter(Boolean).join(' at ')
     if (when) lines.push(when)
     if (has(form.arrivalTime)) lines.push(`Arrival time: ${trim(form.arrivalTime)}`)
@@ -576,7 +577,7 @@ function generateKnowBeforeYouGoEmail(form, includeTldr) {
   }
 
   if (has(form.meetupLink) || has(form.lumaLink)) {
-    lines.push('Event Page')
+    lines.push(sectionTitle('Event Page'))
     if (has(form.meetupLink)) lines.push(`• Meetup: ${trim(form.meetupLink)}`)
     if (has(form.lumaLink)) lines.push(`• Luma: ${trim(form.lumaLink)}`)
     lines.push('')
@@ -584,7 +585,7 @@ function generateKnowBeforeYouGoEmail(form, includeTldr) {
 
   const contactEntries = (form.contacts || []).filter((c) => has(c.name) || has(c.role) || has(c.contactInfo))
   if (contactEntries.length > 0) {
-    lines.push('Helpful Contacts')
+    lines.push(sectionTitle('Helpful Contacts'))
     contactEntries.forEach((c) => {
       const name = trim(c.name)
       const role = trim(c.role)
@@ -601,42 +602,42 @@ function generateKnowBeforeYouGoEmail(form, includeTldr) {
   }
 
   if (has(form.venueName) || has(form.venueAddress)) {
-    lines.push('Location')
+    lines.push(sectionTitle('Location'))
     if (has(form.venueName)) lines.push(trim(form.venueName))
     if (has(form.venueAddress)) lines.push(trim(form.venueAddress))
     lines.push('')
   }
 
   if (has(form.foodDetails) || has(form.drinkDetails)) {
-    lines.push('Food & Refreshments')
+    lines.push(sectionTitle('Food & Refreshments'))
     if (has(form.foodDetails)) lines.push(`• ${trim(form.foodDetails)}`)
     if (has(form.drinkDetails)) lines.push(`• ${trim(form.drinkDetails)}`)
     lines.push('')
   }
 
   if (has(form.setupNotes) || has(form.swagNotes)) {
-    lines.push('Setup')
+    lines.push(sectionTitle('Setup'))
     if (has(form.setupNotes)) lines.push(`• ${trim(form.setupNotes)}`)
     if (has(form.swagNotes)) lines.push(`• ${trim(form.swagNotes)}`)
     lines.push('')
   }
 
   if (has(form.avNotes)) {
-    lines.push('AV')
+    lines.push(sectionTitle('AV'))
     const avBullets = trim(form.avNotes).split(/\n+/).map((s) => s.trim()).filter(Boolean)
     avBullets.forEach((b) => lines.push(`• ${b}`))
     lines.push('')
   }
 
   if (has(form.internalAgenda)) {
-    lines.push('Internal Agenda')
+    lines.push(sectionTitle('Internal Agenda'))
     const agendaBullets = trim(form.internalAgenda).split(/\n+/).map((s) => s.trim()).filter(Boolean)
     agendaBullets.forEach((b) => lines.push(`• ${b}`))
     lines.push('')
   }
 
   if (has(form.additionalNotes)) {
-    lines.push('Additional notes')
+    lines.push(sectionTitle('Additional notes'))
     lines.push(trim(form.additionalNotes))
     lines.push('')
   }
