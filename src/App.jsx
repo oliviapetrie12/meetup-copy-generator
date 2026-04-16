@@ -527,9 +527,36 @@ const KBYG_INITIAL_STATE = {
   avNotes: '',
   internalAgenda: '',
   additionalNotes: '',
-  includeTakePhotos: true,
+  includePhotos: true,
   generateTldr: true,
   kbygTldrInclude: getInitialKbygTldrInclude(),
+}
+
+const KBYG_FORM_STORAGE_KEY = 'meetup-kbyg-form-v1'
+
+function loadKbygFormFromStorage() {
+  if (typeof localStorage === 'undefined') return KBYG_INITIAL_STATE
+  try {
+    const raw = localStorage.getItem(KBYG_FORM_STORAGE_KEY)
+    if (!raw) return KBYG_INITIAL_STATE
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return KBYG_INITIAL_STATE
+    return {
+      ...KBYG_INITIAL_STATE,
+      ...parsed,
+      kbygTldrInclude: {
+        ...getInitialKbygTldrInclude(),
+        ...(parsed.kbygTldrInclude && typeof parsed.kbygTldrInclude === 'object' ? parsed.kbygTldrInclude : {}),
+      },
+      includePhotos: Object.prototype.hasOwnProperty.call(parsed, 'includePhotos')
+        ? parsed.includePhotos
+        : Object.prototype.hasOwnProperty.call(parsed, 'includeTakePhotos')
+          ? parsed.includeTakePhotos
+          : KBYG_INITIAL_STATE.includePhotos,
+    }
+  } catch {
+    return KBYG_INITIAL_STATE
+  }
 }
 
 const SPEAKER_OUTREACH_INITIAL_STATE = {
@@ -855,7 +882,7 @@ function buildKnowBeforeYouGoEmailHtml(form) {
     }
   }
 
-  if (form.includeTakePhotos !== false) {
+  if (form.includePhotos !== false) {
     const takePhotosHtml = KBYG_TAKE_PHOTOS_DEFAULT_LINES.map((line) => `• ${escapeHtml(line)}`).join('<br>')
     chunks.push(
       `<p style="margin:0;line-height:1.5;"><strong>📸 Take Photos</strong><br><br>${takePhotosHtml}</p>`,
@@ -1015,7 +1042,7 @@ function generateKnowBeforeYouGoEmail(form) {
     }
   }
 
-  if (form.includeTakePhotos !== false) {
+  if (form.includePhotos !== false) {
     lines.push(sectionTitle('📸 Take Photos'))
     KBYG_TAKE_PHOTOS_DEFAULT_LINES.forEach((line) => lines.push(`- ${line}`))
     lines.push('')
@@ -2153,7 +2180,14 @@ function buildUrlWithUtm(form) {
 export default function App() {
   const [generatorType, setGeneratorType] = useState('eventPromotion')
   const [form, setForm] = useState(INITIAL_STATE)
-  const [kbygForm, setKbygForm] = useState(KBYG_INITIAL_STATE)
+  const [kbygForm, setKbygForm] = useState(loadKbygFormFromStorage)
+  useEffect(() => {
+    try {
+      localStorage.setItem(KBYG_FORM_STORAGE_KEY, JSON.stringify(kbygForm))
+    } catch {
+      // ignore quota / private mode
+    }
+  }, [kbygForm])
   const [outreachForm, setOutreachForm] = useState(SPEAKER_OUTREACH_INITIAL_STATE)
   const [urlQrForm, setUrlQrForm] = useState(URL_QR_INITIAL_STATE)
   const [qrForm, setQrForm] = useState(QR_INITIAL_STATE)
@@ -3063,7 +3097,7 @@ export default function App() {
                 </label>
               </div>
               <div
-                className={`kbyg-photo-checklist-card${kbygForm.includeTakePhotos !== false ? ' kbyg-photo-checklist-card--on' : ''}`}
+                className={`kbyg-photo-checklist-card${kbygForm.includePhotos !== false ? ' kbyg-photo-checklist-card--on' : ''}`}
                 aria-labelledby="kbyg-photo-checklist-title"
               >
                 <div className="kbyg-photo-checklist-card-header">
@@ -3076,8 +3110,8 @@ export default function App() {
                   <label className="kbyg-photo-checklist-include checkbox-label">
                     <input
                       type="checkbox"
-                      checked={kbygForm.includeTakePhotos !== false}
-                      onChange={updateKbygCheckbox('includeTakePhotos')}
+                      checked={kbygForm.includePhotos !== false}
+                      onChange={updateKbygCheckbox('includePhotos')}
                       aria-describedby="kbyg-photo-checklist-title"
                     />
                     <span className="kbyg-photo-checklist-include-text">Include in email</span>
