@@ -442,6 +442,41 @@ const EYE_STYLES = [
   { value: 'square',         label: 'Square',   icon: '■' },
 ]
 
+const KBYG_TLDR_ITEM_ORDER = [
+  'arrival_time',
+  'venue_location',
+  'parking',
+  'food_drinks',
+  'speaker_arrival',
+  'av_setup',
+  'host_contact',
+  'custom_note',
+]
+
+const KBYG_TLDR_LABELS = {
+  arrival_time: 'Arrival time',
+  venue_location: 'Venue / location',
+  parking: 'Parking',
+  food_drinks: 'Food & drinks',
+  speaker_arrival: 'Speaker arrival note',
+  av_setup: 'AV / presentation setup',
+  host_contact: 'Host / point of contact',
+  custom_note: 'Custom note',
+}
+
+function getInitialKbygTldrInclude() {
+  return {
+    arrival_time: true,
+    venue_location: true,
+    parking: false,
+    food_drinks: true,
+    speaker_arrival: false,
+    av_setup: false,
+    host_contact: true,
+    custom_note: false,
+  }
+}
+
 const KBYG_INITIAL_STATE = {
   recipients: '',
   greetingNames: '',
@@ -451,6 +486,7 @@ const KBYG_INITIAL_STATE = {
   arrivalTime: '',
   venueName: '',
   venueAddress: '',
+  parkingNotes: '',
   meetupLink: '',
   lumaLink: '',
   contacts: [
@@ -463,6 +499,7 @@ const KBYG_INITIAL_STATE = {
   speaker2Name: '',
   speaker2Title: '',
   speaker2TalkTitle: '',
+  speakerArrivalNote: '',
   foodDetails: '',
   drinkDetails: '',
   swagNotes: '',
@@ -470,6 +507,8 @@ const KBYG_INITIAL_STATE = {
   avNotes: '',
   internalAgenda: '',
   additionalNotes: '',
+  generateTldr: true,
+  kbygTldrInclude: getInitialKbygTldrInclude(),
 }
 
 const SPEAKER_OUTREACH_INITIAL_STATE = {
@@ -554,44 +593,97 @@ function generateKnowBeforeYouGoSubject(form) {
   return `${title} | Meetup Know Before You Go${date ? ` | ${date}` : ''}`
 }
 
+const MAX_KBYG_TLDR_LEN = 115
+
+function truncateKbygTldr(s, max = MAX_KBYG_TLDR_LEN) {
+  const t = (typeof s === 'string' ? s.trim() : '').replace(/\s+/g, ' ')
+  if (!t) return ''
+  if (t.length <= max) return t
+  return `${t.slice(0, max - 1).trimEnd()}…`
+}
+
 function buildKbygTldrBullets(form) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const has = (s) => trim(s).length > 0
-  const bullets = []
-  const add = (condition, text) => { if (condition && text && bullets.length < 5) bullets.push(text) }
+  if (form.generateTldr === false) return []
 
-  if (has(form.arrivalTime)) add(true, `Arrive by ${trim(form.arrivalTime)}.`)
-  if (has(form.eventDate) || has(form.eventTime)) {
-    const when = [trim(form.eventDate), trim(form.eventTime)].filter(Boolean).join(' at ')
-    if (when) add(true, `Event: ${when}.`)
+  const inc = { ...getInitialKbygTldrInclude(), ...(form.kbygTldrInclude || {}) }
+  const out = []
+
+  for (const id of KBYG_TLDR_ITEM_ORDER) {
+    if (!inc[id]) continue
+    switch (id) {
+      case 'arrival_time': {
+        if (has(form.arrivalTime)) {
+          out.push(`Arrive by ${trim(form.arrivalTime)}.`)
+        } else if (has(form.eventDate) || has(form.eventTime)) {
+          const when = [trim(form.eventDate), trim(form.eventTime)].filter(Boolean).join(' at ')
+          if (when) out.push(`When: ${when}.`)
+        }
+        break
+      }
+      case 'venue_location': {
+        if (has(form.venueName) || has(form.venueAddress)) {
+          const parts = [trim(form.venueName), trim(form.venueAddress)].filter(Boolean)
+          out.push(`Venue: ${truncateKbygTldr(parts.join(' — '))}`)
+        }
+        break
+      }
+      case 'parking':
+        if (has(form.parkingNotes)) {
+          out.push(`Parking: ${truncateKbygTldr(form.parkingNotes)}`)
+        }
+        break
+      case 'food_drinks': {
+        if (has(form.foodDetails) || has(form.drinkDetails)) {
+          const fd = [trim(form.foodDetails), trim(form.drinkDetails)].filter(Boolean).join('; ')
+          out.push(truncateKbygTldr(`Food & drinks: ${fd}${fd.endsWith('.') ? '' : '.'}`))
+        }
+        break
+      }
+      case 'speaker_arrival':
+        if (has(form.speakerArrivalNote)) {
+          out.push(truncateKbygTldr(form.speakerArrivalNote))
+        }
+        break
+      case 'av_setup': {
+        if (has(form.avNotes)) {
+          const firstAv = trim(form.avNotes)
+            .split(/\n+/)
+            .map((s) => s.trim())
+            .filter(Boolean)[0]
+          if (firstAv) out.push(`AV: ${truncateKbygTldr(firstAv, 100)}`)
+        }
+        break
+      }
+      case 'host_contact': {
+        const c = (form.contacts || []).find((x) => has(x.name))
+        if (c) {
+          const bits = [trim(c.name)]
+          if (has(c.role)) bits.push(trim(c.role))
+          if (has(c.contactInfo)) bits.push(trim(c.contactInfo))
+          out.push(`Contact: ${truncateKbygTldr(bits.join(' · '))}`)
+        }
+        break
+      }
+      case 'custom_note':
+        if (has(form.additionalNotes)) {
+          trim(form.additionalNotes)
+            .split(/\n/)
+            .map((l) => l.trim())
+            .filter(Boolean)
+            .slice(0, 3)
+            .forEach((line) => {
+              out.push(truncateKbygTldr(line, 100))
+            })
+        }
+        break
+      default:
+        break
+    }
   }
 
-  const hasAnyContact = (form.contacts || []).some((c) => has(c.name) || has(c.role) || has(c.contactInfo))
-  add(hasAnyContact, 'Your host and key contacts are listed in Helpful Contacts below.')
-
-  if (has(form.speaker1Name) || has(form.speaker2Name)) add(true, 'Speakers: bring your laptop, slides, and any demo setup.')
-  if (has(form.avNotes)) {
-    const firstAv = trim(form.avNotes).split(/\n+/).map((s) => s.trim()).filter(Boolean)[0]
-    add(!!firstAv, firstAv ? `AV: ${firstAv}` : 'See AV section below.')
-  }
-
-  if (has(form.venueName)) add(true, `Venue: ${trim(form.venueName)}.`)
-  else if (has(form.venueAddress)) add(true, `Location: ${trim(form.venueAddress)}.`)
-
-  if (has(form.foodDetails) || has(form.drinkDetails)) {
-    const fd = [trim(form.foodDetails), trim(form.drinkDetails)].filter(Boolean).join('; ')
-    add(true, `Food & drinks: ${fd}.`)
-  }
-
-  if (has(form.setupNotes)) add(true, `Setup: ${trim(form.setupNotes)}`)
-  if (has(form.swagNotes) && bullets.length < 5) add(true, `Swag: ${trim(form.swagNotes)}`)
-
-  if (has(form.internalAgenda) && bullets.length < 5) {
-    const agendaLines = trim(form.internalAgenda).split(/\n+/).map((s) => s.trim()).filter(Boolean)
-    add(agendaLines.length > 0, agendaLines.length > 0 ? `Agenda: ${agendaLines[0]}${agendaLines.length > 1 ? ' … (see full agenda below)' : ''}` : null)
-  }
-
-  return bullets.slice(0, 5)
+  return out.slice(0, 10)
 }
 
 function escapeHtmlAttr(s) {
@@ -599,7 +691,7 @@ function escapeHtmlAttr(s) {
   return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;')
 }
 
-function buildKnowBeforeYouGoEmailHtml(form, includeTldr) {
+function buildKnowBeforeYouGoEmailHtml(form) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const has = (s) => trim(s).length > 0
   const names = trim(form.greetingNames) || 'everyone'
@@ -618,11 +710,9 @@ function buildKnowBeforeYouGoEmailHtml(form, includeTldr) {
   if (arrivalTime) titleBody += `<br>${escapeHtml(`Arrive by ${arrivalTime}`)}`
   chunks.push(`<p style="margin:0;line-height:1.5;"><strong>Title</strong><br><br>${titleBody}</p>`)
 
-  if (includeTldr) {
-    const tldrBullets = buildKbygTldrBullets(form)
-    const tldrInner = tldrBullets.length
-      ? `<span style="background-color: #FEF08A; font-weight: bold;">TL;DR</span><br><br>${tldrBullets.map((i) => `• ${escapeHtml(i)}`).join('<br>')}`
-      : `<span style="background-color: #FEF08A; font-weight: bold;">TL;DR</span>`
+  const tldrBullets = buildKbygTldrBullets(form)
+  if (tldrBullets.length > 0) {
+    const tldrInner = `<span style="background-color: #FEF08A; font-weight: bold;">TL;DR</span><br><br>${tldrBullets.map((i) => `• ${escapeHtml(i)}`).join('<br>')}`
     chunks.push(`<p style="margin:0;line-height:1.5;">${tldrInner}</p>`)
   }
 
@@ -643,6 +733,12 @@ function buildKnowBeforeYouGoEmailHtml(form, includeTldr) {
     if (has(form.venueName)) loc += escapeHtml(trim(form.venueName))
     if (has(form.venueAddress)) loc += (loc ? '<br>' : '') + escapeHtml(trim(form.venueAddress))
     chunks.push(`<p style="margin:0;line-height:1.5;"><strong>Location</strong><br><br>${loc}</p>`)
+  }
+
+  if (has(form.parkingNotes)) {
+    chunks.push(
+      `<p style="margin:0;line-height:1.5;"><strong>Parking</strong><br><br>${escapeHtml(trim(form.parkingNotes)).replace(/\n/g, '<br>')}</p>`,
+    )
   }
 
   if (has(form.internalAgenda)) {
@@ -735,7 +831,7 @@ function buildKnowBeforeYouGoEmailHtml(form, includeTldr) {
   return `<div style="font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.5;color:#202124;">${body}</div>`
 }
 
-function generateKnowBeforeYouGoEmail(form, includeTldr) {
+function generateKnowBeforeYouGoEmail(form) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const has = (s) => trim(s).length > 0
   const sectionTitle = (title) => `**${title}**`
@@ -757,9 +853,10 @@ function generateKnowBeforeYouGoEmail(form, includeTldr) {
   if (arrivalTime) lines.push(`Arrive by ${arrivalTime}`)
   lines.push('')
 
-  if (includeTldr) {
+  const tldrBulletsPlain = buildKbygTldrBullets(form)
+  if (tldrBulletsPlain.length > 0) {
     lines.push(sectionTitle('TL;DR'))
-    buildKbygTldrBullets(form).forEach((b) => lines.push(`- ${b}`))
+    tldrBulletsPlain.forEach((b) => lines.push(`- ${b}`))
     lines.push('')
   }
 
@@ -778,6 +875,12 @@ function generateKnowBeforeYouGoEmail(form, includeTldr) {
     lines.push(sectionTitle('Location'))
     if (has(form.venueName)) lines.push(trim(form.venueName))
     if (has(form.venueAddress)) lines.push(trim(form.venueAddress))
+    lines.push('')
+  }
+
+  if (has(form.parkingNotes)) {
+    lines.push(sectionTitle('Parking'))
+    lines.push(trim(form.parkingNotes))
     lines.push('')
   }
 
@@ -1983,7 +2086,6 @@ export default function App() {
   const [generatorType, setGeneratorType] = useState('eventPromotion')
   const [form, setForm] = useState(INITIAL_STATE)
   const [kbygForm, setKbygForm] = useState(KBYG_INITIAL_STATE)
-  const [kbygIncludeTldr, setKbygIncludeTldr] = useState(true)
   const [outreachForm, setOutreachForm] = useState(SPEAKER_OUTREACH_INITIAL_STATE)
   const [urlQrForm, setUrlQrForm] = useState(URL_QR_INITIAL_STATE)
   const [qrForm, setQrForm] = useState(QR_INITIAL_STATE)
@@ -2109,6 +2211,17 @@ export default function App() {
   const updateKbyg = (key) => (e) =>
     setKbygForm((prev) => ({ ...prev, [key]: e.target.value }))
 
+  const kbygTldrIncludeMerged = { ...getInitialKbygTldrInclude(), ...(kbygForm.kbygTldrInclude || {}) }
+
+  const updateKbygCheckbox = (key) => (e) =>
+    setKbygForm((prev) => ({ ...prev, [key]: e.target.checked }))
+
+  const updateKbygTldrInclude = (id) => (e) =>
+    setKbygForm((prev) => ({
+      ...prev,
+      kbygTldrInclude: { ...getInitialKbygTldrInclude(), ...(prev.kbygTldrInclude || {}), [id]: e.target.checked },
+    }))
+
   const updateKbygContact = (index, field) => (e) =>
     setKbygForm((prev) => ({
       ...prev,
@@ -2156,9 +2269,9 @@ export default function App() {
   const handleGenerate = () => {
     if (generatorType === 'knowBeforeYouGo') {
       setGeneratedSubject(generateKnowBeforeYouGoSubject(kbygForm))
-      const emailText = generateKnowBeforeYouGoEmail(kbygForm, kbygIncludeTldr)
+      const emailText = generateKnowBeforeYouGoEmail(kbygForm)
       setGeneratedCopy(emailText)
-      setKbygEmailHtml(buildKnowBeforeYouGoEmailHtml(kbygForm, kbygIncludeTldr))
+      setKbygEmailHtml(buildKnowBeforeYouGoEmailHtml(kbygForm))
       setMeetupPageHtml('')
       setGeneratedOutreachLinkedIn('')
     } else if (generatorType === 'speakerOutreach') {
@@ -2802,6 +2915,10 @@ export default function App() {
               <legend>Location</legend>
               <label>Venue name <input type="text" value={kbygForm.venueName} onChange={updateKbyg('venueName')} placeholder="e.g. WeWork Downtown" /></label>
               <label>Venue address <input type="text" value={kbygForm.venueAddress} onChange={updateKbyg('venueAddress')} placeholder="e.g. 123 Main St" /></label>
+              <label>
+                Parking <span className="form-hint">(optional)</span>
+                <input type="text" value={kbygForm.parkingNotes} onChange={updateKbyg('parkingNotes')} />
+              </label>
             </fieldset>
             <fieldset className="form-fieldset">
               <legend>Event Links</legend>
@@ -2827,6 +2944,10 @@ export default function App() {
               <label>Speaker 2 name <input type="text" value={kbygForm.speaker2Name} onChange={updateKbyg('speaker2Name')} placeholder="e.g. John Doe" /></label>
               <label>Speaker 2 title <input type="text" value={kbygForm.speaker2Title} onChange={updateKbyg('speaker2Title')} placeholder="e.g. Principal Engineer" /></label>
               <label>Speaker 2 talk title <input type="text" value={kbygForm.speaker2TalkTitle} onChange={updateKbyg('speaker2TalkTitle')} placeholder="Talk title" /></label>
+              <label>
+                Speaker arrival note <span className="form-hint">(optional)</span>
+                <input type="text" value={kbygForm.speakerArrivalNote} onChange={updateKbyg('speakerArrivalNote')} />
+              </label>
             </fieldset>
             <fieldset className="form-fieldset">
               <legend>Logistics</legend>
@@ -2837,6 +2958,34 @@ export default function App() {
               <label>AV notes <input type="text" value={kbygForm.avNotes} onChange={updateKbyg('avNotes')} placeholder="e.g. HDMI adapter provided" /></label>
             </fieldset>
             <fieldset className="form-fieldset">
+              <legend>TL;DR</legend>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={kbygForm.generateTldr !== false}
+                  onChange={updateKbygCheckbox('generateTldr')}
+                />
+                Generate TL;DR
+              </label>
+              {kbygForm.generateTldr !== false && (
+                <div className="tldr-include-group" role="group" aria-label="Include these callouts in the TL;DR">
+                  <span className="tldr-include-heading">Include these callouts in the TL;DR</span>
+                  <div className="tldr-include-checkboxes">
+                    {KBYG_TLDR_ITEM_ORDER.map((id) => (
+                      <label key={id} className="checkbox-label tldr-include-option">
+                        <input
+                          type="checkbox"
+                          checked={!!kbygTldrIncludeMerged[id]}
+                          onChange={updateKbygTldrInclude(id)}
+                        />
+                        {KBYG_TLDR_LABELS[id]}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </fieldset>
+            <fieldset className="form-fieldset">
               <legend>Agenda</legend>
               <label>Internal agenda <textarea value={kbygForm.internalAgenda} onChange={updateKbyg('internalAgenda')} placeholder="Paste or type agenda..." rows={4} /></label>
             </fieldset>
@@ -2844,10 +2993,6 @@ export default function App() {
               <legend>Additional</legend>
               <label>Additional notes <textarea value={kbygForm.additionalNotes} onChange={updateKbyg('additionalNotes')} placeholder="Any other logistics..." rows={3} /></label>
             </fieldset>
-            <label className="checkbox-label">
-              <input type="checkbox" checked={kbygIncludeTldr} onChange={(e) => setKbygIncludeTldr(e.target.checked)} />
-              Include TL;DR summary
-            </label>
             <button type="submit" className="btn-generate">Generate Email</button>
             <button type="button" onClick={handleReset} className="btn-reset">🔄 Reset Form</button>
           </form>
