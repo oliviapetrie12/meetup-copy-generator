@@ -1168,7 +1168,7 @@ export default function ConferenceKnowBeforeYouGo() {
           <fieldset className="form-fieldset">
             <legend>Parking</legend>
             <label>
-              Parking
+              Parking <span className="form-hint">(optional)</span>
               <textarea value={form.parkingText} onChange={update('parkingText')} rows={3} />
               <span className="form-hint">Optional: Add any parking details or leave blank.</span>
             </label>
@@ -1177,7 +1177,7 @@ export default function ConferenceKnowBeforeYouGo() {
           <fieldset className="form-fieldset">
             <legend>Food &amp; beverage</legend>
             <label>
-              Food &amp; beverage
+              Food &amp; beverage <span className="form-hint">(optional)</span>
               <textarea value={form.foodBeverageText} onChange={update('foodBeverageText')} rows={3} />
               <span className="form-hint">Optional: Add notes if food is provided.</span>
             </label>
