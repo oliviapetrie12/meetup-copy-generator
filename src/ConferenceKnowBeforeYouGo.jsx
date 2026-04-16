@@ -35,25 +35,52 @@ const CONTACT_GROUP_LABELS = {
 
 const CONTACT_GROUP_ORDER = ['devrel_onsite', 'devrel_remote', 'conference_organizer']
 
-const INITIAL_FORM = {
-  conferenceName: '',
-  knowBeforeYouGoDeckUrl: '',
-  tldrText: '',
-  eventDatesBoothSetup: '',
-  eventDatesBoothHours: '',
-  eventDatesBoothCleanup: '',
-  eventDatesNotes: '',
-  eventDatesStaffingSchedule: '',
-  ticketsText: '',
-  locationVenue: '',
-  locationAddress: '',
-  contacts: [{ ...INITIAL_CONTACT }],
-  boothSetupTeardown: '',
-  avSetupRequirements: '',
-  swagText: '',
-  parkingText: '',
-  foodBeverageText: '',
-  additionalSections: [],
+/** Starter copy users can edit or clear; not re-applied after mount except on Reset. */
+const DEFAULT_TLDR_TEXT = [
+  'Bring all booth materials from your home',
+  'Keep the original box for return shipping',
+  'Check in at registration upon arrival',
+  'Review booth schedule and staffing expectations',
+].join('\n')
+
+const DEFAULT_BOOTH_SETUP_LOGISTICS = [
+  'Include standard setup instructions',
+  'Include bringing swag, banner, table cloth, signs',
+].join('\n')
+
+const DEFAULT_SWAG_TEXT = [
+  'Keep extra swag behind the table',
+  'Replenish throughout the day',
+  'Monitor distribution across event days',
+].join('\n')
+
+const DEFAULT_PARKING_TEXT =
+  'Parking details vary by venue. Check event page or SpotHero.'
+
+const DEFAULT_FOOD_BEVERAGE_TEXT =
+  'Meals and snacks may be provided. Lunch is typically on your own.'
+
+function getInitialForm() {
+  return {
+    conferenceName: '',
+    knowBeforeYouGoDeckUrl: '',
+    tldrText: DEFAULT_TLDR_TEXT,
+    eventDatesBoothSetup: '',
+    eventDatesBoothHours: '',
+    eventDatesBoothCleanup: '',
+    eventDatesNotes: '',
+    eventDatesStaffingSchedule: '',
+    ticketsText: '',
+    locationVenue: '',
+    locationAddress: '',
+    contacts: [{ ...INITIAL_CONTACT }],
+    boothSetupTeardown: DEFAULT_BOOTH_SETUP_LOGISTICS,
+    avSetupRequirements: '',
+    swagText: DEFAULT_SWAG_TEXT,
+    parkingText: DEFAULT_PARKING_TEXT,
+    foodBeverageText: DEFAULT_FOOD_BEVERAGE_TEXT,
+    additionalSections: [],
+  }
 }
 
 function trim(s) {
@@ -453,7 +480,7 @@ function generateConferenceEmailPlain(form) {
 }
 
 export default function ConferenceKnowBeforeYouGo() {
-  const [form, setForm] = useState(INITIAL_FORM)
+  const [form, setForm] = useState(() => getInitialForm())
   const [subject, setSubject] = useState('')
   const [plain, setPlain] = useState('')
   const [html, setHtml] = useState('')
@@ -522,11 +549,7 @@ export default function ConferenceKnowBeforeYouGo() {
   )
 
   const handleReset = () => {
-    setForm({
-      ...INITIAL_FORM,
-      contacts: [{ ...INITIAL_CONTACT }],
-      additionalSections: [],
-    })
+    setForm(getInitialForm())
     setSubject('')
     setPlain('')
     setHtml('')
