@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 
 function escapeHtml(s) {
   if (s == null) return ''
@@ -205,14 +205,14 @@ function buildContactsSectionPlain(form) {
   return parts.join('\n').replace(/\n+$/, '\n')
 }
 
-function generateConferenceSubject(form) {
+/** Auto subject: "[Event Name] Know Before You Go + [booth info]" (venue, else first line of address). */
+function generateAutoSubjectLine(form) {
   const name = trim(form.conferenceName)
-  const datesHint =
-    trim(form.eventDatesBoothHours).split('\n')[0]?.trim() ||
-    trim(form.eventDatesBoothSetup).split('\n')[0]?.trim() ||
-    ''
-  if (!name) return 'Conference booth — Know before you go'
-  return `${name} | Booth know-before-you-go${datesHint ? ` | ${datesHint}` : ''}`
+  const venue = trim(form.locationVenue)
+  const addrFirst = trim(form.locationAddress).split('\n')[0]?.trim() || ''
+  const boothInfo = venue || addrFirst
+  const base = name ? `${name} Know Before You Go` : 'Know Before You Go'
+  return boothInfo ? `${base} + ${boothInfo}` : base
 }
 
 /** Preserve newlines; each line escaped. */
@@ -481,12 +481,18 @@ function generateConferenceEmailPlain(form) {
 
 export default function ConferenceKnowBeforeYouGo() {
   const [form, setForm] = useState(() => getInitialForm())
-  const [subject, setSubject] = useState('')
+  const subjectManuallyEditedRef = useRef(false)
+  const [subjectLine, setSubjectLine] = useState(() => generateAutoSubjectLine(getInitialForm()))
   const [plain, setPlain] = useState('')
   const [html, setHtml] = useState('')
   const [copied, setCopied] = useState(false)
   const [emailCopied, setEmailCopied] = useState(false)
   const [subjectCopied, setSubjectCopied] = useState(false)
+
+  useEffect(() => {
+    if (subjectManuallyEditedRef.current) return
+    setSubjectLine(generateAutoSubjectLine(form))
+  }, [form.conferenceName, form.locationVenue, form.locationAddress])
 
   const update = (key) => (e) => {
     const v = e.target.value
@@ -542,7 +548,6 @@ export default function ConferenceKnowBeforeYouGo() {
   const handleGenerate = useCallback(
     (e) => {
       e.preventDefault()
-      setSubject(generateConferenceSubject(form))
       setPlain(generateConferenceEmailPlain(form))
       setHtml(buildConferenceEmailHtml(form))
     },
@@ -550,16 +555,18 @@ export default function ConferenceKnowBeforeYouGo() {
   )
 
   const handleReset = () => {
-    setForm(getInitialForm())
-    setSubject('')
+    const next = getInitialForm()
+    subjectManuallyEditedRef.current = false
+    setForm(next)
+    setSubjectLine(generateAutoSubjectLine(next))
     setPlain('')
     setHtml('')
   }
 
   const copySubject = async () => {
-    if (!subject) return
+    if (!subjectLine.trim()) return
     try {
-      await navigator.clipboard.writeText(subject)
+      await navigator.clipboard.writeText(subjectLine.trim())
       setSubjectCopied(true)
       setTimeout(() => setSubjectCopied(false), 2000)
     } catch (err) {
@@ -622,6 +629,22 @@ export default function ConferenceKnowBeforeYouGo() {
         <form onSubmit={handleGenerate} className="form">
           <fieldset className="form-fieldset">
             <legend>Email</legend>
+            <label>
+              Subject line
+              <input
+                type="text"
+                value={subjectLine}
+                onChange={(e) => {
+                  subjectManuallyEditedRef.current = true
+                  setSubjectLine(e.target.value)
+                }}
+                placeholder="e.g. ElasticON 2026 Know Before You Go + Booth 412"
+                autoComplete="off"
+              />
+            </label>
+            <span className="form-hint">
+              Auto-fills from event name and location; if you edit this field, it won&apos;t auto-update until you reset the form.
+            </span>
             <label>
               Event name
               <input
@@ -857,19 +880,19 @@ export default function ConferenceKnowBeforeYouGo() {
           <h2>Generated email</h2>
         </div>
         <div className="output-content">
+          {subjectLine.trim() ? (
+            <div className="subject-line-section">
+              <h3 className="subject-line-heading">Subject line</h3>
+              <pre className="output-text subject-line-text">{subjectLine.trim()}</pre>
+              <div className="output-actions">
+                <button type="button" onClick={copySubject} className="btn-copy" aria-pressed={subjectCopied}>
+                  {subjectCopied ? 'Copied!' : 'Copy Subject'}
+                </button>
+              </div>
+            </div>
+          ) : null}
           {plain ? (
             <>
-              {subject && (
-                <div className="subject-line-section">
-                  <h3 className="subject-line-heading">Subject line</h3>
-                  <pre className="output-text subject-line-text">{subject}</pre>
-                  <div className="output-actions">
-                    <button type="button" onClick={copySubject} className="btn-copy" aria-pressed={subjectCopied}>
-                      {subjectCopied ? 'Copied!' : 'Copy subject'}
-                    </button>
-                  </div>
-                </div>
-              )}
               <h3 className="generated-email-heading">Email body</h3>
               {html ? (
                 <div className="meetup-page-preview output-text" dangerouslySetInnerHTML={{ __html: html }} />
