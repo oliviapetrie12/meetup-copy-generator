@@ -37,10 +37,10 @@ const CONTACT_GROUP_ORDER = ['devrel_onsite', 'devrel_remote', 'conference_organ
 
 /** Booth materials delivery: one scenario block + shared bullets in Booth Setup &amp; Logistics. */
 const BOOTH_MATERIALS_DELIVERY = {
-  shipped_to_me: {
-    label: 'Shipped to me (bring to event)',
+  shipped_to_individual: {
+    label: 'Shipped to individual',
     bullets: [
-      'Bring all shipped booth materials from home or your travel origin—plan for luggage, shipping boxes, and weight limits.',
+      'Plan for luggage, shipping boxes, and weight limits when transporting items to the venue.',
       'Arrive with enough time to move everything to the booth and finish setup before the floor opens.',
     ],
   },
@@ -60,7 +60,7 @@ const BOOTH_MATERIALS_DELIVERY = {
   },
 }
 
-const BOOTH_DELIVERY_METHOD_ORDER = ['shipped_to_me', 'shipped_to_venue', 'minimal_setup']
+const BOOTH_DELIVERY_METHOD_ORDER = ['shipped_to_individual', 'shipped_to_venue', 'minimal_setup']
 
 function getFixedBoothLogisticsBullets() {
   return [
@@ -70,21 +70,64 @@ function getFixedBoothLogisticsBullets() {
   ]
 }
 
+function normalizeBoothDeliveryMethodKey(raw) {
+  const k = trim(raw)
+  if (k === 'shipped_to_me') return 'shipped_to_individual'
+  return k
+}
+
+/** Intro line for "Shipped to individual" (name optional). */
+function shippedToIndividualIntroPlain(form) {
+  const name = trim(form.boothMaterialsShippedToName)
+  if (name) {
+    return `All booth materials were shipped to ${name}, so please bring everything with you to the event, including:`
+  }
+  return 'All booth materials were shipped to the onsite contact, so please bring everything with you to the event, including:'
+}
+
+function shippedToIndividualIntroHtml(form) {
+  const name = trim(form.boothMaterialsShippedToName)
+  if (name) {
+    return `All booth materials were shipped to ${escapeHtml(name)}, so please bring everything with you to the event, including:`
+  }
+  return escapeHtml(
+    'All booth materials were shipped to the onsite contact, so please bring everything with you to the event, including:',
+  )
+}
+
 function buildBoothSetupLogisticsSectionHtml(form) {
-  const key = trim(form.boothMaterialsDeliveryMethod)
+  const key = normalizeBoothDeliveryMethodKey(form.boothMaterialsDeliveryMethod)
   const scenario = BOOTH_MATERIALS_DELIVERY[key]
   if (!scenario) return ''
-  const lines = [...scenario.bullets, ...getFixedBoothLogisticsBullets()]
-  const body = lines.map((l) => `• ${escapeHtml(l)}`).join('<br>')
+
+  const fixedBulletsHtml = getFixedBoothLogisticsBullets()
+    .map((l) => `• ${escapeHtml(l)}`)
+    .join('<br>')
+
+  if (key === 'shipped_to_individual') {
+    const intro = shippedToIndividualIntroHtml(form)
+    const scenarioBullets = scenario.bullets.map((l) => `• ${escapeHtml(l)}`).join('<br>')
+    const body = `${intro}<br><br>${scenarioBullets}<br><br>${fixedBulletsHtml}`
+    return `<strong>📢 Booth Setup &amp; Logistics</strong><br><br>${body}`
+  }
+
+  const scenarioBullets = scenario.bullets.map((l) => `• ${escapeHtml(l)}`).join('<br>')
+  const body = `${scenarioBullets}<br><br>${fixedBulletsHtml}`
   return `<strong>📢 Booth Setup &amp; Logistics</strong><br><br>${body}`
 }
 
 function appendBoothSetupLogisticsPlain(lines, form) {
-  const key = trim(form.boothMaterialsDeliveryMethod)
+  const key = normalizeBoothDeliveryMethodKey(form.boothMaterialsDeliveryMethod)
   const scenario = BOOTH_MATERIALS_DELIVERY[key]
   if (!scenario) return
   lines.push('📢 Booth Setup & Logistics')
-  ;[...scenario.bullets, ...getFixedBoothLogisticsBullets()].forEach((l) => lines.push(`• ${l}`))
+  if (key === 'shipped_to_individual') {
+    lines.push(shippedToIndividualIntroPlain(form))
+    scenario.bullets.forEach((l) => lines.push(`• ${l}`))
+  } else {
+    scenario.bullets.forEach((l) => lines.push(`• ${l}`))
+  }
+  getFixedBoothLogisticsBullets().forEach((l) => lines.push(`• ${l}`))
   lines.push('')
 }
 
@@ -114,7 +157,8 @@ function getInitialForm() {
     locationVenue: '',
     locationAddress: '',
     contacts: [{ ...INITIAL_CONTACT }],
-    boothMaterialsDeliveryMethod: 'shipped_to_me',
+    boothMaterialsDeliveryMethod: 'shipped_to_individual',
+    boothMaterialsShippedToName: '',
     avSetupRequirements: '',
     swagText: DEFAULT_SWAG_TEXT,
     parkingText: DEFAULT_PARKING_TEXT,
@@ -574,6 +618,11 @@ export default function ConferenceKnowBeforeYouGo() {
     setForm((prev) => ({ ...prev, [key]: v }))
   }
 
+  const updateBoothDeliveryMethod = (e) => {
+    const v = normalizeBoothDeliveryMethodKey(e.target.value)
+    setForm((prev) => ({ ...prev, boothMaterialsDeliveryMethod: v }))
+  }
+
   const updateContact = (index, key) => (e) => {
     const v = e.target.value
     setForm((prev) => {
@@ -875,7 +924,7 @@ export default function ConferenceKnowBeforeYouGo() {
             <legend>Booth setup &amp; logistics</legend>
             <label>
               Booth Materials Delivery Method
-              <select value={form.boothMaterialsDeliveryMethod} onChange={update('boothMaterialsDeliveryMethod')}>
+              <select value={normalizeBoothDeliveryMethodKey(form.boothMaterialsDeliveryMethod)} onChange={updateBoothDeliveryMethod}>
                 {BOOTH_DELIVERY_METHOD_ORDER.map((value) => (
                   <option key={value} value={value}>
                     {BOOTH_MATERIALS_DELIVERY[value].label}
@@ -883,6 +932,18 @@ export default function ConferenceKnowBeforeYouGo() {
                 ))}
               </select>
             </label>
+            {normalizeBoothDeliveryMethodKey(form.boothMaterialsDeliveryMethod) === 'shipped_to_individual' && (
+              <label>
+                Who were materials shipped to?
+                <input
+                  type="text"
+                  value={form.boothMaterialsShippedToName}
+                  onChange={update('boothMaterialsShippedToName')}
+                  placeholder="Name of recipient"
+                  autoComplete="name"
+                />
+              </label>
+            )}
             <span className="form-hint">
               Generated email includes scenario-specific instructions plus shared guidance on furniture, roles, and swag.
             </span>
