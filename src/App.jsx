@@ -477,6 +477,19 @@ function getInitialKbygTldrInclude() {
   }
 }
 
+const KBYG_SPEAKER_ARRIVAL_QUICK_FILL = [
+  'Please arrive 30 minutes early.',
+  'Please arrive 15 minutes early.',
+  'Please arrive by 5:00 PM for setup and AV check.',
+]
+
+const KBYG_AV_QUICK_FILL = [
+  'A TV/screen will be available.',
+  'A TV/screen will be available. It is recommended to bring a backup HDMI adapter.',
+  'Please bring your laptop and any adapters you may need.',
+  'HDMI connection will be available.',
+]
+
 const KBYG_INITIAL_STATE = {
   recipients: '',
   greetingNames: '',
@@ -2222,6 +2235,11 @@ export default function App() {
       kbygTldrInclude: { ...getInitialKbygTldrInclude(), ...(prev.kbygTldrInclude || {}), [id]: e.target.checked },
     }))
 
+  /** Quick-fill replaces the entire field value (does not append to existing text). */
+  const applyMeetupKbygQuickFill = (fieldKey, value) => {
+    setKbygForm((prev) => ({ ...prev, [fieldKey]: value }))
+  }
+
   const updateKbygContact = (index, field) => (e) =>
     setKbygForm((prev) => ({
       ...prev,
@@ -2944,10 +2962,25 @@ export default function App() {
               <label>Speaker 2 name <input type="text" value={kbygForm.speaker2Name} onChange={updateKbyg('speaker2Name')} placeholder="e.g. John Doe" /></label>
               <label>Speaker 2 title <input type="text" value={kbygForm.speaker2Title} onChange={updateKbyg('speaker2Title')} placeholder="e.g. Principal Engineer" /></label>
               <label>Speaker 2 talk title <input type="text" value={kbygForm.speaker2TalkTitle} onChange={updateKbyg('speaker2TalkTitle')} placeholder="Talk title" /></label>
-              <label>
-                Speaker arrival note <span className="form-hint">(optional)</span>
-                <input type="text" value={kbygForm.speakerArrivalNote} onChange={updateKbyg('speakerArrivalNote')} />
-              </label>
+              <div className="kbyg-quick-fill-wrap">
+                <span className="form-hint kbyg-quick-fill-hint">Quick fill</span>
+                <div className="quick-fill-chips" role="group" aria-label="Speaker arrival quick fill">
+                  {KBYG_SPEAKER_ARRIVAL_QUICK_FILL.map((text) => (
+                    <button
+                      key={text}
+                      type="button"
+                      className="kbyg-quick-fill-btn"
+                      onClick={() => applyMeetupKbygQuickFill('speakerArrivalNote', text)}
+                    >
+                      {text}
+                    </button>
+                  ))}
+                </div>
+                <label>
+                  Speaker arrival note <span className="form-hint">(optional)</span>
+                  <input type="text" value={kbygForm.speakerArrivalNote} onChange={updateKbyg('speakerArrivalNote')} />
+                </label>
+              </div>
             </fieldset>
             <fieldset className="form-fieldset">
               <legend>Logistics</legend>
@@ -2955,7 +2988,25 @@ export default function App() {
               <label>Drink details <input type="text" value={kbygForm.drinkDetails} onChange={updateKbyg('drinkDetails')} placeholder="e.g. Coffee, water, soda" /></label>
               <label>Swag notes <input type="text" value={kbygForm.swagNotes} onChange={updateKbyg('swagNotes')} placeholder="e.g. T-shirts for attendees" /></label>
               <label>Setup notes <input type="text" value={kbygForm.setupNotes} onChange={updateKbyg('setupNotes')} placeholder="e.g. Tables and signage" /></label>
-              <label>AV notes <input type="text" value={kbygForm.avNotes} onChange={updateKbyg('avNotes')} placeholder="e.g. HDMI adapter provided" /></label>
+              <div className="kbyg-quick-fill-wrap">
+                <span className="form-hint kbyg-quick-fill-hint">Quick fill</span>
+                <div className="quick-fill-chips" role="group" aria-label="AV and presentation setup quick fill">
+                  {KBYG_AV_QUICK_FILL.map((text) => (
+                    <button
+                      key={text}
+                      type="button"
+                      className="kbyg-quick-fill-btn"
+                      onClick={() => applyMeetupKbygQuickFill('avNotes', text)}
+                    >
+                      {text}
+                    </button>
+                  ))}
+                </div>
+                <label>
+                  AV / presentation setup
+                  <input type="text" value={kbygForm.avNotes} onChange={updateKbyg('avNotes')} placeholder="e.g. HDMI adapter provided" />
+                </label>
+              </div>
             </fieldset>
             <fieldset className="form-fieldset">
               <legend>TL;DR</legend>

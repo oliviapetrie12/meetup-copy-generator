@@ -267,6 +267,45 @@ body {
   font-size: 0.82rem;
 }
 
+/* Meetup KBYG quick-fill chips */
+.kbyg-quick-fill-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.kbyg-quick-fill-hint {
+  margin: 0;
+}
+
+.quick-fill-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: flex-start;
+}
+
+.kbyg-quick-fill-btn {
+  padding: 0.25rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #64748b;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+  line-height: 1.35;
+  text-align: left;
+  max-width: 100%;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.kbyg-quick-fill-btn:hover {
+  background: #e8eef5;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+
 .form label {
   display: flex;
   flex-direction: column;
