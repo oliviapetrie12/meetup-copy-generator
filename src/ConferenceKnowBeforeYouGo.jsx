@@ -1170,6 +1170,7 @@ export default function ConferenceKnowBeforeYouGo() {
             <label>
               Parking
               <textarea value={form.parkingText} onChange={update('parkingText')} rows={3} />
+              <span className="form-hint">Optional: Add any parking details or leave blank.</span>
             </label>
           </fieldset>
 
@@ -1178,6 +1179,7 @@ export default function ConferenceKnowBeforeYouGo() {
             <label>
               Food &amp; beverage
               <textarea value={form.foodBeverageText} onChange={update('foodBeverageText')} rows={3} />
+              <span className="form-hint">Optional: Add notes if food is provided.</span>
             </label>
           </fieldset>
 
