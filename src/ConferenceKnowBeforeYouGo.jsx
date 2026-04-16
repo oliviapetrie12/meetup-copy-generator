@@ -14,6 +14,23 @@ function escapeHtmlAttr(s) {
   return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;')
 }
 
+/**
+ * Plain text for Google Docs / paste targets: <br> → newline, strip tags, keep emojis and • bullets.
+ * Section gaps from <br><br> become \n\n.
+ */
+function conferenceHtmlToGoogleDocPlain(htmlString) {
+  if (!htmlString || typeof htmlString !== 'string') return ''
+  const withBreaks = htmlString.replace(/<br\s*\/?>/gi, '\n')
+  try {
+    const doc = new DOMParser().parseFromString(withBreaks, 'text/html')
+    let text = doc.body?.textContent ?? ''
+    text = text.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n')
+    return text.trim()
+  } catch {
+    return withBreaks.replace(/<[^>]+>/g, '').replace(/\n{3,}/g, '\n\n').trim()
+  }
+}
+
 /** Appended to every generated output (no form field). */
 const STANDARD_TRAVEL_EXPENSES_TEXT =
   'Travel & expenses: follow your regional policy for submitting receipts and expense reports. Code charges to the project indicated by your manager. For policy questions, contact your People or Finance partner.'
@@ -604,8 +621,8 @@ export default function ConferenceKnowBeforeYouGo() {
   const [subjectLine, setSubjectLine] = useState(() => generateAutoSubjectLine(getInitialForm()))
   const [plain, setPlain] = useState('')
   const [html, setHtml] = useState('')
-  const [copied, setCopied] = useState(false)
   const [emailCopied, setEmailCopied] = useState(false)
+  const [googleDocCopied, setGoogleDocCopied] = useState(false)
   const [subjectCopied, setSubjectCopied] = useState(false)
 
   useEffect(() => {
@@ -698,52 +715,26 @@ export default function ConferenceKnowBeforeYouGo() {
     }
   }
 
-  const copyBody = async () => {
-    if (!plain) return
-    try {
-      if (html && typeof ClipboardItem !== 'undefined') {
-        try {
-          await navigator.clipboard.write([
-            new ClipboardItem({
-              'text/html': new Blob([html], { type: 'text/html' }),
-              'text/plain': new Blob([plain], { type: 'text/plain' }),
-            }),
-          ])
-        } catch {
-          await navigator.clipboard.writeText(plain)
-        }
-      } else {
-        await navigator.clipboard.writeText(plain)
-      }
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch (err) {
-      console.error('Copy failed', err)
-    }
-  }
-
-  /** Puts full body HTML on the clipboard for rich paste (e.g. Gmail). Falls back to writeText(html). */
+  /** Full email body HTML (<br>, inline styles) for clients that accept pasted HTML. */
   const copyForEmail = async () => {
     if (!html) return
     try {
-      if (typeof ClipboardItem !== 'undefined') {
-        try {
-          await navigator.clipboard.write([
-            new ClipboardItem({
-              'text/html': new Blob([html], { type: 'text/html' }),
-              'text/plain': new Blob([plain || ''], { type: 'text/plain' }),
-            }),
-          ])
-        } catch {
-          await navigator.clipboard.writeText(html)
-        }
-      } else {
-        await navigator.clipboard.writeText(html)
-      }
+      await navigator.clipboard.writeText(html)
       setEmailCopied(true)
       setTimeout(() => setEmailCopied(false), 2000)
     } catch (err) {
       console.error('Copy for email failed', err)
+    }
+  }
+
+  const copyForGoogleDoc = async () => {
+    if (!html) return
+    try {
+      await navigator.clipboard.writeText(conferenceHtmlToGoogleDocPlain(html))
+      setGoogleDocCopied(true)
+      setTimeout(() => setGoogleDocCopied(false), 2000)
+    } catch (err) {
+      console.error('Copy for Google Doc failed', err)
     }
   }
 
@@ -1048,11 +1039,11 @@ export default function ConferenceKnowBeforeYouGo() {
                 <pre className="output-text">{plain}</pre>
               )}
               <div className="output-actions">
-                <button type="button" onClick={copyBody} className="btn-copy" aria-pressed={copied}>
-                  {copied ? 'Copied!' : 'Copy to clipboard'}
-                </button>
                 <button type="button" onClick={copyForEmail} className="btn-copy" aria-pressed={emailCopied}>
                   {emailCopied ? 'Copied!' : 'Copy for Email'}
+                </button>
+                <button type="button" onClick={copyForGoogleDoc} className="btn-copy" aria-pressed={googleDocCopied}>
+                  {googleDocCopied ? 'Copied!' : 'Copy for Google Doc'}
                 </button>
               </div>
             </>
