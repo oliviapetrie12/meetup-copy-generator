@@ -9,6 +9,11 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;')
 }
 
+function escapeHtmlAttr(s) {
+  if (s == null) return ''
+  return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+}
+
 /** Appended to every generated output (no form field). */
 const STANDARD_TRAVEL_EXPENSES_TEXT =
   'Travel & expenses: follow your regional policy for submitting receipts and expense reports. Code charges to the project indicated by your manager. For policy questions, contact your People or Finance partner.'
@@ -16,8 +21,8 @@ const STANDARD_TRAVEL_EXPENSES_TEXT =
 const INITIAL_CONTACT = { name: '', role: '', email: '', phone: '' }
 
 const INITIAL_FORM = {
-  greetingNames: '',
   conferenceName: '',
+  knowBeforeYouGoDeckUrl: '',
   tldrText: '',
   eventDatesHours: '',
   ticketsText: '',
@@ -79,12 +84,28 @@ function generateConferenceSubject(form) {
   return `${name} | Booth know-before-you-go${datesHint ? ` | ${datesHint}` : ''}`
 }
 
+/** Event name for copy; fallback when field is empty. */
+function eventNameLabel(form) {
+  return trim(form.conferenceName) || 'the event'
+}
+
+function buildConferenceIntroHtml(form) {
+  const name = eventNameLabel(form)
+  const enc = escapeHtml(name)
+  let html = `Hi Team,<br><br>`
+  html += `First and foremost, thank you for attending ${enc} and helping out at the DevRel booth! We appreciate your help very much!`
+  if (has(form.knowBeforeYouGoDeckUrl)) {
+    const href = escapeHtmlAttr(trim(form.knowBeforeYouGoDeckUrl))
+    html += `<br><br>For additional information, please take a look at the <a href="${href}" style="color:#1D4ED8;text-decoration:underline;">${enc} Know Before You Go slide deck</a>. If you have any questions, please don't hesitate to reach out.`
+  }
+  return html
+}
+
 function buildConferenceEmailHtml(form) {
-  const names = trim(form.greetingNames) || 'team'
-  const confName = trim(form.conferenceName) || 'the conference'
+  const confName = eventNameLabel(form)
   const parts = []
 
-  parts.push(`Hi ${escapeHtml(names)},`)
+  parts.push(buildConferenceIntroHtml(form))
   parts.push(`<strong>Title</strong><br><br>${escapeHtml(confName)}`)
 
   if (has(form.tldrText)) {
@@ -162,11 +183,20 @@ function contactLinePlain(c) {
 }
 
 function generateConferenceEmailPlain(form) {
-  const names = trim(form.greetingNames) || 'team'
-  const confName = trim(form.conferenceName) || 'the conference'
+  const confName = eventNameLabel(form)
   const lines = []
 
-  lines.push(`Hi ${names},`, '')
+  lines.push('Hi Team', '')
+  lines.push(
+    `First and foremost, thank you for attending ${confName} and helping out at the DevRel booth! We appreciate your help very much!`,
+    '',
+  )
+  if (has(form.knowBeforeYouGoDeckUrl)) {
+    lines.push(
+      `For additional information, please take a look at the ${confName} Know Before You Go slide deck (${trim(form.knowBeforeYouGoDeckUrl)}). If you have any questions, please don't hesitate to reach out.`,
+      '',
+    )
+  }
   lines.push('Title')
   lines.push(confName)
   lines.push('')
@@ -361,16 +391,7 @@ export default function ConferenceKnowBeforeYouGo() {
           <fieldset className="form-fieldset">
             <legend>Email</legend>
             <label>
-              Greeting names
-              <input
-                type="text"
-                value={form.greetingNames}
-                onChange={update('greetingNames')}
-                placeholder="e.g. booth team, everyone"
-              />
-            </label>
-            <label>
-              Conference / event name
+              Event name
               <input
                 type="text"
                 value={form.conferenceName}
@@ -378,6 +399,17 @@ export default function ConferenceKnowBeforeYouGo() {
                 placeholder="e.g. ElasticON 2026"
               />
             </label>
+            <label>
+              Know Before You Go Deck URL
+              <input
+                type="url"
+                value={form.knowBeforeYouGoDeckUrl}
+                onChange={update('knowBeforeYouGoDeckUrl')}
+                placeholder="https://…"
+                autoComplete="off"
+              />
+            </label>
+            <span className="form-hint">If provided, the generated email links to this deck. Leave blank to omit that sentence.</span>
           </fieldset>
 
           <fieldset className="form-fieldset">
