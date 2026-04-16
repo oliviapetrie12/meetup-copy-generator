@@ -2583,6 +2583,12 @@ export default function App() {
     setMeetupPageHtml('')
   }
 
+  /** Rebuild Meetup event page + LinkedIn preview from current `form` only — does not modify form state. */
+  const handleRegenerateEventPageFromDetails = () => {
+    if (generatorType !== 'eventPromotion') return
+    handleGenerate()
+  }
+
   const handleLinkedInConcise = () => {
     const src = linkedInPost || buildLinkedInPost(form, linkedinVariant)
     setLinkedInPost(makeMoreConcise(src))
@@ -3757,13 +3763,23 @@ export default function App() {
                     ) : (
                       <pre className="output-text">{generatedCopy}</pre>
                     )}
-                    <div className="output-actions output-actions-inline">
+                    <div className="output-actions output-actions-inline event-page-output-actions">
                       <button type="button" onClick={handleMeetupPageConcise} className="btn-section-action">
                         Make concise
                       </button>
-                      <button type="button" onClick={handleGenerate} className="btn-regenerate" title="Regenerate from form">
-                        🔄 Regenerate
-                      </button>
+                      <div className="event-regenerate-action">
+                        <button
+                          type="button"
+                          onClick={handleRegenerateEventPageFromDetails}
+                          className="btn-regenerate"
+                          title="Rebuild preview from your current form fields"
+                        >
+                          🔄 Regenerate from current details
+                        </button>
+                        <p className="form-hint event-page-regenerate-hint">
+                          Rebuilds the draft using your latest edits without clearing your inputs
+                        </p>
+                      </div>
                       <button type="button" onClick={handleCopy} className="btn-copy" aria-pressed={copied}>
                         {copied ? 'Copied!' : 'Copy for Meetup (HTML + plain text)'}
                       </button>

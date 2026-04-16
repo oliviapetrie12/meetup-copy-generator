@@ -860,6 +860,23 @@ body {
   margin-bottom: 0 !important;
 }
 
+.event-page-output-actions {
+  align-items: flex-start;
+}
+
+.event-regenerate-action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  max-width: 20rem;
+}
+
+.event-page-regenerate-hint {
+  margin: 0 !important;
+  line-height: 1.35;
+}
+
 .conference-kbyg-copy-actions {
   flex-direction: row;
   flex-wrap: wrap;
