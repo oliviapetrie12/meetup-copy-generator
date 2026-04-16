@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import QRCodeStyling from "qr-code-styling"
-import elasticLogo from './logo.png'
+import elasticLogo from './logo. png'
 
 function SearchableSelect({ value, onChange, options, placeholder = 'Type to search…', id }) {
   const [open, setOpen] = useState(false)
@@ -298,7 +298,8 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;')
 }
 
-function emailTextToHtml(text) {
+function emailTextToHtml(text, options = {}) {
+  const { tldrCallout = false } = options
   const lines = String(text || '').split('\n')
   const parts = []
   let paragraph = []
@@ -315,12 +316,14 @@ function emailTextToHtml(text) {
     listItems = []
   }
 
-  for (const raw of lines) {
+  for (let idx = 0; idx < lines.length; idx++) {
+    const raw = lines[idx]
     const line = raw.trimEnd()
+    const lineTrim = raw.trim()
     const bulletMatch = line.match(/^\s*[-•]\s+(.+)$/)
-    const boldHeader = line.match(/^\*\*(.+)\*\*$/)
+    const boldHeader = lineTrim.match(/^\*\*(.+)\*\*$/)
 
-    if (!line.trim()) {
+    if (!lineTrim) {
       flushParagraph()
       flushList()
       continue
@@ -329,6 +332,29 @@ function emailTextToHtml(text) {
     if (bulletMatch) {
       flushParagraph()
       listItems.push(bulletMatch[1].trim())
+      continue
+    }
+
+    if (tldrCallout && boldHeader && boldHeader[1].trim() === 'TL;DR') {
+      flushParagraph()
+      flushList()
+      const tldrBullets = []
+      let j = idx + 1
+      for (; j < lines.length; j++) {
+        const innerRaw = lines[j]
+        const innerTrim = innerRaw.trim()
+        if (!innerTrim) break
+        const bm = innerRaw.trimEnd().match(/^\s*[-•]\s+(.+)$/)
+        if (bm) tldrBullets.push(bm[1].trim())
+        else break
+      }
+      const ul = tldrBullets.length
+        ? `<ul class="mt-2 mb-0 list-disc pl-5 font-normal">${tldrBullets.map((i) => `<li>${escapeHtml(i)}</li>`).join('')}</ul>`
+        : ''
+      parts.push(
+        `<div class="font-bold bg-yellow-100 px-3 py-2 rounded-md border border-yellow-300"><p class="m-0">TL;DR</p>${ul}</div>`,
+      )
+      idx = j - 1
       continue
     }
 
@@ -1991,7 +2017,7 @@ export default function App() {
       setGeneratedSubject(generateKnowBeforeYouGoSubject(kbygForm))
       const emailText = generateKnowBeforeYouGoEmail(kbygForm, kbygIncludeTldr)
       setGeneratedCopy(emailText)
-      setKbygEmailHtml(emailTextToHtml(emailText))
+      setKbygEmailHtml(emailTextToHtml(emailText, { tldrCallout: true }))
       setMeetupPageHtml('')
       setGeneratedOutreachLinkedIn('')
     } else if (generatorType === 'speakerOutreach') {
