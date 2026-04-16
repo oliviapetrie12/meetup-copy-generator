@@ -635,6 +635,14 @@ body {
   margin-top: 0;
 }
 
+.event-page-section-toggles {
+  margin-bottom: 0.35rem;
+}
+
+.event-page-section-toggles .tldr-include-checkboxes {
+  margin-top: 0.15rem;
+}
+
 .btn-quick-draft {
   align-self: flex-start;
   margin: 0;

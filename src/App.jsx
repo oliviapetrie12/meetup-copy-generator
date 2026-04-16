@@ -349,6 +349,19 @@ function emailTextToHtml(text) {
   return `<div style="font-family:system-ui,-apple-system,sans-serif;">${parts.join('')}</div>`
 }
 
+/** Reusable defaults for the Meetup Event Page generator (merged into INITIAL_STATE; all editable in the UI). */
+const EVENT_PAGE_FORM_DEFAULTS = {
+  meetupPageWhyAttend:
+    '- Learn from community talks and real-world Elastic use cases\n- Network with other practitioners\n- All experience levels welcome',
+  meetupPageWhatToExpect:
+    'Format: Talk + networking\n\nFood and drinks will be provided.\n\nTone: Community-first',
+  meetupPageClosing:
+    'Come hang out, learn something new, and connect with others in the community.',
+  eventPageIncludeWhyAttend: true,
+  eventPageIncludeWhatToExpect: true,
+  eventPageIncludeSpeakerSection: true,
+}
+
 const INITIAL_STATE = {
   chapterOrCity: '',
   eventTitle: '',
@@ -379,12 +392,10 @@ const INITIAL_STATE = {
   intuitionAudience: '',
   intuitionWhyAttend: '',
   intuitionKeyTakeaway: '',
-  meetupPageWhyAttend: '',
-  meetupPageWhatToExpect: '',
   meetupPageAgenda: '',
-  meetupPageClosing: '',
   eventPageSectionEmojis: true,
   eventPageInviteSpeakers: false,
+  ...EVENT_PAGE_FORM_DEFAULTS,
 }
 
 const GENERATOR_TYPES = [
@@ -2032,7 +2043,7 @@ function buildQuickMeetupEventPageDraft(form) {
   }
 
   if (meetupEventPageFieldIsEmpty(form.meetupPageClosing)) {
-    out.meetupPageClosing = 'Food, refreshments, and networking to follow. We hope to see you there.'
+    out.meetupPageClosing = EVENT_PAGE_FORM_DEFAULTS.meetupPageClosing
   }
 
   return out
@@ -2129,11 +2140,11 @@ function generateMeetupCopy(form) {
     sections.push({ title: 'Parking', body: normalizeElastiFlow(trim(form.parkingNotes)) })
   }
 
-  if (has(form.meetupPageWhyAttend)) {
+  if (form.eventPageIncludeWhyAttend !== false && has(form.meetupPageWhyAttend)) {
     sections.push({ title: 'Why Attend', body: normalizeElastiFlow(trim(form.meetupPageWhyAttend)) })
   }
 
-  if (has(form.meetupPageWhatToExpect)) {
+  if (form.eventPageIncludeWhatToExpect !== false && has(form.meetupPageWhatToExpect)) {
     sections.push({
       title: 'What to Expect',
       body: normalizeElastiFlow(trim(form.meetupPageWhatToExpect)),
@@ -2157,7 +2168,7 @@ function generateMeetupCopy(form) {
     })
   }
 
-  if (hasSpeaker1 || hasSpeaker2 || hasSpeaker3) {
+  if (form.eventPageIncludeSpeakerSection !== false && (hasSpeaker1 || hasSpeaker2 || hasSpeaker3)) {
     sections.push({
       title: 'Talk Abstracts',
       body: buildTalkAbstracts(form),
@@ -3069,6 +3080,35 @@ export default function App() {
                   Quick generate draft
                 </button>
                 <p className="form-hint">Fills in missing sections — you can edit everything after</p>
+              </div>
+              <div className="event-page-section-toggles" role="group" aria-label="Include sections on generated Meetup page">
+                <span className="form-hint tldr-include-heading">Include on generated page</span>
+                <div className="tldr-include-checkboxes">
+                  <label className="checkbox-label tldr-include-option">
+                    <input
+                      type="checkbox"
+                      checked={form.eventPageIncludeWhyAttend !== false}
+                      onChange={(e) => setForm((prev) => ({ ...prev, eventPageIncludeWhyAttend: e.target.checked }))}
+                    />
+                    Why Attend section
+                  </label>
+                  <label className="checkbox-label tldr-include-option">
+                    <input
+                      type="checkbox"
+                      checked={form.eventPageIncludeWhatToExpect !== false}
+                      onChange={(e) => setForm((prev) => ({ ...prev, eventPageIncludeWhatToExpect: e.target.checked }))}
+                    />
+                    What to Expect section
+                  </label>
+                  <label className="checkbox-label tldr-include-option">
+                    <input
+                      type="checkbox"
+                      checked={form.eventPageIncludeSpeakerSection !== false}
+                      onChange={(e) => setForm((prev) => ({ ...prev, eventPageIncludeSpeakerSection: e.target.checked }))}
+                    />
+                    Speaker section (talk abstracts)
+                  </label>
+                </div>
               </div>
               <label>
                 Why Attend
