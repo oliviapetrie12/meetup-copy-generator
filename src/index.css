@@ -243,6 +243,30 @@ body {
   cursor: pointer;
 }
 
+.tldr-include-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.tldr-include-heading {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.tldr-include-checkboxes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr));
+  gap: 0.35rem 1rem;
+}
+
+.tldr-include-option {
+  font-weight: 500;
+  font-size: 0.82rem;
+}
+
 .form label {
   display: flex;
   flex-direction: column;

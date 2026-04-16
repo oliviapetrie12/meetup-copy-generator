@@ -164,6 +164,9 @@ function getInitialForm() {
   return {
     conferenceName: '',
     knowBeforeYouGoDeckUrl: '',
+    generateTldr: true,
+    tldrInclude: getInitialTldrInclude(),
+    leadCaptureText: '',
     customTldrNotes: '',
     eventDatesBoothSetup: '',
     eventDatesBoothHours: '',
@@ -214,62 +217,171 @@ function linesToHtmlPreserve(text) {
     .join('<br>')
 }
 
-/** TL;DR if Booth Setup, Booth Cleanup, or Custom TL;DR Notes exist. */
+const TLDR_ITEM_ORDER = [
+  'arrival_time',
+  'badge_pickup',
+  'booth_materials',
+  'staffing_note',
+  'lead_capture',
+  'swag_materials',
+  'return_shipping',
+  'key_contact',
+  'important_links',
+  'custom_note',
+]
+
+const TLDR_INCLUDE_LABELS = {
+  arrival_time: 'Arrival time',
+  badge_pickup: 'Badge pickup',
+  booth_materials: 'Booth materials',
+  staffing_note: 'Staffing note',
+  lead_capture: 'Lead capture',
+  swag_materials: 'Swag/materials',
+  return_shipping: 'Return shipping',
+  key_contact: 'Key contact',
+  important_links: 'Important links',
+  custom_note: 'Custom note',
+}
+
+function getInitialTldrInclude() {
+  return {
+    arrival_time: true,
+    badge_pickup: false,
+    booth_materials: true,
+    staffing_note: false,
+    lead_capture: true,
+    swag_materials: false,
+    return_shipping: true,
+    key_contact: true,
+    important_links: false,
+    custom_note: false,
+  }
+}
+
+const MAX_TLDR_LINE = 120
+
+function truncateTldrLine(s, max = MAX_TLDR_LINE) {
+  const t = trim(s).replace(/\s+/g, ' ')
+  if (!t) return ''
+  if (t.length <= max) return t
+  return `${t.slice(0, max - 1).trimEnd()}…`
+}
+
+function tldrBoothMaterialsSummary(form) {
+  const key = normalizeBoothDeliveryMethodKey(form.boothMaterialsDeliveryMethod)
+  const scenario = BOOTH_MATERIALS_DELIVERY[key]
+  if (!scenario) return null
+  let s = scenario.label
+  if (key === 'shipped_to_individual' && has(form.boothMaterialsShippedToName)) {
+    s += ` — ${truncateTldrLine(form.boothMaterialsShippedToName, 48)}`
+  }
+  return `Materials: ${s}`
+}
+
+/** Plain-text bullet lines (with leading •). Respects generateTldr + tldrInclude + non-empty sources. */
+function getTldrBullets(form) {
+  if (form.generateTldr === false) return []
+  const inc = { ...getInitialTldrInclude(), ...(form.tldrInclude || {}) }
+  const out = []
+
+  for (const id of TLDR_ITEM_ORDER) {
+    if (!inc[id]) continue
+    switch (id) {
+      case 'arrival_time':
+        if (has(form.eventDatesBoothSetup)) {
+          out.push(`• Arrive / build: ${truncateTldrLine(form.eventDatesBoothSetup)}`)
+        }
+        break
+      case 'badge_pickup':
+        if (has(form.ticketsText)) {
+          out.push(`• Badges: ${truncateTldrLine(form.ticketsText)}`)
+        }
+        break
+      case 'booth_materials': {
+        const mat = tldrBoothMaterialsSummary(form)
+        if (mat) out.push(`• ${mat}`)
+        break
+      }
+      case 'staffing_note':
+        if (has(form.staffingScheduleNotes)) {
+          out.push(`• Staffing: ${truncateTldrLine(form.staffingScheduleNotes.split(/\n/)[0])}`)
+        } else if (has(form.staffingScheduleLink)) {
+          out.push(`• Staffing: ${truncateTldrLine(form.staffingScheduleLink, 100)}`)
+        }
+        break
+      case 'lead_capture':
+        if (has(form.leadCaptureText)) {
+          out.push(`• Lead capture: ${truncateTldrLine(form.leadCaptureText)}`)
+        }
+        break
+      case 'swag_materials':
+        if (has(form.swagText)) {
+          out.push(`• Swag: ${truncateTldrLine(form.swagText)}`)
+        }
+        break
+      case 'return_shipping':
+        if (has(form.eventDatesBoothCleanup)) {
+          out.push(`• Return / strike: ${truncateTldrLine(form.eventDatesBoothCleanup)}`)
+        }
+        break
+      case 'key_contact': {
+        const c = (form.contacts || []).find((x) => has(x.name))
+        if (c) {
+          const bits = [trim(c.name)]
+          if (has(c.role)) bits.push(trim(c.role))
+          if (has(c.email)) bits.push(trim(c.email))
+          out.push(`• Key contact: ${truncateTldrLine(bits.join(' · '))}`)
+        }
+        break
+      }
+      case 'important_links': {
+        const parts = []
+        if (has(form.knowBeforeYouGoDeckUrl)) {
+          parts.push(`Deck: ${truncateTldrLine(form.knowBeforeYouGoDeckUrl, 72)}`)
+        }
+        if (has(form.staffingScheduleLink)) {
+          parts.push(`Staffing: ${truncateTldrLine(form.staffingScheduleLink, 72)}`)
+        }
+        if (parts.length) out.push(`• Links: ${parts.join(' · ')}`)
+        break
+      }
+      case 'custom_note':
+        if (has(form.customTldrNotes)) {
+          trim(form.customTldrNotes)
+            .split(/\n/)
+            .map((l) => l.trim())
+            .filter(Boolean)
+            .forEach((line) => {
+              out.push(`• ${truncateTldrLine(line)}`)
+            })
+        }
+        break
+      default:
+        break
+    }
+  }
+
+  return out
+}
+
 function hasConferenceTldrSection(form) {
-  return (
-    has(form.eventDatesBoothSetup) ||
-    has(form.eventDatesBoothCleanup) ||
-    has(form.customTldrNotes)
-  )
+  return form.generateTldr !== false && getTldrBullets(form).length > 0
 }
 
 const TLDR_HEADING_HTML =
   '<strong>📝 <span style="background-color:#FEF08A;font-weight:bold;">TL;DR</span></strong>'
 
-/** Setup + Cleanup (when set), then each non-empty line of custom notes as • line<br> (email-safe). */
 function buildConferenceTldrBodyHtml(form) {
-  const chunks = []
-  if (has(form.eventDatesBoothSetup)) {
-    chunks.push(`• Setup: ${linesToHtmlPreserve(trim(form.eventDatesBoothSetup))}`)
-  }
-  if (has(form.eventDatesBoothCleanup)) {
-    chunks.push(`• Cleanup: ${linesToHtmlPreserve(trim(form.eventDatesBoothCleanup))}`)
-  }
-  if (has(form.customTldrNotes)) {
-    trim(form.customTldrNotes)
-      .split(/\n/)
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .forEach((line) => {
-        chunks.push(`• ${escapeHtml(line)}`)
-      })
-  }
-  return chunks.join('<br>')
-}
-
-function appendPlainLabeledBullet(lines, label, text) {
-  const raw = trim(text)
-  if (!raw) return
-  const parts = raw.split(/\n/)
-  lines.push(`• ${label}: ${parts[0].trimEnd()}`)
-  for (let i = 1; i < parts.length; i++) {
-    lines.push(`  ${parts[i].trimEnd()}`)
-  }
+  return getTldrBullets(form)
+    .map((line) => escapeHtml(line))
+    .join('<br>')
 }
 
 function appendConferenceTldrPlain(lines, form) {
   if (!hasConferenceTldrSection(form)) return
 
   lines.push('📝 TL;DR')
-  appendPlainLabeledBullet(lines, 'Setup', form.eventDatesBoothSetup)
-  appendPlainLabeledBullet(lines, 'Cleanup', form.eventDatesBoothCleanup)
-  if (has(form.customTldrNotes)) {
-    trim(form.customTldrNotes)
-      .split(/\n/)
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .forEach((l) => lines.push(`• ${l}`))
-  }
+  getTldrBullets(form).forEach((b) => lines.push(b))
   lines.push('')
 }
 
@@ -689,6 +801,19 @@ export default function ConferenceKnowBeforeYouGo() {
     setForm((prev) => ({ ...prev, boothMaterialsDeliveryMethod: v }))
   }
 
+  const tldrIncludeMerged = { ...getInitialTldrInclude(), ...(form.tldrInclude || {}) }
+
+  const updateGenerateTldr = (e) => {
+    setForm((prev) => ({ ...prev, generateTldr: e.target.checked }))
+  }
+
+  const updateTldrInclude = (key) => (e) => {
+    setForm((prev) => ({
+      ...prev,
+      tldrInclude: { ...getInitialTldrInclude(), ...(prev.tldrInclude || {}), [key]: e.target.checked },
+    }))
+  }
+
   const updateContact = (index, key) => (e) => {
     const v = e.target.value
     setForm((prev) => {
@@ -833,18 +958,43 @@ export default function ConferenceKnowBeforeYouGo() {
 
           <fieldset className="form-fieldset">
             <legend>TL;DR</legend>
+            <label className="checkbox-label">
+              <input type="checkbox" checked={form.generateTldr !== false} onChange={updateGenerateTldr} />
+              Generate TL;DR
+            </label>
+            <span className="form-hint">
+              Short bullets only. Check what to include; empty fields are skipped. Turn off to omit the TL;DR block entirely.
+            </span>
+            <div className="tldr-include-group" role="group" aria-label="Include in TL;DR">
+              <span className="tldr-include-heading">Include in TL;DR</span>
+              <div className="tldr-include-checkboxes">
+                {TLDR_ITEM_ORDER.map((id) => (
+                  <label key={id} className="checkbox-label tldr-include-option">
+                    <input type="checkbox" checked={!!tldrIncludeMerged[id]} onChange={updateTldrInclude(id)} />
+                    {TLDR_INCLUDE_LABELS[id]}
+                  </label>
+                ))}
+              </div>
+            </div>
             <label>
-              Custom TL;DR Notes
+              Lead capture (for TL;DR)
+              <input
+                type="text"
+                value={form.leadCaptureText}
+                onChange={update('leadCaptureText')}
+                placeholder="e.g. Scanner app, badge scans, demo sign-ups…"
+                autoComplete="off"
+              />
+            </label>
+            <label>
+              Custom note (for TL;DR)
               <textarea
                 value={form.customTldrNotes}
                 onChange={update('customTldrNotes')}
-                placeholder="Optional extra bullets (one line per item). Appended after Setup and Cleanup in the generated TL;DR."
-                rows={4}
+                placeholder="One short line per bullet when Custom note is checked"
+                rows={3}
               />
             </label>
-            <span className="form-hint">
-              TL;DR also includes Booth Setup and Booth Cleanup from &quot;Event dates &amp; hours&quot; when those fields are filled.
-            </span>
           </fieldset>
 
           <fieldset className="form-fieldset">
