@@ -18,7 +18,22 @@ function escapeHtmlAttr(s) {
 const STANDARD_TRAVEL_EXPENSES_TEXT =
   'Travel & expenses: follow your regional policy for submitting receipts and expense reports. Code charges to the project indicated by your manager. For policy questions, contact your People or Finance partner.'
 
-const INITIAL_CONTACT = { name: '', role: '', email: '', phone: '' }
+const INITIAL_CONTACT = { name: '', role: '', email: '', phone: '', group: '' }
+
+const CONTACT_GROUP_OPTIONS = [
+  { value: '', label: 'No group' },
+  { value: 'devrel_onsite', label: 'DevRel Onsite Support' },
+  { value: 'devrel_remote', label: 'DevRel Remote Support' },
+  { value: 'conference_organizer', label: 'Conference Organizer' },
+]
+
+const CONTACT_GROUP_LABELS = {
+  devrel_onsite: 'DevRel Onsite Support',
+  devrel_remote: 'DevRel Remote Support',
+  conference_organizer: 'Conference Organizer',
+}
+
+const CONTACT_GROUP_ORDER = ['devrel_onsite', 'devrel_remote', 'conference_organizer']
 
 const INITIAL_FORM = {
   conferenceName: '',
@@ -70,13 +85,96 @@ function tldrTextToBulletsHtml(text) {
     .join('<br>')
 }
 
-function contactLineHtml(c) {
-  const bits = []
-  if (has(c.name)) bits.push(escapeHtml(trim(c.name)))
-  if (has(c.role)) bits.push(escapeHtml(trim(c.role)))
-  if (has(c.email)) bits.push(escapeHtml(trim(c.email)))
-  if (has(c.phone)) bits.push(escapeHtml(trim(c.phone)))
-  return bits.join(' – ')
+/** Name + optional role on first line; email and phone on following lines only if set. */
+function formatContactBlockHtml(c) {
+  const name = escapeHtml(trim(c.name))
+  const firstLine = has(c.role) ? `${name} – ${escapeHtml(trim(c.role))}` : name
+  const lines = [firstLine]
+  if (has(c.email)) lines.push(escapeHtml(trim(c.email)))
+  if (has(c.phone)) lines.push(escapeHtml(trim(c.phone)))
+  return lines.join('<br>')
+}
+
+function formatContactBlockPlain(c) {
+  const name = trim(c.name)
+  const firstLine = has(c.role) ? `${name} – ${trim(c.role)}` : name
+  const lines = [firstLine]
+  if (has(c.email)) lines.push(trim(c.email))
+  if (has(c.phone)) lines.push(trim(c.phone))
+  return lines.join('\n')
+}
+
+function buildContactsSectionHtml(form) {
+  const withName = (form.contacts || []).filter((c) => has(c.name))
+  if (withName.length === 0) return ''
+
+  const byGroup = new Map()
+  for (const c of withName) {
+    const g = trim(c.group)
+    const key = CONTACT_GROUP_ORDER.includes(g) ? g : '_other'
+    if (!byGroup.has(key)) byGroup.set(key, [])
+    byGroup.get(key).push(c)
+  }
+
+  const chunks = []
+  for (const key of CONTACT_GROUP_ORDER) {
+    const list = byGroup.get(key)
+    if (!list?.length) continue
+    chunks.push(
+      `<strong>${escapeHtml(CONTACT_GROUP_LABELS[key])}</strong><br><br>${list.map(formatContactBlockHtml).join('<br><br>')}`,
+    )
+  }
+
+  const other = byGroup.get('_other') || []
+  if (other.length) {
+    const block = other.map(formatContactBlockHtml).join('<br><br>')
+    if (chunks.length) {
+      chunks.push(`<strong>Other contacts</strong><br><br>${block}`)
+    } else {
+      chunks.push(block)
+    }
+  }
+
+  return `<strong>💬 Contacts</strong><br><br>${chunks.join('<br><br>')}`
+}
+
+function buildContactsSectionPlain(form) {
+  const withName = (form.contacts || []).filter((c) => has(c.name))
+  if (withName.length === 0) return ''
+
+  const byGroup = new Map()
+  for (const c of withName) {
+    const g = trim(c.group)
+    const key = CONTACT_GROUP_ORDER.includes(g) ? g : '_other'
+    if (!byGroup.has(key)) byGroup.set(key, [])
+    byGroup.get(key).push(c)
+  }
+
+  const hasGrouped = CONTACT_GROUP_ORDER.some((k) => (byGroup.get(k) || []).length > 0)
+
+  const parts = ['💬 Contacts', '']
+  for (const key of CONTACT_GROUP_ORDER) {
+    const list = byGroup.get(key)
+    if (!list?.length) continue
+    parts.push(CONTACT_GROUP_LABELS[key], '')
+    list.forEach((c) => {
+      parts.push(formatContactBlockPlain(c))
+      parts.push('')
+    })
+  }
+
+  const other = byGroup.get('_other') || []
+  if (other.length) {
+    if (hasGrouped) {
+      parts.push('Other contacts', '')
+    }
+    other.forEach((c) => {
+      parts.push(formatContactBlockPlain(c))
+      parts.push('')
+    })
+  }
+
+  return parts.join('\n').replace(/\n+$/, '\n')
 }
 
 function generateConferenceSubject(form) {
@@ -213,12 +311,9 @@ function buildConferenceEmailHtml(form) {
     parts.push(`<strong>🏢 Location</strong><br><br>${loc}`)
   }
 
-  const contactEntries = (form.contacts || []).filter(
-    (c) => has(c.name) || has(c.role) || has(c.email) || has(c.phone),
-  )
-  if (contactEntries.length > 0) {
-    const rows = contactEntries.map((c) => contactLineHtml(c)).join('<br>')
-    parts.push(`<strong>💬 Contacts</strong><br><br>${rows}`)
+  const contactsHtml = buildContactsSectionHtml(form)
+  if (contactsHtml) {
+    parts.push(contactsHtml)
   }
 
   if (has(form.boothSetupTeardown)) {
@@ -253,15 +348,6 @@ function buildConferenceEmailHtml(form) {
 
   const inner = parts.join('<br><br>')
   return `<div style="font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.5;color:#202124;">${inner}</div>`
-}
-
-function contactLinePlain(c) {
-  const bits = []
-  if (has(c.name)) bits.push(trim(c.name))
-  if (has(c.role)) bits.push(trim(c.role))
-  if (has(c.email)) bits.push(trim(c.email))
-  if (has(c.phone)) bits.push(trim(c.phone))
-  return bits.join(' – ')
 }
 
 function generateConferenceEmailPlain(form) {
@@ -309,14 +395,9 @@ function generateConferenceEmailPlain(form) {
     lines.push('')
   }
 
-  const contactEntries = (form.contacts || []).filter(
-    (c) => has(c.name) || has(c.role) || has(c.email) || has(c.phone),
-  )
-  if (contactEntries.length > 0) {
-    lines.push('💬 Contacts')
-    contactEntries.forEach((c) => {
-      lines.push(contactLinePlain(c))
-    })
+  const contactsPlain = buildContactsSectionPlain(form)
+  if (contactsPlain) {
+    lines.push(contactsPlain.trimEnd())
     lines.push('')
   }
 
@@ -385,6 +466,13 @@ export default function ConferenceKnowBeforeYouGo() {
       ...prev,
       contacts: [...(prev.contacts || []), { ...INITIAL_CONTACT }],
     }))
+  }
+
+  const removeContact = (index) => {
+    setForm((prev) => {
+      const next = (prev.contacts || []).filter((_, i) => i !== index)
+      return { ...prev, contacts: next.length ? next : [{ ...INITIAL_CONTACT }] }
+    })
   }
 
   const updateAdditionalSection = (index, key) => (e) => {
@@ -568,28 +656,50 @@ export default function ConferenceKnowBeforeYouGo() {
 
           <fieldset className="form-fieldset">
             <legend>Contacts</legend>
+            <p className="form-hint">Only contacts with a name are included in the email. Use groups to organize onsite, remote, and organizer contacts.</p>
             {(form.contacts || []).map((contact, index) => (
               <div key={index} className="contact-row">
                 <label>
-                  Name
-                  <input type="text" value={contact.name} onChange={updateContact(index, 'name')} placeholder="e.g. Jane Smith" />
+                  Name <span className="form-hint">(required)</span>
+                  <input
+                    type="text"
+                    value={contact.name}
+                    onChange={updateContact(index, 'name')}
+                    placeholder="e.g. Jane Smith"
+                    aria-required="true"
+                  />
                 </label>
                 <label>
-                  Role
+                  Group (optional)
+                  <select value={contact.group || ''} onChange={updateContact(index, 'group')} aria-label="Contact group">
+                    {CONTACT_GROUP_OPTIONS.map((opt) => (
+                      <option key={opt.value || 'none'} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Role (optional)
                   <input type="text" value={contact.role} onChange={updateContact(index, 'role')} placeholder="e.g. booth lead" />
                 </label>
                 <label>
-                  Email
+                  Email (optional)
                   <input type="email" value={contact.email} onChange={updateContact(index, 'email')} placeholder="e.g. jane@example.com" autoComplete="off" />
                 </label>
                 <label>
-                  Phone
+                  Phone (optional)
                   <input type="text" value={contact.phone} onChange={updateContact(index, 'phone')} placeholder="e.g. +1 …" autoComplete="off" />
                 </label>
+                {(form.contacts || []).length > 1 && (
+                  <button type="button" className="btn-reset" onClick={() => removeContact(index)}>
+                    Remove contact
+                  </button>
+                )}
               </div>
             ))}
             <button type="button" onClick={addContact} className="btn-add-speaker">
-              + Add contact
+              Add Contact
             </button>
           </fieldset>
 
