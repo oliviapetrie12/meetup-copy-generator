@@ -35,14 +35,6 @@ const CONTACT_GROUP_LABELS = {
 
 const CONTACT_GROUP_ORDER = ['devrel_onsite', 'devrel_remote', 'conference_organizer']
 
-/** Starter copy users can edit or clear; not re-applied after mount except on Reset. */
-const DEFAULT_TLDR_TEXT = [
-  'Bring all booth materials from your home',
-  'Keep the original box for return shipping',
-  'Check in at registration upon arrival',
-  'Review booth schedule and staffing expectations',
-].join('\n')
-
 const DEFAULT_BOOTH_SETUP_LOGISTICS = [
   'Include standard setup instructions',
   'Include bringing swag, banner, table cloth, signs',
@@ -64,7 +56,7 @@ function getInitialForm() {
   return {
     conferenceName: '',
     knowBeforeYouGoDeckUrl: '',
-    tldrText: DEFAULT_TLDR_TEXT,
+    tldrText: '',
     eventDatesBoothSetup: '',
     eventDatesBoothHours: '',
     eventDatesBoothCleanup: '',
@@ -111,6 +103,68 @@ function tldrTextToBulletsHtml(text) {
     .filter(Boolean)
     .map((l) => `• ${escapeHtml(l)}`)
     .join('<br>')
+}
+
+/** Preserve newlines; each line escaped. */
+function linesToHtmlPreserve(text) {
+  return String(text ?? '')
+    .split(/\n/)
+    .map((line) => escapeHtml(line))
+    .join('<br>')
+}
+
+/** TL;DR block is shown if Booth Setup, Booth Cleanup, or optional override text is present. */
+function hasConferenceTldrSection(form) {
+  return (
+    has(form.eventDatesBoothSetup) ||
+    has(form.eventDatesBoothCleanup) ||
+    has(form.tldrText)
+  )
+}
+
+const TLDR_HEADING_HTML =
+  '<strong>📝 <span style="background-color:#FEF08A;font-weight:bold;">TL;DR</span></strong>'
+
+/** Auto from Event dates (Setup/Cleanup), or optional manual override when tldrText is set. */
+function buildConferenceTldrBodyHtml(form) {
+  if (has(form.tldrText)) {
+    return tldrTextToBulletsHtml(form.tldrText)
+  }
+  const chunks = []
+  if (has(form.eventDatesBoothSetup)) {
+    chunks.push(`• Setup: ${linesToHtmlPreserve(trim(form.eventDatesBoothSetup))}`)
+  }
+  if (has(form.eventDatesBoothCleanup)) {
+    chunks.push(`• Cleanup: ${linesToHtmlPreserve(trim(form.eventDatesBoothCleanup))}`)
+  }
+  return chunks.join('<br>')
+}
+
+function appendPlainLabeledBullet(lines, label, text) {
+  const raw = trim(text)
+  if (!raw) return
+  const parts = raw.split(/\n/)
+  lines.push(`• ${label}: ${parts[0].trimEnd()}`)
+  for (let i = 1; i < parts.length; i++) {
+    lines.push(`  ${parts[i].trimEnd()}`)
+  }
+}
+
+function appendConferenceTldrPlain(lines, form) {
+  if (!hasConferenceTldrSection(form)) return
+
+  lines.push('📝 TL;DR')
+  if (has(form.tldrText)) {
+    trim(form.tldrText)
+      .split(/\n/)
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .forEach((l) => lines.push(`• ${l}`))
+  } else {
+    appendPlainLabeledBullet(lines, 'Setup', form.eventDatesBoothSetup)
+    appendPlainLabeledBullet(lines, 'Cleanup', form.eventDatesBoothCleanup)
+  }
+  lines.push('')
 }
 
 /** Name + optional role on first line; email and phone on following lines only if set. */
@@ -215,14 +269,6 @@ function generateAutoSubjectLine(form) {
   return boothInfo ? `${base} + ${boothInfo}` : base
 }
 
-/** Preserve newlines; each line escaped. */
-function linesToHtmlPreserve(text) {
-  return String(text ?? '')
-    .split(/\n/)
-    .map((line) => escapeHtml(line))
-    .join('<br>')
-}
-
 function hasEventDatesAndHoursContent(form) {
   return (
     has(form.eventDatesBoothSetup) ||
@@ -317,11 +363,9 @@ function buildConferenceEmailHtml(form) {
     parts.push(`<strong>Title</strong><br><br>${escapeHtml(trim(form.conferenceName))}`)
   }
 
-  if (has(form.tldrText)) {
-    const bullets = tldrTextToBulletsHtml(form.tldrText)
-    parts.push(
-      `<strong>📝 <span style="background-color: #FEF08A; font-weight: bold;">TL;DR</span></strong><br><br>${bullets}`,
-    )
+  const tldrBodyHtml = buildConferenceTldrBodyHtml(form)
+  if (hasConferenceTldrSection(form) && tldrBodyHtml.length > 0) {
+    parts.push(`${TLDR_HEADING_HTML}<br><br>${tldrBodyHtml}`)
   }
 
   const eventDatesBlock = buildEventDatesAndHoursSectionHtml(form)
@@ -404,15 +448,7 @@ function generateConferenceEmailPlain(form) {
     lines.push('')
   }
 
-  if (has(form.tldrText)) {
-    lines.push('📝 TL;DR')
-    trim(form.tldrText)
-      .split(/\n/)
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .forEach((l) => lines.push(`• ${l}`))
-    lines.push('')
-  }
+  appendConferenceTldrPlain(lines, form)
   const eventDatesPlain = buildEventDatesAndHoursSectionPlain(form)
   if (eventDatesPlain) {
     lines.push(eventDatesPlain)
@@ -668,11 +704,19 @@ export default function ConferenceKnowBeforeYouGo() {
           </fieldset>
 
           <fieldset className="form-fieldset">
-            <legend>TL;DR</legend>
+            <legend>TL;DR (optional)</legend>
             <label>
-              TL;DR
-              <textarea value={form.tldrText} onChange={update('tldrText')} placeholder="Short summary for staff…" rows={4} />
+              Optional TL;DR override
+              <textarea
+                value={form.tldrText}
+                onChange={update('tldrText')}
+                placeholder="Leave blank to auto-fill from Booth Setup &amp; Booth Cleanup (Event dates). Enter text here only to replace that auto TL;DR."
+                rows={3}
+              />
             </label>
+            <span className="form-hint">
+              By default, TL;DR uses Booth Setup and Booth Cleanup from &quot;Event dates &amp; hours&quot; below.
+            </span>
           </fieldset>
 
           <fieldset className="form-fieldset">
