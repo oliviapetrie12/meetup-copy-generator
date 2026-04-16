@@ -349,10 +349,10 @@ function emailTextToHtml(text, options = {}) {
         else break
       }
       const ul = tldrBullets.length
-        ? `<ul class="mt-2 mb-0 list-disc pl-5 font-normal">${tldrBullets.map((i) => `<li>${escapeHtml(i)}</li>`).join('')}</ul>`
+        ? `<ul style="margin-top:8px;padding-left:20px;">${tldrBullets.map((i) => `<li style="margin-bottom:4px;">${escapeHtml(i)}</li>`).join('')}</ul>`
         : ''
       parts.push(
-        `<div class="font-bold bg-yellow-100 px-3 py-2 rounded-md border border-yellow-300"><p class="m-0">TL;DR</p>${ul}</div>`,
+        `<div style="margin:0 0 0.75em;"><p style="margin:0;"><span style="background-color:#FEF08A;font-weight:bold;">TL;DR</span></p>${ul}</div>`,
       )
       idx = j - 1
       continue
