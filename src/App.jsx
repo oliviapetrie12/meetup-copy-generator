@@ -2642,7 +2642,7 @@ export default function App() {
     <div className="app">
       <header className="header">
         <h1><span className="header-emoji" role="img" aria-hidden="true">🧰</span> Elastic DevRel (Programs) Toolkit</h1>
-        <p className="subtitle">Generate event copy, logistics, and tools for meetups and conferences — everything you need to run DevRel events end-to-end.</p>
+        <p className="subtitle">Run DevRel events faster — from meetup pages to conference logistics, all in one place.</p>
       </header>
 
       <div className="app-body">
