@@ -356,7 +356,7 @@ const EVENT_PAGE_FORM_DEFAULTS = {
   meetupPageWhatToExpect:
     'Format: Talk + networking\n\nFood and drinks will be provided.\n\nTone: Community-first',
   meetupPageClosing:
-    'Come hang out, learn something new, and connect with others in the community.',
+    'Come hang out, learn something new, and connect with others in the Elastic community.',
   eventPageIncludeWhyAttend: true,
   eventPageIncludeWhatToExpect: true,
   eventPageIncludeSpeakerSection: true,
