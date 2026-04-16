@@ -619,9 +619,25 @@ body {
   transform: scale(0.98);
 }
 
+.quick-draft-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  margin: 0 0 0.75rem;
+}
+
+.quick-draft-stack .btn-quick-draft {
+  margin: 0;
+}
+
+.quick-draft-stack .form-hint {
+  margin-top: 0;
+}
+
 .btn-quick-draft {
   align-self: flex-start;
-  margin: 0 0 0.75rem;
+  margin: 0;
   padding: 0.55rem 1rem;
   font-size: 0.88rem;
   font-weight: 600;

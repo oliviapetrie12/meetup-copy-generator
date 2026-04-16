@@ -3064,9 +3064,12 @@ export default function App() {
               <p className="form-hint kbyg-quick-fill-hint">
                 Optional copy for the generated Meetup page. Quick generate draft fills only empty fields and does not overwrite what you already typed.
               </p>
-              <button type="button" className="btn-quick-draft" onClick={handleQuickMeetupDraft}>
-                Quick generate draft
-              </button>
+              <div className="quick-draft-stack">
+                <button type="button" className="btn-quick-draft" onClick={handleQuickMeetupDraft}>
+                  Quick generate draft
+                </button>
+                <p className="form-hint">Fills in missing sections — you can edit everything after</p>
+              </div>
               <label>
                 Why Attend
                 <textarea
