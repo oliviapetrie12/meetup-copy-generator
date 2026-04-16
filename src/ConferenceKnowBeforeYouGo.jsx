@@ -35,10 +35,58 @@ const CONTACT_GROUP_LABELS = {
 
 const CONTACT_GROUP_ORDER = ['devrel_onsite', 'devrel_remote', 'conference_organizer']
 
-const DEFAULT_BOOTH_SETUP_LOGISTICS = [
-  'Include standard setup instructions',
-  'Include bringing swag, banner, table cloth, signs',
-].join('\n')
+/** Booth materials delivery: one scenario block + shared bullets in Booth Setup &amp; Logistics. */
+const BOOTH_MATERIALS_DELIVERY = {
+  shipped_to_me: {
+    label: 'Shipped to me (bring to event)',
+    bullets: [
+      'Bring all shipped booth materials from home or your travel origin—plan for luggage, shipping boxes, and weight limits.',
+      'Arrive with enough time to move everything to the booth and finish setup before the floor opens.',
+    ],
+  },
+  shipped_to_venue: {
+    label: 'Shipped to venue',
+    bullets: [
+      'Coordinate with event staff on receiving, storage, and where crates or pallets will be staged.',
+      'After you arrive, check in with registration or ops to locate your delivered materials before you start building the booth.',
+    ],
+  },
+  minimal_setup: {
+    label: 'No shipped materials / minimal setup',
+    bullets: [
+      'Expect a light footprint (e.g. laptop, small signage, swag); confirm ahead of time what the venue provides.',
+      'Keep setup and teardown quick—focus on essentials and leave the space clean and complete.',
+    ],
+  },
+}
+
+const BOOTH_DELIVERY_METHOD_ORDER = ['shipped_to_me', 'shipped_to_venue', 'minimal_setup']
+
+function getFixedBoothLogisticsBullets() {
+  return [
+    'Table and chairs are typically provided onsite—confirm placement with venue or event staff if anything is unclear.',
+    'Assign setup and cleanup roles: who opens the booth, who covers sessions, and who does the final sweep and pack-out.',
+    'Place swag where it is visible from the aisle; keep backup stock behind or under the table and replenish as needed.',
+  ]
+}
+
+function buildBoothSetupLogisticsSectionHtml(form) {
+  const key = trim(form.boothMaterialsDeliveryMethod)
+  const scenario = BOOTH_MATERIALS_DELIVERY[key]
+  if (!scenario) return ''
+  const lines = [...scenario.bullets, ...getFixedBoothLogisticsBullets()]
+  const body = lines.map((l) => `• ${escapeHtml(l)}`).join('<br>')
+  return `<strong>📢 Booth Setup &amp; Logistics</strong><br><br>${body}`
+}
+
+function appendBoothSetupLogisticsPlain(lines, form) {
+  const key = trim(form.boothMaterialsDeliveryMethod)
+  const scenario = BOOTH_MATERIALS_DELIVERY[key]
+  if (!scenario) return
+  lines.push('📢 Booth Setup & Logistics')
+  ;[...scenario.bullets, ...getFixedBoothLogisticsBullets()].forEach((l) => lines.push(`• ${l}`))
+  lines.push('')
+}
 
 const DEFAULT_SWAG_TEXT = [
   'Keep extra swag behind the table',
@@ -66,7 +114,7 @@ function getInitialForm() {
     locationVenue: '',
     locationAddress: '',
     contacts: [{ ...INITIAL_CONTACT }],
-    boothSetupTeardown: DEFAULT_BOOTH_SETUP_LOGISTICS,
+    boothMaterialsDeliveryMethod: 'shipped_to_me',
     avSetupRequirements: '',
     swagText: DEFAULT_SWAG_TEXT,
     parkingText: DEFAULT_PARKING_TEXT,
@@ -386,10 +434,9 @@ function buildConferenceEmailHtml(form) {
     parts.push(contactsHtml)
   }
 
-  if (has(form.boothSetupTeardown)) {
-    parts.push(
-      `<strong>📢 Booth Setup &amp; Teardown</strong><br><br>${textToHtmlLines(form.boothSetupTeardown)}`,
-    )
+  const boothLogisticsHtml = buildBoothSetupLogisticsSectionHtml(form)
+  if (boothLogisticsHtml) {
+    parts.push(boothLogisticsHtml)
   }
   if (has(form.avSetupRequirements)) {
     parts.push(
@@ -468,11 +515,7 @@ function generateConferenceEmailPlain(form) {
     lines.push('')
   }
 
-  if (has(form.boothSetupTeardown)) {
-    lines.push('📢 Booth Setup & Teardown')
-    lines.push(trim(form.boothSetupTeardown))
-    lines.push('')
-  }
+  appendBoothSetupLogisticsPlain(lines, form)
   if (has(form.avSetupRequirements)) {
     lines.push('🔌 AV / Setup Requirements')
     lines.push(trim(form.avSetupRequirements))
@@ -829,16 +872,20 @@ export default function ConferenceKnowBeforeYouGo() {
           </fieldset>
 
           <fieldset className="form-fieldset">
-            <legend>Booth setup &amp; teardown</legend>
+            <legend>Booth setup &amp; logistics</legend>
             <label>
-              Booth setup &amp; teardown
-              <textarea
-                value={form.boothSetupTeardown}
-                onChange={update('boothSetupTeardown')}
-                placeholder="Build / strike times, deliveries, power, rigging…"
-                rows={4}
-              />
+              Booth Materials Delivery Method
+              <select value={form.boothMaterialsDeliveryMethod} onChange={update('boothMaterialsDeliveryMethod')}>
+                {BOOTH_DELIVERY_METHOD_ORDER.map((value) => (
+                  <option key={value} value={value}>
+                    {BOOTH_MATERIALS_DELIVERY[value].label}
+                  </option>
+                ))}
+              </select>
             </label>
+            <span className="form-hint">
+              Generated email includes scenario-specific instructions plus shared guidance on furniture, roles, and swag.
+            </span>
           </fieldset>
 
           <fieldset className="form-fieldset">
