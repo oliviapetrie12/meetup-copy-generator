@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { makeMoreConcise } from './outputHelpers.js'
+import { mergeOrganizerParsedIntoForm, parseOrganizerDetails } from './conferenceOrganizerImport.js'
 
 function escapeHtml(s) {
   if (s == null) return ''
@@ -780,6 +781,7 @@ export default function ConferenceKnowBeforeYouGo() {
   const [emailCopied, setEmailCopied] = useState(false)
   const [googleDocCopied, setGoogleDocCopied] = useState(false)
   const [subjectCopied, setSubjectCopied] = useState(false)
+  const [organizerImportText, setOrganizerImportText] = useState('')
 
   useEffect(() => {
     if (subjectManuallyEditedRef.current) return
@@ -871,6 +873,12 @@ export default function ConferenceKnowBeforeYouGo() {
     setSubjectLine(generateAutoSubjectLine(next))
     setPlain('')
     setHtml('')
+    setOrganizerImportText('')
+  }
+
+  const handleParseOrganizerDetails = () => {
+    const parsed = parseOrganizerDetails(organizerImportText)
+    setForm((prev) => mergeOrganizerParsedIntoForm(prev, parsed))
   }
 
   const copySubject = async () => {
@@ -949,6 +957,31 @@ export default function ConferenceKnowBeforeYouGo() {
               />
             </label>
             <span className="form-hint">If provided, the generated email links to this deck. Leave blank to omit that sentence.</span>
+          </fieldset>
+
+          <fieldset className="form-fieldset">
+            <legend>Import organizer details</legend>
+            <p className="form-hint">
+              Optional. Paste text from an exhibitor guide, organizer email, or notes — then parse to fill empty fields only (your edits are kept).
+            </p>
+            <label>
+              Organizer / exhibitor text
+              <textarea
+                value={organizerImportText}
+                onChange={(e) => setOrganizerImportText(e.target.value)}
+                placeholder="Parking, booth hours, setup and teardown, shipping, Wi‑Fi, lead capture, venue, badge check-in, food…"
+                rows={10}
+                autoComplete="off"
+              />
+            </label>
+            <div className="quick-draft-stack">
+              <button type="button" className="btn-quick-draft" onClick={handleParseOrganizerDetails}>
+                Parse organizer details
+              </button>
+              <p className="form-hint">
+                Pulls useful details into relevant sections for review — you can edit everything after
+              </p>
+            </div>
           </fieldset>
 
           <fieldset className="form-fieldset">
