@@ -354,7 +354,7 @@ const EVENT_PAGE_FORM_DEFAULTS = {
   meetupPageWhyAttend:
     '- Learn from community talks and real-world Elastic use cases\n- Network with other practitioners\n- All experience levels welcome',
   meetupPageWhatToExpect:
-    'Talks + networking\nFood and drinks will be provided.',
+    'Talks + networking\nFood and drinks will be provided',
   meetupPageClosing:
     'Come hang out, learn something new, and connect with others in the Elastic community.',
   eventPageIncludeWhyAttend: true,
