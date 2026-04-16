@@ -24,7 +24,11 @@ const INITIAL_FORM = {
   conferenceName: '',
   knowBeforeYouGoDeckUrl: '',
   tldrText: '',
-  eventDatesHours: '',
+  eventDatesBoothSetup: '',
+  eventDatesBoothHours: '',
+  eventDatesBoothCleanup: '',
+  eventDatesNotes: '',
+  eventDatesStaffingSchedule: '',
   ticketsText: '',
   locationVenue: '',
   locationAddress: '',
@@ -77,11 +81,88 @@ function contactLineHtml(c) {
 
 function generateConferenceSubject(form) {
   const name = trim(form.conferenceName)
-  const datesHint = trim(form.eventDatesHours)
-    .split('\n')[0]
-    ?.trim()
+  const datesHint =
+    trim(form.eventDatesBoothHours).split('\n')[0]?.trim() ||
+    trim(form.eventDatesBoothSetup).split('\n')[0]?.trim() ||
+    ''
   if (!name) return 'Conference booth — Know before you go'
   return `${name} | Booth know-before-you-go${datesHint ? ` | ${datesHint}` : ''}`
+}
+
+/** Preserve newlines; each line escaped. */
+function linesToHtmlPreserve(text) {
+  return String(text ?? '')
+    .split(/\n/)
+    .map((line) => escapeHtml(line))
+    .join('<br>')
+}
+
+function hasEventDatesAndHoursContent(form) {
+  return (
+    has(form.eventDatesBoothSetup) ||
+    has(form.eventDatesBoothHours) ||
+    has(form.eventDatesBoothCleanup) ||
+    has(form.eventDatesNotes) ||
+    has(form.eventDatesStaffingSchedule)
+  )
+}
+
+function buildEventDatesAndHoursSectionHtml(form) {
+  if (!hasEventDatesAndHoursContent(form)) return ''
+
+  const subs = []
+  if (has(form.eventDatesBoothSetup)) {
+    subs.push(`Booth Setup: ${escapeHtml(trim(form.eventDatesBoothSetup))}`)
+  }
+  if (has(form.eventDatesBoothHours)) {
+    subs.push(`Booth Hours:<br>${linesToHtmlPreserve(form.eventDatesBoothHours)}`)
+  }
+  if (has(form.eventDatesBoothCleanup)) {
+    subs.push(`Booth Cleanup: ${escapeHtml(trim(form.eventDatesBoothCleanup))}`)
+  }
+  if (has(form.eventDatesNotes)) {
+    subs.push(`Notes:<br>${linesToHtmlPreserve(form.eventDatesNotes)}`)
+  }
+
+  let html = `<strong>🗓 Event Dates &amp; Hours</strong>`
+  if (subs.length > 0) {
+    html += `<br><br>${subs.join('<br><br>')}`
+  }
+  if (has(form.eventDatesStaffingSchedule)) {
+    html += `<br><br><strong>Staffing Schedule</strong><br>${linesToHtmlPreserve(form.eventDatesStaffingSchedule)}`
+  }
+  return html
+}
+
+function buildEventDatesAndHoursSectionPlain(form) {
+  if (!hasEventDatesAndHoursContent(form)) return ''
+
+  const lines = []
+  lines.push('🗓 Event Dates & Hours', '')
+  if (has(form.eventDatesBoothSetup)) {
+    lines.push(`Booth Setup: ${trim(form.eventDatesBoothSetup)}`)
+    lines.push('')
+  }
+  if (has(form.eventDatesBoothHours)) {
+    lines.push('Booth Hours:')
+    lines.push(trim(form.eventDatesBoothHours))
+    lines.push('')
+  }
+  if (has(form.eventDatesBoothCleanup)) {
+    lines.push(`Booth Cleanup: ${trim(form.eventDatesBoothCleanup)}`)
+    lines.push('')
+  }
+  if (has(form.eventDatesNotes)) {
+    lines.push('Notes:')
+    lines.push(trim(form.eventDatesNotes))
+    lines.push('')
+  }
+  if (has(form.eventDatesStaffingSchedule)) {
+    lines.push('Staffing Schedule')
+    lines.push(trim(form.eventDatesStaffingSchedule))
+    lines.push('')
+  }
+  return lines.join('\n')
 }
 
 /** Event name for copy; fallback when field is empty. */
@@ -115,8 +196,9 @@ function buildConferenceEmailHtml(form) {
     )
   }
 
-  if (has(form.eventDatesHours)) {
-    parts.push(`<strong>🗓 Event Dates &amp; Hours</strong><br><br>${textToHtmlLines(form.eventDatesHours)}`)
+  const eventDatesBlock = buildEventDatesAndHoursSectionHtml(form)
+  if (eventDatesBlock) {
+    parts.push(eventDatesBlock)
   }
   if (has(form.ticketsText)) {
     parts.push(`<strong>🎟 Tickets</strong><br><br>${textToHtmlLines(form.ticketsText)}`)
@@ -210,9 +292,9 @@ function generateConferenceEmailPlain(form) {
       .forEach((l) => lines.push(`• ${l}`))
     lines.push('')
   }
-  if (has(form.eventDatesHours)) {
-    lines.push('🗓 Event Dates & Hours')
-    lines.push(trim(form.eventDatesHours))
+  const eventDatesPlain = buildEventDatesAndHoursSectionPlain(form)
+  if (eventDatesPlain) {
+    lines.push(eventDatesPlain)
     lines.push('')
   }
   if (has(form.ticketsText)) {
@@ -423,12 +505,43 @@ export default function ConferenceKnowBeforeYouGo() {
           <fieldset className="form-fieldset">
             <legend>Event dates &amp; hours</legend>
             <label>
-              Event dates &amp; hours
+              Booth Setup
               <textarea
-                value={form.eventDatesHours}
-                onChange={update('eventDatesHours')}
-                placeholder="e.g. Wed 9am–6pm, Thu 10am–5pm exhibitor hours…"
+                value={form.eventDatesBoothSetup}
+                onChange={update('eventDatesBoothSetup')}
+                placeholder="e.g. Build begins Tuesday 8am…"
+                rows={3}
+              />
+            </label>
+            <label>
+              Booth Hours
+              <textarea
+                value={form.eventDatesBoothHours}
+                onChange={update('eventDatesBoothHours')}
+                placeholder="One line per block or day (line breaks preserved in the email)"
                 rows={4}
+              />
+            </label>
+            <label>
+              Booth Cleanup
+              <textarea
+                value={form.eventDatesBoothCleanup}
+                onChange={update('eventDatesBoothCleanup')}
+                placeholder="e.g. Strike by 8pm Thursday…"
+                rows={3}
+              />
+            </label>
+            <label>
+              Notes
+              <textarea value={form.eventDatesNotes} onChange={update('eventDatesNotes')} placeholder="Anything else for dates &amp; hours…" rows={3} />
+            </label>
+            <label>
+              Staffing Schedule <span className="form-hint">(optional)</span>
+              <textarea
+                value={form.eventDatesStaffingSchedule}
+                onChange={update('eventDatesStaffingSchedule')}
+                placeholder="Who is on booth when…"
+                rows={3}
               />
             </label>
           </fieldset>
