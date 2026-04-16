@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import QRCodeStyling from "qr-code-styling"
-import elasticLogo from './logo. png'
+import elasticLogo from './logo.png'
 
 function SearchableSelect({ value, onChange, options, placeholder = 'Type to search…', id }) {
   const [open, setOpen] = useState(false)
