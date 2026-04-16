@@ -379,6 +379,10 @@ const INITIAL_STATE = {
   intuitionAudience: '',
   intuitionWhyAttend: '',
   intuitionKeyTakeaway: '',
+  meetupPageWhyAttend: '',
+  meetupPageWhatToExpect: '',
+  meetupPageAgenda: '',
+  meetupPageClosing: '',
   eventPageSectionEmojis: true,
   eventPageInviteSpeakers: false,
 }
@@ -1993,6 +1997,47 @@ function formatSpeakerForEvent(name, title, company) {
   return cred ? `${n} (${cred})` : n
 }
 
+function meetupEventPageFieldIsEmpty(value) {
+  return typeof value !== 'string' || !value.trim()
+}
+
+/** Draft text for Meetup Event Page optional sections; only includes keys that should be filled (caller merges when field is empty). */
+function buildQuickMeetupEventPageDraft(form) {
+  const trim = (s) => (typeof s === 'string' ? s.trim() : '')
+  const out = {}
+
+  if (meetupEventPageFieldIsEmpty(form.meetupPageWhyAttend)) {
+    const bullets = buildIntuitionWhyAttend(form, 0)
+    out.meetupPageWhyAttend = bullets.map((b) => `- ${trim(b).replace(/^[-•]\s*/, '')}`).join('\n')
+  }
+
+  if (meetupEventPageFieldIsEmpty(form.meetupPageWhatToExpect)) {
+    const city = getCityForIntuition(form)
+    const theme1 = getIntroTheme(form.speaker1TalkTitle, form.speaker1TalkAbstract)
+    if (city && theme1) {
+      out.meetupPageWhatToExpect = `Expect an evening of community talks focused on ${theme1}, time for questions, and networking with the ${city} Elastic community. Light refreshments will be available.`
+    } else if (city) {
+      out.meetupPageWhatToExpect = `Expect community talks, Q&A, and networking with the ${city} Elastic community. Light refreshments will be available.`
+    } else {
+      out.meetupPageWhatToExpect =
+        'Expect community talks, Q&A, and networking. Light refreshments will be available.'
+    }
+  }
+
+  if (meetupEventPageFieldIsEmpty(form.meetupPageAgenda)) {
+    const built = trim(buildAgenda(form))
+    out.meetupPageAgenda =
+      built ||
+      `6:00 PM Doors open / mingle\n6:30 PM Talks\n8:00 PM Event concludes`
+  }
+
+  if (meetupEventPageFieldIsEmpty(form.meetupPageClosing)) {
+    out.meetupPageClosing = 'Food, refreshments, and networking to follow. We hope to see you there.'
+  }
+
+  return out
+}
+
 function buildIntro(form) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const dateRaw = trim(form.date)
@@ -2084,9 +2129,23 @@ function generateMeetupCopy(form) {
     sections.push({ title: 'Parking', body: normalizeElastiFlow(trim(form.parkingNotes)) })
   }
 
+  if (has(form.meetupPageWhyAttend)) {
+    sections.push({ title: 'Why Attend', body: normalizeElastiFlow(trim(form.meetupPageWhyAttend)) })
+  }
+
+  if (has(form.meetupPageWhatToExpect)) {
+    sections.push({
+      title: 'What to Expect',
+      body: normalizeElastiFlow(trim(form.meetupPageWhatToExpect)),
+    })
+  }
+
+  const agendaBody = has(form.meetupPageAgenda)
+    ? normalizeElastiFlow(trim(form.meetupPageAgenda))
+    : normalizeElastiFlow(buildAgenda(form))
   sections.push({
     title: 'Agenda',
-    body: normalizeElastiFlow(buildAgenda(form)),
+    body: agendaBody,
   })
 
   const useEmojis = form.eventPageSectionEmojis !== false
@@ -2109,10 +2168,17 @@ function generateMeetupCopy(form) {
     sections.push({ title: 'Host / Sponsor', body: normalizeElastiFlow(trim(form.hostOrSponsor)) })
   }
 
+  if (has(form.meetupPageClosing)) {
+    sections.push({ title: 'Closing', body: normalizeElastiFlow(trim(form.meetupPageClosing)) })
+  }
+
   const withEmoji = {
     'When': '📅 Date and Time',
     'Where': '📍 Location',
+    'Why Attend': '✨ Why Attend',
+    'What to Expect': '💡 What to Expect',
     'Agenda': '📝 Agenda',
+    'Closing': '👋 Closing',
     'Talk Abstracts': '💬 Talk Abstracts',
     'Arrival': '🪧 Arrival Instructions',
     'Parking': '🚗 Parking',
@@ -2122,7 +2188,10 @@ function generateMeetupCopy(form) {
   const plainHeader = {
     'When': 'Date and Time',
     'Where': 'Location',
+    'Why Attend': 'Why Attend',
+    'What to Expect': 'What to Expect',
     'Agenda': 'Agenda',
+    'Closing': 'Closing',
     'Talk Abstracts': 'Talk Abstracts',
     'Arrival': 'Arrival Instructions',
     'Parking': 'Parking',
@@ -2309,6 +2378,10 @@ export default function App() {
 
   const update = (key) => (e) =>
     setForm((prev) => ({ ...prev, [key]: e.target.value }))
+
+  const handleQuickMeetupDraft = () => {
+    setForm((prev) => ({ ...prev, ...buildQuickMeetupEventPageDraft(prev) }))
+  }
 
   const updateKbyg = (key) => (e) =>
     setKbygForm((prev) => ({ ...prev, [key]: e.target.value }))
@@ -2986,6 +3059,51 @@ export default function App() {
                 placeholder="e.g. Free street parking after 6 PM"
               />
             </label>
+            <fieldset className="form-fieldset">
+              <legend>Meetup event page sections</legend>
+              <p className="form-hint kbyg-quick-fill-hint">
+                Optional copy for the generated Meetup page. Quick generate draft fills only empty fields and does not overwrite what you already typed.
+              </p>
+              <button type="button" className="btn-quick-draft" onClick={handleQuickMeetupDraft}>
+                Quick generate draft
+              </button>
+              <label>
+                Why Attend
+                <textarea
+                  value={form.meetupPageWhyAttend}
+                  onChange={update('meetupPageWhyAttend')}
+                  placeholder="e.g. bullets on learning goals and community"
+                  rows={4}
+                />
+              </label>
+              <label>
+                What to Expect
+                <textarea
+                  value={form.meetupPageWhatToExpect}
+                  onChange={update('meetupPageWhatToExpect')}
+                  placeholder="e.g. format of the evening, refreshments, Q&A"
+                  rows={3}
+                />
+              </label>
+              <label>
+                Agenda
+                <textarea
+                  value={form.meetupPageAgenda}
+                  onChange={update('meetupPageAgenda')}
+                  placeholder="Leave empty to use the timed agenda from event time and speakers above"
+                  rows={5}
+                />
+              </label>
+              <label>
+                Closing
+                <textarea
+                  value={form.meetupPageClosing}
+                  onChange={update('meetupPageClosing')}
+                  placeholder="e.g. closing line about networking or seeing attendees there"
+                  rows={2}
+                />
+              </label>
+            </fieldset>
             <fieldset className="form-fieldset">
               <legend>Intuition Email Details</legend>
               <label>Audience / who this is for (optional) <input type="text" value={form.intuitionAudience} onChange={update('intuitionAudience')} placeholder="e.g. developers interested in search" /></label>
