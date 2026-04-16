@@ -490,6 +490,13 @@ const KBYG_AV_QUICK_FILL = [
   'HDMI connection will be available.',
 ]
 
+const KBYG_TAKE_PHOTOS_DEFAULT_LINES = [
+  'Capture a few photos of the setup and space',
+  'Take photos during the talk (speaker + audience)',
+  'Get a few candid networking shots',
+  'Optional: short video clips for social',
+]
+
 const KBYG_INITIAL_STATE = {
   recipients: '',
   greetingNames: '',
@@ -520,6 +527,7 @@ const KBYG_INITIAL_STATE = {
   avNotes: '',
   internalAgenda: '',
   additionalNotes: '',
+  includeTakePhotos: true,
   generateTldr: true,
   kbygTldrInclude: getInitialKbygTldrInclude(),
 }
@@ -847,6 +855,13 @@ function buildKnowBeforeYouGoEmailHtml(form) {
     }
   }
 
+  if (form.includeTakePhotos !== false) {
+    const takePhotosHtml = KBYG_TAKE_PHOTOS_DEFAULT_LINES.map((line) => `• ${escapeHtml(line)}`).join('<br>')
+    chunks.push(
+      `<p style="margin:0;line-height:1.5;"><strong>📸 Take Photos</strong><br><br>${takePhotosHtml}</p>`,
+    )
+  }
+
   if (has(form.additionalNotes)) {
     const noteLines = trim(form.additionalNotes).split(/\n/).map((s) => s.trim()).filter(Boolean)
     if (noteLines.length > 0) {
@@ -998,6 +1013,12 @@ function generateKnowBeforeYouGoEmail(form) {
       avBullets.forEach((b) => lines.push(`- ${b}`))
       lines.push('')
     }
+  }
+
+  if (form.includeTakePhotos !== false) {
+    lines.push(sectionTitle('📸 Take Photos'))
+    KBYG_TAKE_PHOTOS_DEFAULT_LINES.forEach((line) => lines.push(`- ${line}`))
+    lines.push('')
   }
 
   if (has(form.additionalNotes)) {
@@ -3041,6 +3062,14 @@ export default function App() {
                   <input type="text" value={kbygForm.avNotes} onChange={updateKbyg('avNotes')} placeholder="e.g. HDMI adapter provided" />
                 </label>
               </div>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={kbygForm.includeTakePhotos !== false}
+                  onChange={updateKbygCheckbox('includeTakePhotos')}
+                />
+                Include Take Photos section
+              </label>
             </fieldset>
             <fieldset className="form-fieldset">
               <legend>TL;DR</legend>
