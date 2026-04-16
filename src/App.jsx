@@ -756,8 +756,10 @@ function buildKnowBeforeYouGoEmailHtml(form) {
 
   if (has(form.internalAgenda)) {
     const agendaBullets = trim(form.internalAgenda).split(/\n+/).map((s) => s.trim()).filter(Boolean)
-    const agendaHtml = agendaBullets.map((b) => `• ${escapeHtml(b)}`).join('<br>')
-    chunks.push(`<p style="margin:0;line-height:1.5;"><strong>Agenda</strong><br><br>${agendaHtml}</p>`)
+    if (agendaBullets.length > 0) {
+      const agendaHtml = agendaBullets.map((b) => `• ${escapeHtml(b)}`).join('<br>')
+      chunks.push(`<p style="margin:0;line-height:1.5;"><strong>Agenda</strong><br><br>${agendaHtml}</p>`)
+    }
   }
 
   const speakerBits = []
@@ -775,6 +777,12 @@ function buildKnowBeforeYouGoEmailHtml(form) {
   }
   if (speakerBits.length) {
     chunks.push(`<p style="margin:0;line-height:1.5;"><strong>Speaker</strong><br><br>${speakerBits.join('<br>')}</p>`)
+  }
+
+  if (has(form.speakerArrivalNote)) {
+    chunks.push(
+      `<p style="margin:0;line-height:1.5;"><strong>Speaker arrival</strong><br><br>${escapeHtml(trim(form.speakerArrivalNote)).replace(/\n/g, '<br>')}</p>`,
+    )
   }
 
   if (has(form.meetupLink) || has(form.lumaLink)) {
@@ -817,7 +825,9 @@ function buildKnowBeforeYouGoEmailHtml(form) {
     const fd = []
     if (has(form.foodDetails)) fd.push(`• ${escapeHtml(trim(form.foodDetails))}`)
     if (has(form.drinkDetails)) fd.push(`• ${escapeHtml(trim(form.drinkDetails))}`)
-    chunks.push(`<p style="margin:0;line-height:1.5;"><strong>Food &amp; refreshments</strong><br><br>${fd.join('<br>')}</p>`)
+    if (fd.length > 0) {
+      chunks.push(`<p style="margin:0;line-height:1.5;"><strong>Food &amp; beverage</strong><br><br>${fd.join('<br>')}</p>`)
+    }
   }
 
   if (has(form.setupNotes) || has(form.swagNotes)) {
@@ -829,13 +839,20 @@ function buildKnowBeforeYouGoEmailHtml(form) {
 
   if (has(form.avNotes)) {
     const avBullets = trim(form.avNotes).split(/\n+/).map((s) => s.trim()).filter(Boolean)
-    const avHtml = avBullets.map((b) => `• ${escapeHtml(b)}`).join('<br>')
-    chunks.push(`<p style="margin:0;line-height:1.5;"><strong>AV</strong><br><br>${avHtml}</p>`)
+    if (avBullets.length > 0) {
+      const avHtml = avBullets.map((b) => `• ${escapeHtml(b)}`).join('<br>')
+      chunks.push(
+        `<p style="margin:0;line-height:1.5;"><strong>AV / presentation setup</strong><br><br>${avHtml}</p>`,
+      )
+    }
   }
 
   if (has(form.additionalNotes)) {
-    const notesHtml = escapeHtml(trim(form.additionalNotes)).replace(/\n/g, '<br>')
-    chunks.push(`<p style="margin:0;line-height:1.5;"><strong>Additional notes</strong><br><br>${notesHtml}</p>`)
+    const noteLines = trim(form.additionalNotes).split(/\n/).map((s) => s.trim()).filter(Boolean)
+    if (noteLines.length > 0) {
+      const notesHtml = noteLines.map((line) => escapeHtml(line)).join('<br>')
+      chunks.push(`<p style="margin:0;line-height:1.5;"><strong>Additional notes</strong><br><br>${notesHtml}</p>`)
+    }
   }
 
   chunks.push(`<p style="margin:0;line-height:1.5;">${escapeHtml('Please let me know if you have any questions.')}</p>`)
@@ -898,10 +915,12 @@ function generateKnowBeforeYouGoEmail(form) {
   }
 
   if (has(form.internalAgenda)) {
-    lines.push(sectionTitle('Agenda'))
     const agendaBullets = trim(form.internalAgenda).split(/\n+/).map((s) => s.trim()).filter(Boolean)
-    agendaBullets.forEach((b) => lines.push(`- ${b}`))
-    lines.push('')
+    if (agendaBullets.length > 0) {
+      lines.push(sectionTitle('Agenda'))
+      agendaBullets.forEach((b) => lines.push(`- ${b}`))
+      lines.push('')
+    }
   }
 
   const sp1 = has(form.speaker1Name) || has(form.speaker1Title) || has(form.speaker1TalkTitle)
@@ -920,6 +939,12 @@ function generateKnowBeforeYouGoEmail(form) {
       if (has(form.speaker2TalkTitle)) t += ` — ${trim(form.speaker2TalkTitle)}`
       lines.push(`- ${t}`)
     }
+    lines.push('')
+  }
+
+  if (has(form.speakerArrivalNote)) {
+    lines.push(sectionTitle('Speaker arrival'))
+    lines.push(trim(form.speakerArrivalNote))
     lines.push('')
   }
 
@@ -949,10 +974,14 @@ function generateKnowBeforeYouGoEmail(form) {
   }
 
   if (has(form.foodDetails) || has(form.drinkDetails)) {
-    lines.push(sectionTitle('Food & refreshments'))
-    if (has(form.foodDetails)) lines.push(`- ${trim(form.foodDetails)}`)
-    if (has(form.drinkDetails)) lines.push(`- ${trim(form.drinkDetails)}`)
-    lines.push('')
+    const foodLines = []
+    if (has(form.foodDetails)) foodLines.push(`- ${trim(form.foodDetails)}`)
+    if (has(form.drinkDetails)) foodLines.push(`- ${trim(form.drinkDetails)}`)
+    if (foodLines.length > 0) {
+      lines.push(sectionTitle('Food & beverage'))
+      foodLines.forEach((l) => lines.push(l))
+      lines.push('')
+    }
   }
 
   if (has(form.setupNotes) || has(form.swagNotes)) {
@@ -963,16 +992,21 @@ function generateKnowBeforeYouGoEmail(form) {
   }
 
   if (has(form.avNotes)) {
-    lines.push(sectionTitle('AV'))
     const avBullets = trim(form.avNotes).split(/\n+/).map((s) => s.trim()).filter(Boolean)
-    avBullets.forEach((b) => lines.push(`- ${b}`))
-    lines.push('')
+    if (avBullets.length > 0) {
+      lines.push(sectionTitle('AV / presentation setup'))
+      avBullets.forEach((b) => lines.push(`- ${b}`))
+      lines.push('')
+    }
   }
 
   if (has(form.additionalNotes)) {
-    lines.push(sectionTitle('Additional notes'))
-    lines.push(trim(form.additionalNotes))
-    lines.push('')
+    const noteLines = trim(form.additionalNotes).split(/\n/).map((s) => s.trim()).filter(Boolean)
+    if (noteLines.length > 0) {
+      lines.push(sectionTitle('Additional notes'))
+      noteLines.forEach((line) => lines.push(line))
+      lines.push('')
+    }
   }
 
   lines.push('Please let me know if you have any questions.')
