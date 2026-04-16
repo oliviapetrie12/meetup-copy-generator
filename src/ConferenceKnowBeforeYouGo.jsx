@@ -896,7 +896,7 @@ export default function ConferenceKnowBeforeYouGo() {
               <textarea
                 value={form.staffingScheduleNotes}
                 onChange={update('staffingScheduleNotes')}
-                placeholder="One bullet per line; shown as • lines under the schedule link when provided."
+                placeholder="Paste a Google Sheet link or add quick staffing notes below"
                 rows={3}
               />
             </label>
