@@ -154,12 +154,6 @@ const DEFAULT_SWAG_TEXT = [
   'Monitor distribution across event days',
 ].join('\n')
 
-const DEFAULT_PARKING_TEXT =
-  'Parking details vary by venue. Check event page or SpotHero.'
-
-const DEFAULT_FOOD_BEVERAGE_TEXT =
-  'Meals and snacks may be provided. Lunch is typically on your own.'
-
 function getInitialForm() {
   return {
     conferenceName: '',
@@ -182,8 +176,8 @@ function getInitialForm() {
     boothMaterialsShippedToName: '',
     avSetupRequirements: '',
     swagText: DEFAULT_SWAG_TEXT,
-    parkingText: DEFAULT_PARKING_TEXT,
-    foodBeverageText: DEFAULT_FOOD_BEVERAGE_TEXT,
+    parkingText: '',
+    foodBeverageText: '',
     additionalSections: [],
   }
 }
@@ -1175,7 +1169,7 @@ export default function ConferenceKnowBeforeYouGo() {
             <legend>Parking</legend>
             <label>
               Parking
-              <textarea value={form.parkingText} onChange={update('parkingText')} placeholder="Lots, validation, load-in…" rows={3} />
+              <textarea value={form.parkingText} onChange={update('parkingText')} rows={3} />
             </label>
           </fieldset>
 
@@ -1183,7 +1177,7 @@ export default function ConferenceKnowBeforeYouGo() {
             <legend>Food &amp; beverage</legend>
             <label>
               Food &amp; beverage
-              <textarea value={form.foodBeverageText} onChange={update('foodBeverageText')} placeholder="Catering, staff meals, hospitality suite…" rows={3} />
+              <textarea value={form.foodBeverageText} onChange={update('foodBeverageText')} rows={3} />
             </label>
           </fieldset>
 
