@@ -9,203 +9,203 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;')
 }
 
+/** Appended to every generated output (no form field). */
+const STANDARD_TRAVEL_EXPENSES_TEXT =
+  'Travel & expenses: follow your regional policy for submitting receipts and expense reports. Code charges to the project indicated by your manager. For policy questions, contact your People or Finance partner.'
+
+const INITIAL_CONTACT = { name: '', role: '', email: '', phone: '' }
+
 const INITIAL_FORM = {
   greetingNames: '',
   conferenceName: '',
-  conferenceDates: '',
-  boothOrHall: '',
-  scheduleText: '',
-  setupText: '',
-  contacts: [{ name: '', role: '', contactInfo: '' }],
-  additionalNotes: '',
+  tldrText: '',
+  eventDatesHours: '',
+  ticketsText: '',
+  locationVenue: '',
+  locationAddress: '',
+  contacts: [{ ...INITIAL_CONTACT }],
+  boothSetupTeardown: '',
+  swagText: '',
+  parkingText: '',
+  foodBeverageText: '',
+  additionalSections: [],
 }
 
-function buildConferenceTldrBullets(form) {
-  const trim = (s) => (typeof s === 'string' ? s.trim() : '')
-  const has = (s) => trim(s).length > 0
-  const bullets = []
-  const add = (condition, text) => {
-    if (condition && text && bullets.length < 5) bullets.push(text)
-  }
+function trim(s) {
+  return typeof s === 'string' ? s.trim() : ''
+}
 
-  if (has(form.conferenceDates)) add(true, `Dates: ${trim(form.conferenceDates)}.`)
-  if (has(form.boothOrHall)) add(true, `Booth / hall: ${trim(form.boothOrHall)}.`)
-  if (has(form.scheduleText)) {
-    const first = trim(form.scheduleText).split(/\n+/).map((l) => l.trim()).filter(Boolean)[0]
-    if (first) add(true, `Schedule: ${first}${trim(form.scheduleText).includes('\n') ? ' … (see Schedule below)' : ''}`)
-  }
-  if (has(form.setupText)) {
-    const first = trim(form.setupText).split(/\n+/).map((l) => l.trim()).filter(Boolean)[0]
-    if (first) add(true, `Setup: ${first}${trim(form.setupText).includes('\n') ? ' … (see Setup below)' : ''}`)
-  }
-  const hasAnyContact = (form.contacts || []).some((c) => has(c.name) || has(c.role) || has(c.contactInfo))
-  add(hasAnyContact, 'Key contacts are listed in Contacts below.')
+function has(s) {
+  return trim(s).length > 0
+}
 
-  return bullets.slice(0, 5)
+function textToHtmlParagraphs(text) {
+  return escapeHtml(trim(text)).replace(/\n/g, '<br>')
 }
 
 function generateConferenceSubject(form) {
-  const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const name = trim(form.conferenceName)
-  const dates = trim(form.conferenceDates)
+  const datesHint = trim(form.eventDatesHours)
+    .split('\n')[0]
+    ?.trim()
   if (!name) return 'Conference booth — Know before you go'
-  return `${name} | Booth know-before-you-go${dates ? ` | ${dates}` : ''}`
+  return `${name} | Booth know-before-you-go${datesHint ? ` | ${datesHint}` : ''}`
 }
 
-function buildConferenceEmailHtml(form, includeTldr) {
-  const trim = (s) => (typeof s === 'string' ? s.trim() : '')
-  const has = (s) => trim(s).length > 0
+function buildConferenceEmailHtml(form) {
   const names = trim(form.greetingNames) || 'team'
   const confName = trim(form.conferenceName) || 'the conference'
+  const parts = []
 
-  const chunks = []
-  chunks.push(`<p style="margin:0;line-height:1.5;">Hi ${escapeHtml(names)},</p>`)
+  parts.push(`<p>Hi ${escapeHtml(names)},</p>`)
+  parts.push(`<p><strong>Title</strong><br>${escapeHtml(confName)}</p>`)
 
-  let titleBody = escapeHtml(confName)
-  if (has(form.conferenceDates)) titleBody += `<br>${escapeHtml(trim(form.conferenceDates))}`
-  if (has(form.boothOrHall)) titleBody += `<br>${escapeHtml(`Booth / location: ${trim(form.boothOrHall)}`)}`
-  chunks.push(`<p style="margin:0;line-height:1.5;"><strong>Title</strong><br><br>${titleBody}</p>`)
-
-  if (includeTldr) {
-    const tldrBullets = buildConferenceTldrBullets(form)
-    const tldrInner = tldrBullets.length
-      ? `<span style="background-color: #FEF08A; font-weight: bold;">TL;DR</span><br><br>${tldrBullets.map((i) => `• ${escapeHtml(i)}`).join('<br>')}`
-      : `<span style="background-color: #FEF08A; font-weight: bold;">TL;DR</span>`
-    chunks.push(`<p style="margin:0;line-height:1.5;">${tldrInner}</p>`)
+  if (has(form.tldrText)) {
+    parts.push(`<p><strong>TL;DR</strong><br>${textToHtmlParagraphs(form.tldrText)}</p>`)
+  }
+  if (has(form.eventDatesHours)) {
+    parts.push(`<p><strong>Event dates &amp; hours</strong><br>${textToHtmlParagraphs(form.eventDatesHours)}</p>`)
+  }
+  if (has(form.ticketsText)) {
+    parts.push(`<p><strong>Tickets</strong><br>${textToHtmlParagraphs(form.ticketsText)}</p>`)
+  }
+  if (has(form.locationVenue) || has(form.locationAddress)) {
+    let loc = ''
+    if (has(form.locationVenue)) loc += escapeHtml(trim(form.locationVenue))
+    if (has(form.locationAddress)) loc += (loc ? '<br>' : '') + escapeHtml(trim(form.locationAddress))
+    parts.push(`<p><strong>Location</strong><br>${loc}</p>`)
   }
 
-  chunks.push(
-    `<p style="margin:0;line-height:1.5;">${escapeHtml(
-      `Below is booth logistics for ${confName}. Use this as a quick reference for staffing, setup, and who to contact on site.`,
-    )}</p>`,
+  const contactEntries = (form.contacts || []).filter(
+    (c) => has(c.name) || has(c.role) || has(c.email) || has(c.phone),
   )
-
-  if (has(form.scheduleText)) {
-    const lines = trim(form.scheduleText)
-      .split(/\n+/)
-      .map((l) => l.trim())
-      .filter(Boolean)
-    const schedHtml = lines.map((b) => `• ${escapeHtml(b)}`).join('<br>')
-    chunks.push(`<p style="margin:0;line-height:1.5;"><strong>Schedule</strong><br><br>${schedHtml}</p>`)
-  }
-
-  if (has(form.setupText)) {
-    const lines = trim(form.setupText)
-      .split(/\n+/)
-      .map((l) => l.trim())
-      .filter(Boolean)
-    const setupHtml = lines.map((b) => `• ${escapeHtml(b)}`).join('<br>')
-    chunks.push(`<p style="margin:0;line-height:1.5;"><strong>Setup</strong><br><br>${setupHtml}</p>`)
-  }
-
-  const contactEntries = (form.contacts || []).filter((c) => has(c.name) || has(c.role) || has(c.contactInfo))
   if (contactEntries.length > 0) {
-    const contactLines = contactEntries.map((c) => {
-      const name = trim(c.name)
-      const role = trim(c.role)
-      const info = trim(c.contactInfo)
-      let main = ''
-      if (name && info) main = `${name} (${info})`
-      else if (name) main = name
-      else if (info) main = info
-      let line = ''
-      if (main && role) line = `${main} – ${role}`
-      else if (main) line = main
-      else line = role
-      return `• ${escapeHtml(line)}`
+    const rows = contactEntries.map((c) => {
+      const bits = []
+      if (has(c.name)) bits.push(escapeHtml(trim(c.name)))
+      if (has(c.role)) bits.push(escapeHtml(trim(c.role)))
+      if (has(c.email)) bits.push(escapeHtml(trim(c.email)))
+      if (has(c.phone)) bits.push(escapeHtml(trim(c.phone)))
+      return bits.join(' · ')
     })
-    chunks.push(`<p style="margin:0;line-height:1.5;"><strong>Contacts</strong><br><br>${contactLines.join('<br>')}</p>`)
+    parts.push(`<p><strong>Contacts</strong><br>${rows.join('<br>')}</p>`)
   }
 
-  if (has(form.additionalNotes)) {
-    const notesHtml = escapeHtml(trim(form.additionalNotes)).replace(/\n/g, '<br>')
-    chunks.push(`<p style="margin:0;line-height:1.5;"><strong>Additional notes</strong><br><br>${notesHtml}</p>`)
+  if (has(form.boothSetupTeardown)) {
+    parts.push(`<p><strong>Booth setup &amp; teardown</strong><br>${textToHtmlParagraphs(form.boothSetupTeardown)}</p>`)
+  }
+  if (has(form.swagText)) {
+    parts.push(`<p><strong>Swag</strong><br>${textToHtmlParagraphs(form.swagText)}</p>`)
+  }
+  if (has(form.parkingText)) {
+    parts.push(`<p><strong>Parking</strong><br>${textToHtmlParagraphs(form.parkingText)}</p>`)
+  }
+  if (has(form.foodBeverageText)) {
+    parts.push(`<p><strong>Food &amp; beverage</strong><br>${textToHtmlParagraphs(form.foodBeverageText)}</p>`)
   }
 
-  chunks.push(`<p style="margin:0;line-height:1.5;">${escapeHtml('Please reach out if anything changes on site or you need a hand.')}</p>`)
+  ;(form.additionalSections || []).forEach((sec) => {
+    const t = trim(sec.title)
+    const c = trim(sec.content)
+    if (!t && !c) return
+    const title = t || 'Section'
+    parts.push(`<p><strong>${escapeHtml(title)}</strong><br>${c ? textToHtmlParagraphs(sec.content) : ''}</p>`)
+  })
 
-  const body = chunks.join('<br><br>')
-  return `<div style="font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.5;color:#202124;">${body}</div>`
+  parts.push(`<p><strong>Travel &amp; expenses</strong><br>${escapeHtml(STANDARD_TRAVEL_EXPENSES_TEXT)}</p>`)
+  parts.push(`<p>${escapeHtml('Please reach out if anything changes on site or you need a hand.')}</p>`)
+
+  return `<div>${parts.join('')}</div>`
 }
 
-function generateConferenceEmailPlain(form, includeTldr) {
-  const trim = (s) => (typeof s === 'string' ? s.trim() : '')
-  const has = (s) => trim(s).length > 0
-  const section = (t) => `**${t}**`
+function generateConferenceEmailPlain(form) {
   const names = trim(form.greetingNames) || 'team'
   const confName = trim(form.conferenceName) || 'the conference'
-
   const lines = []
-  lines.push(`Hi ${names},`, '')
 
-  lines.push(section('Title'))
+  lines.push(`Hi ${names},`, '')
+  lines.push('**Title**')
   lines.push(confName)
-  if (has(form.conferenceDates)) lines.push(trim(form.conferenceDates))
-  if (has(form.boothOrHall)) lines.push(`Booth / location: ${trim(form.boothOrHall)}`)
   lines.push('')
 
-  if (includeTldr) {
-    lines.push(section('TL;DR'))
-    buildConferenceTldrBullets(form).forEach((b) => lines.push(`- ${b}`))
+  if (has(form.tldrText)) {
+    lines.push('**TL;DR**')
+    lines.push(trim(form.tldrText))
+    lines.push('')
+  }
+  if (has(form.eventDatesHours)) {
+    lines.push('**Event dates & hours**')
+    lines.push(trim(form.eventDatesHours))
+    lines.push('')
+  }
+  if (has(form.ticketsText)) {
+    lines.push('**Tickets**')
+    lines.push(trim(form.ticketsText))
+    lines.push('')
+  }
+  if (has(form.locationVenue) || has(form.locationAddress)) {
+    lines.push('**Location**')
+    if (has(form.locationVenue)) lines.push(trim(form.locationVenue))
+    if (has(form.locationAddress)) lines.push(trim(form.locationAddress))
     lines.push('')
   }
 
-  lines.push(
-    `Below is booth logistics for ${confName}. Use this as a quick reference for staffing, setup, and who to contact on site.`,
-    '',
+  const contactEntries = (form.contacts || []).filter(
+    (c) => has(c.name) || has(c.role) || has(c.email) || has(c.phone),
   )
-
-  if (has(form.scheduleText)) {
-    lines.push(section('Schedule'))
-    trim(form.scheduleText)
-      .split(/\n+/)
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .forEach((l) => lines.push(`- ${l}`))
-    lines.push('')
-  }
-
-  if (has(form.setupText)) {
-    lines.push(section('Setup'))
-    trim(form.setupText)
-      .split(/\n+/)
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .forEach((l) => lines.push(`- ${l}`))
-    lines.push('')
-  }
-
-  const contactEntries = (form.contacts || []).filter((c) => has(c.name) || has(c.role) || has(c.contactInfo))
   if (contactEntries.length > 0) {
-    lines.push(section('Contacts'))
+    lines.push('**Contacts**')
     contactEntries.forEach((c) => {
-      const name = trim(c.name)
-      const role = trim(c.role)
-      const info = trim(c.contactInfo)
-      let main = ''
-      if (name && info) main = `${name} (${info})`
-      else if (name) main = name
-      else if (info) main = info
-      if (main && role) lines.push(`- ${main} – ${role}`)
-      else if (main) lines.push(`- ${main}`)
-      else if (role) lines.push(`- ${role}`)
+      const bits = []
+      if (has(c.name)) bits.push(trim(c.name))
+      if (has(c.role)) bits.push(trim(c.role))
+      if (has(c.email)) bits.push(trim(c.email))
+      if (has(c.phone)) bits.push(trim(c.phone))
+      lines.push(`- ${bits.join(' · ')}`)
     })
     lines.push('')
   }
 
-  if (has(form.additionalNotes)) {
-    lines.push(section('Additional notes'))
-    lines.push(trim(form.additionalNotes))
+  if (has(form.boothSetupTeardown)) {
+    lines.push('**Booth setup & teardown**')
+    lines.push(trim(form.boothSetupTeardown))
+    lines.push('')
+  }
+  if (has(form.swagText)) {
+    lines.push('**Swag**')
+    lines.push(trim(form.swagText))
+    lines.push('')
+  }
+  if (has(form.parkingText)) {
+    lines.push('**Parking**')
+    lines.push(trim(form.parkingText))
+    lines.push('')
+  }
+  if (has(form.foodBeverageText)) {
+    lines.push('**Food & beverage**')
+    lines.push(trim(form.foodBeverageText))
     lines.push('')
   }
 
+  ;(form.additionalSections || []).forEach((sec) => {
+    const t = trim(sec.title)
+    const c = trim(sec.content)
+    if (!t && !c) return
+    lines.push(`**${t || 'Section'}**`)
+    if (c) lines.push(c)
+    lines.push('')
+  })
+
+  lines.push('**Travel & expenses**')
+  lines.push(STANDARD_TRAVEL_EXPENSES_TEXT)
+  lines.push('')
   lines.push('Please reach out if anything changes on site or you need a hand.')
+
   return lines.join('\n')
 }
 
 export default function ConferenceKnowBeforeYouGo() {
   const [form, setForm] = useState(INITIAL_FORM)
-  const [includeTldr, setIncludeTldr] = useState(true)
   const [subject, setSubject] = useState('')
   const [plain, setPlain] = useState('')
   const [html, setHtml] = useState('')
@@ -213,7 +213,7 @@ export default function ConferenceKnowBeforeYouGo() {
   const [subjectCopied, setSubjectCopied] = useState(false)
 
   const update = (key) => (e) => {
-    const v = e.target.type === 'checkbox' ? e.target.checked : e.target.value
+    const v = e.target.value
     setForm((prev) => ({ ...prev, [key]: v }))
   }
 
@@ -229,7 +229,30 @@ export default function ConferenceKnowBeforeYouGo() {
   const addContact = () => {
     setForm((prev) => ({
       ...prev,
-      contacts: [...(prev.contacts || []), { name: '', role: '', contactInfo: '' }],
+      contacts: [...(prev.contacts || []), { ...INITIAL_CONTACT }],
+    }))
+  }
+
+  const updateAdditionalSection = (index, key) => (e) => {
+    const v = e.target.value
+    setForm((prev) => {
+      const next = [...(prev.additionalSections || [])]
+      next[index] = { ...next[index], [key]: v }
+      return { ...prev, additionalSections: next }
+    })
+  }
+
+  const addAdditionalSection = () => {
+    setForm((prev) => ({
+      ...prev,
+      additionalSections: [...(prev.additionalSections || []), { title: '', content: '' }],
+    }))
+  }
+
+  const removeAdditionalSection = (index) => {
+    setForm((prev) => ({
+      ...prev,
+      additionalSections: (prev.additionalSections || []).filter((_, i) => i !== index),
     }))
   }
 
@@ -237,17 +260,18 @@ export default function ConferenceKnowBeforeYouGo() {
     (e) => {
       e.preventDefault()
       setSubject(generateConferenceSubject(form))
-      const text = generateConferenceEmailPlain(form, includeTldr)
-      const h = buildConferenceEmailHtml(form, includeTldr)
-      setPlain(text)
-      setHtml(h)
+      setPlain(generateConferenceEmailPlain(form))
+      setHtml(buildConferenceEmailHtml(form))
     },
-    [form, includeTldr],
+    [form],
   )
 
   const handleReset = () => {
-    setForm(INITIAL_FORM)
-    setIncludeTldr(true)
+    setForm({
+      ...INITIAL_FORM,
+      contacts: [{ ...INITIAL_CONTACT }],
+      additionalSections: [],
+    })
     setSubject('')
     setPlain('')
     setHtml('')
@@ -303,11 +327,8 @@ export default function ConferenceKnowBeforeYouGo() {
                 placeholder="e.g. booth team, everyone"
               />
             </label>
-          </fieldset>
-          <fieldset className="form-fieldset">
-            <legend>Conference &amp; booth</legend>
             <label>
-              Conference name
+              Conference / event name
               <input
                 type="text"
                 value={form.conferenceName}
@@ -315,49 +336,49 @@ export default function ConferenceKnowBeforeYouGo() {
                 placeholder="e.g. ElasticON 2026"
               />
             </label>
-            <label>
-              Dates
-              <input
-                type="text"
-                value={form.conferenceDates}
-                onChange={update('conferenceDates')}
-                placeholder="e.g. March 4–6, 2026"
-              />
-            </label>
-            <label>
-              Booth # / hall / floor
-              <input
-                type="text"
-                value={form.boothOrHall}
-                onChange={update('boothOrHall')}
-                placeholder="e.g. Hall B, booth 412"
-              />
-            </label>
           </fieldset>
+
           <fieldset className="form-fieldset">
-            <legend>Schedule</legend>
+            <legend>TL;DR</legend>
             <label>
-              Staffing / schedule
-              <textarea
-                value={form.scheduleText}
-                onChange={update('scheduleText')}
-                placeholder="One line per block or day (e.g. Wed 9–5 staffing: …)"
-                rows={5}
-              />
+              TL;DR
+              <textarea value={form.tldrText} onChange={update('tldrText')} placeholder="Short summary for staff…" rows={4} />
             </label>
           </fieldset>
+
           <fieldset className="form-fieldset">
-            <legend>Setup</legend>
+            <legend>Event dates &amp; hours</legend>
             <label>
-              Booth setup &amp; logistics
+              Event dates &amp; hours
               <textarea
-                value={form.setupText}
-                onChange={update('setupText')}
-                placeholder="Build times, deliveries, power, Wi‑Fi, signage…"
-                rows={5}
+                value={form.eventDatesHours}
+                onChange={update('eventDatesHours')}
+                placeholder="e.g. Wed 9am–6pm, Thu 10am–5pm exhibitor hours…"
+                rows={4}
               />
             </label>
           </fieldset>
+
+          <fieldset className="form-fieldset">
+            <legend>Tickets</legend>
+            <label>
+              Tickets
+              <textarea value={form.ticketsText} onChange={update('ticketsText')} placeholder="Badge pickup, exhibitor passes, guest list…" rows={3} />
+            </label>
+          </fieldset>
+
+          <fieldset className="form-fieldset">
+            <legend>Location</legend>
+            <label>
+              Venue
+              <input type="text" value={form.locationVenue} onChange={update('locationVenue')} placeholder="e.g. Moscone South" />
+            </label>
+            <label>
+              Address
+              <input type="text" value={form.locationAddress} onChange={update('locationAddress')} placeholder="Street, city, region" />
+            </label>
+          </fieldset>
+
           <fieldset className="form-fieldset">
             <legend>Contacts</legend>
             {(form.contacts || []).map((contact, index) => (
@@ -368,11 +389,15 @@ export default function ConferenceKnowBeforeYouGo() {
                 </label>
                 <label>
                   Role
-                  <input type="text" value={contact.role} onChange={updateContact(index, 'role')} placeholder="e.g. booth lead, on-site AV" />
+                  <input type="text" value={contact.role} onChange={updateContact(index, 'role')} placeholder="e.g. booth lead" />
                 </label>
                 <label>
-                  Email or Slack
-                  <input type="text" value={contact.contactInfo} onChange={updateContact(index, 'contactInfo')} placeholder="e.g. jane@example.com" />
+                  Email
+                  <input type="email" value={contact.email} onChange={updateContact(index, 'email')} placeholder="e.g. jane@example.com" autoComplete="off" />
+                </label>
+                <label>
+                  Phone
+                  <input type="text" value={contact.phone} onChange={updateContact(index, 'phone')} placeholder="e.g. +1 …" autoComplete="off" />
                 </label>
               </div>
             ))}
@@ -380,17 +405,72 @@ export default function ConferenceKnowBeforeYouGo() {
               + Add contact
             </button>
           </fieldset>
+
           <fieldset className="form-fieldset">
-            <legend>Additional</legend>
+            <legend>Booth setup &amp; teardown</legend>
             <label>
-              Additional notes
-              <textarea value={form.additionalNotes} onChange={update('additionalNotes')} placeholder="Parking, badges, shipping, evening events…" rows={3} />
+              Booth setup &amp; teardown
+              <textarea
+                value={form.boothSetupTeardown}
+                onChange={update('boothSetupTeardown')}
+                placeholder="Build / strike times, deliveries, power, rigging…"
+                rows={4}
+              />
             </label>
           </fieldset>
-          <label className="checkbox-label">
-            <input type="checkbox" checked={includeTldr} onChange={(e) => setIncludeTldr(e.target.checked)} />
-            Include TL;DR summary
-          </label>
+
+          <fieldset className="form-fieldset">
+            <legend>Swag</legend>
+            <label>
+              Swag
+              <textarea value={form.swagText} onChange={update('swagText')} placeholder="What to bring, inventory, giveaways…" rows={3} />
+            </label>
+          </fieldset>
+
+          <fieldset className="form-fieldset">
+            <legend>Parking</legend>
+            <label>
+              Parking
+              <textarea value={form.parkingText} onChange={update('parkingText')} placeholder="Lots, validation, load-in…" rows={3} />
+            </label>
+          </fieldset>
+
+          <fieldset className="form-fieldset">
+            <legend>Food &amp; beverage</legend>
+            <label>
+              Food &amp; beverage
+              <textarea value={form.foodBeverageText} onChange={update('foodBeverageText')} placeholder="Catering, staff meals, hospitality suite…" rows={3} />
+            </label>
+          </fieldset>
+
+          <fieldset className="form-fieldset">
+            <legend>Additional sections</legend>
+            <p className="form-hint">Optional custom sections (title + content). Travel &amp; expenses are added automatically to the output.</p>
+            {(form.additionalSections || []).map((sec, index) => (
+              <div key={index} className="contact-row conference-additional-section">
+                <label>
+                  Section title
+                  <input
+                    type="text"
+                    value={sec.title}
+                    onChange={updateAdditionalSection(index, 'title')}
+                    placeholder="e.g. Evening event"
+                  />
+                </label>
+                <label>
+                  Content
+                  <textarea value={sec.content} onChange={updateAdditionalSection(index, 'content')} placeholder="Details…" rows={3} />
+                </label>
+                <button type="button" className="btn-reset" onClick={() => removeAdditionalSection(index)}>
+                  Remove section
+                </button>
+              </div>
+            ))}
+            <button type="button" onClick={addAdditionalSection} className="btn-add-speaker">
+              + Add section
+            </button>
+          </fieldset>
+
           <button type="submit" className="btn-generate">
             Generate email
           </button>
