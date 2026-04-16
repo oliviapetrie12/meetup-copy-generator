@@ -786,6 +786,80 @@ body {
   margin-top: 0.5rem;
 }
 
+.output-actions-inline {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.btn-section-action {
+  padding: 0.32rem 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #475569;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  font-family: inherit;
+}
+
+.btn-section-action:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.btn-section-action-wide {
+  margin-top: 0.35rem;
+}
+
+.btn-regenerate-compact {
+  padding: 0.28rem 0.55rem;
+  min-width: 2rem;
+}
+
+.kbyg-per-section-tools {
+  margin: 0.5rem 0 0.75rem;
+  padding: 0.65rem 0.75rem;
+  background: #faf8f5;
+  border: 1px solid #ede8e0;
+  border-radius: 10px;
+}
+
+.kbyg-per-section-hint {
+  display: block;
+  margin-bottom: 0.35rem !important;
+}
+
+.kbyg-section-tools-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.kbyg-section-tools-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+}
+
+.kbyg-section-tools-label {
+  min-width: 6.5rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.kbyg-plain-hint {
+  margin-top: 0.5rem !important;
+  margin-bottom: 0 !important;
+}
+
 .conference-kbyg-copy-actions {
   flex-direction: row;
   flex-wrap: wrap;

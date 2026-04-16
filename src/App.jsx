@@ -1,7 +1,13 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import QRCodeStyling from "qr-code-styling"
 import elasticLogo from './logo.png'
 import ConferenceKnowBeforeYouGo from './ConferenceKnowBeforeYouGo.jsx'
+import {
+  makeMoreConcise,
+  parseKbygPlainSections,
+  rebuildKbygPlainFromSections,
+  replaceKbygSectionBody,
+} from './outputHelpers.js'
 
 function SearchableSelect({ value, onChange, options, placeholder = 'Type to search…', id }) {
   const [open, setOpen] = useState(false)
@@ -665,13 +671,13 @@ function truncateKbygTldr(s, max = MAX_KBYG_TLDR_LEN) {
   return `${t.slice(0, max - 1).trimEnd()}…`
 }
 
-function buildKbygTldrBullets(form) {
+function buildKbygTldrBullets(form, opts = {}) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const has = (s) => trim(s).length > 0
   if (form.generateTldr === false) return []
 
   const inc = { ...getInitialKbygTldrInclude(), ...(form.kbygTldrInclude || {}) }
-  const out = []
+  let out = []
 
   for (const id of KBYG_TLDR_ITEM_ORDER) {
     if (!inc[id]) continue
@@ -746,7 +752,13 @@ function buildKbygTldrBullets(form) {
     }
   }
 
-  return out.slice(0, 10)
+  out = out.slice(0, 10)
+  const rot = Math.max(0, Number(opts.tldrRotation) || 0)
+  if (out.length > 1 && rot > 0) {
+    const r = rot % out.length
+    out = [...out.slice(r), ...out.slice(0, r)]
+  }
+  return out
 }
 
 function escapeHtmlAttr(s) {
@@ -754,7 +766,7 @@ function escapeHtmlAttr(s) {
   return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;')
 }
 
-function buildKnowBeforeYouGoEmailHtml(form) {
+function buildKnowBeforeYouGoEmailHtml(form, opts = {}) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const has = (s) => trim(s).length > 0
   const names = trim(form.greetingNames) || 'everyone'
@@ -773,7 +785,7 @@ function buildKnowBeforeYouGoEmailHtml(form) {
   if (arrivalTime) titleBody += `<br>${escapeHtml(`Arrive by ${arrivalTime}`)}`
   chunks.push(`<p style="margin:0;line-height:1.5;"><strong>Title</strong><br><br>${titleBody}</p>`)
 
-  const tldrBullets = buildKbygTldrBullets(form)
+  const tldrBullets = buildKbygTldrBullets(form, opts)
   if (tldrBullets.length > 0) {
     const tldrInner = `<span style="background-color: #FEF08A; font-weight: bold;">TL;DR</span><br><br>${tldrBullets.map((i) => `• ${escapeHtml(i)}`).join('<br>')}`
     chunks.push(`<p style="margin:0;line-height:1.5;">${tldrInner}</p>`)
@@ -918,7 +930,7 @@ function buildKnowBeforeYouGoEmailHtml(form) {
   return `<div style="font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.5;color:#202124;">${body}</div>`
 }
 
-function generateKnowBeforeYouGoEmail(form) {
+function generateKnowBeforeYouGoEmail(form, opts = {}) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const has = (s) => trim(s).length > 0
   const sectionTitle = (title) => `**${title}**`
@@ -940,7 +952,7 @@ function generateKnowBeforeYouGoEmail(form) {
   if (arrivalTime) lines.push(`Arrive by ${arrivalTime}`)
   lines.push('')
 
-  const tldrBulletsPlain = buildKbygTldrBullets(form)
+  const tldrBulletsPlain = buildKbygTldrBullets(form, opts)
   if (tldrBulletsPlain.length > 0) {
     lines.push(sectionTitle('TL;DR'))
     tldrBulletsPlain.forEach((b) => lines.push(`- ${b}`))
@@ -2294,11 +2306,21 @@ export default function App() {
   const [intuitionPreviewCopied, setIntuitionPreviewCopied] = useState(false)
   const [intuitionWhyAttendCopied, setIntuitionWhyAttendCopied] = useState(false)
   const [intuitionBodyCopied, setIntuitionBodyCopied] = useState(false)
+  const [kbygTldrRotation, setKbygTldrRotation] = useState(0)
+  const [kbygSectionCopiedId, setKbygSectionCopiedId] = useState(null)
   const [comboboxOpen, setComboboxOpen] = useState(false)
   const [comboboxHighlight, setComboboxHighlight] = useState(0)
   const comboboxRef = useRef(null)
   const [showSpeaker2, setShowSpeaker2] = useState(false)
   const [showSpeaker3, setShowSpeaker3] = useState(false)
+
+  const kbygSections = useMemo(
+    () =>
+      generatorType === 'knowBeforeYouGo' && generatedCopy
+        ? parseKbygPlainSections(generatedCopy)
+        : [],
+    [generatorType, generatedCopy],
+  )
 
   const query = (form.chapterOrCity || '').trim().toLowerCase()
   const filteredGroups = query
@@ -2459,10 +2481,12 @@ export default function App() {
 
   const handleGenerate = () => {
     if (generatorType === 'knowBeforeYouGo') {
+      setKbygTldrRotation(0)
+      const opts = { tldrRotation: 0 }
       setGeneratedSubject(generateKnowBeforeYouGoSubject(kbygForm))
-      const emailText = generateKnowBeforeYouGoEmail(kbygForm)
+      const emailText = generateKnowBeforeYouGoEmail(kbygForm, opts)
       setGeneratedCopy(emailText)
-      setKbygEmailHtml(buildKnowBeforeYouGoEmailHtml(kbygForm))
+      setKbygEmailHtml(buildKnowBeforeYouGoEmailHtml(kbygForm, opts))
       setMeetupPageHtml('')
       setGeneratedOutreachLinkedIn('')
     } else if (generatorType === 'speakerOutreach') {
@@ -2520,6 +2544,62 @@ export default function App() {
     setGeneratedCopy(generateSpeakerOutreachEmail(outreachForm, nextVariant))
   }
 
+  const handleRegenKbygTldr = () => {
+    const next = kbygTldrRotation + 1
+    setKbygTldrRotation(next)
+    const opts = { tldrRotation: next }
+    setGeneratedSubject(generateKnowBeforeYouGoSubject(kbygForm))
+    setGeneratedCopy(generateKnowBeforeYouGoEmail(kbygForm, opts))
+    setKbygEmailHtml(buildKnowBeforeYouGoEmailHtml(kbygForm, opts))
+  }
+
+  const handleKbygSectionConcise = (sectionKey) => {
+    const sections = parseKbygPlainSections(generatedCopy)
+    const target = sections.find((s) => s.key === sectionKey)
+    if (!target) return
+    const updated = replaceKbygSectionBody(sections, sectionKey, makeMoreConcise(target.body))
+    setGeneratedCopy(rebuildKbygPlainFromSections(updated))
+    setKbygEmailHtml('')
+  }
+
+  const handleKbygFullConcise = () => {
+    setGeneratedCopy(makeMoreConcise(generatedCopy))
+    setKbygEmailHtml('')
+  }
+
+  const copyKbygSection = async (sectionKey, text) => {
+    if (!text) return
+    try {
+      await navigator.clipboard.writeText(text)
+      setKbygSectionCopiedId(sectionKey)
+      setTimeout(() => setKbygSectionCopiedId(null), 2000)
+    } catch (err) {
+      console.error('Copy failed', err)
+    }
+  }
+
+  const handleMeetupPageConcise = () => {
+    setGeneratedCopy(makeMoreConcise(generatedCopy))
+    setMeetupPageHtml('')
+  }
+
+  const handleLinkedInConcise = () => {
+    const src = linkedInPost || buildLinkedInPost(form, linkedinVariant)
+    setLinkedInPost(makeMoreConcise(src))
+  }
+
+  const handleOutreachSubjectConcise = () => {
+    setGeneratedSubject(makeMoreConcise(generatedSubject))
+  }
+
+  const handleOutreachBodyConcise = () => {
+    setGeneratedCopy(makeMoreConcise(generatedCopy))
+  }
+
+  const handleOutreachLinkedInConcise = () => {
+    setGeneratedOutreachLinkedIn(makeMoreConcise(generatedOutreachLinkedIn))
+  }
+
   const handleCopy = async () => {
     if (!generatedCopy) return
     try {
@@ -2557,6 +2637,7 @@ export default function App() {
 
   const handleReset = () => {
     if (generatorType === 'knowBeforeYouGo') {
+      setKbygTldrRotation(0)
       setKbygForm(KBYG_INITIAL_STATE)
     } else if (generatorType === 'speakerOutreach') {
       setOutreachForm(SPEAKER_OUTREACH_INITIAL_STATE)
@@ -3548,7 +3629,10 @@ export default function App() {
                         <h3 className="subject-line-heading">💬 LinkedIn Message</h3>
                         <pre className="output-text subject-line-text">{generatedOutreachLinkedIn}</pre>
                         <p className="outreach-char-count">{generatedOutreachLinkedIn.length} characters</p>
-                        <div className="output-actions">
+                        <div className="output-actions output-actions-inline">
+                          <button type="button" onClick={handleOutreachLinkedInConcise} className="btn-section-action">
+                            Make concise
+                          </button>
                           <button type="button" onClick={handleCopyOutreachLinkedIn} className="btn-copy" aria-pressed={outreachLinkedInCopied}>
                             {outreachLinkedInCopied ? 'Copied!' : 'Copy LinkedIn Message'}
                           </button>
@@ -3561,7 +3645,10 @@ export default function App() {
                           <div className="subject-line-section outreach-output-card">
                             <h3 className="subject-line-heading">Subject</h3>
                             <pre className="output-text subject-line-text">{generatedSubject}</pre>
-                            <div className="output-actions">
+                            <div className="output-actions output-actions-inline">
+                              <button type="button" onClick={handleOutreachSubjectConcise} className="btn-section-action">
+                                Make concise
+                              </button>
                               <button type="button" onClick={handleCopySubject} className="btn-copy" aria-pressed={subjectCopied}>
                                 {subjectCopied ? 'Copied!' : 'Copy Subject'}
                               </button>
@@ -3572,7 +3659,10 @@ export default function App() {
                           <div className="subject-line-section outreach-output-card">
                             <h3 className="subject-line-heading">📧 Email Body</h3>
                             <pre className="output-text subject-line-text">{generatedCopy}</pre>
-                            <div className="output-actions">
+                            <div className="output-actions output-actions-inline">
+                              <button type="button" onClick={handleOutreachBodyConcise} className="btn-section-action">
+                                Make concise
+                              </button>
                               <button type="button" onClick={handleCopy} className="btn-copy" aria-pressed={copied}>
                                 {copied ? 'Copied!' : 'Copy Email'}
                               </button>
@@ -3589,7 +3679,14 @@ export default function App() {
                       <div className="subject-line-section">
                         <h3 className="subject-line-heading">Subject Line</h3>
                         <pre className="output-text subject-line-text">{generatedSubject}</pre>
-                        <div className="output-actions">
+                        <div className="output-actions output-actions-inline">
+                          <button
+                            type="button"
+                            className="btn-section-action"
+                            onClick={() => setGeneratedSubject(makeMoreConcise(generatedSubject))}
+                          >
+                            Make concise
+                          </button>
                           <button type="button" onClick={handleCopySubject} className="btn-copy" aria-pressed={subjectCopied}>
                             {subjectCopied ? 'Copied!' : 'Copy Subject'}
                           </button>
@@ -3597,12 +3694,54 @@ export default function App() {
                       </div>
                     )}
                     <h3 className="generated-email-heading">Generated Email</h3>
+                    {kbygSections.length > 0 && (
+                      <div className="kbyg-per-section-tools">
+                        <span className="form-hint kbyg-per-section-hint">Sections</span>
+                        <ul className="kbyg-section-tools-list" aria-label="Email sections">
+                          {kbygSections.map((sec) => (
+                            <li key={sec.key} className="kbyg-section-tools-item">
+                              <span className="kbyg-section-tools-label">{sec.label}</span>
+                              <button
+                                type="button"
+                                className="btn-section-action"
+                                onClick={() => copyKbygSection(sec.key, sec.body)}
+                              >
+                                {kbygSectionCopiedId === sec.key ? 'Copied!' : 'Copy'}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-section-action"
+                                onClick={() => handleKbygSectionConcise(sec.key)}
+                              >
+                                Concise
+                              </button>
+                              {sec.label === 'TL;DR' && (
+                                <button
+                                  type="button"
+                                  className="btn-regenerate btn-regenerate-compact"
+                                  onClick={handleRegenKbygTldr}
+                                  title="Regenerate TL;DR order"
+                                >
+                                  🔄
+                                </button>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                        <button type="button" className="btn-section-action btn-section-action-wide" onClick={handleKbygFullConcise}>
+                          Make entire email more concise
+                        </button>
+                        {!kbygEmailHtml && generatedCopy ? (
+                          <p className="form-hint kbyg-plain-hint">Rich HTML preview is off after concise edits. Copy plain text below or Generate again to restore HTML.</p>
+                        ) : null}
+                      </div>
+                    )}
                     {kbygEmailHtml ? (
                       <div className="meetup-page-preview output-text" dangerouslySetInnerHTML={{ __html: kbygEmailHtml }} />
                     ) : (
                       <pre className="output-text">{generatedCopy}</pre>
                     )}
-                    <div className="output-actions">
+                    <div className="output-actions output-actions-inline">
                       <button type="button" onClick={handleCopy} className="btn-copy" aria-pressed={copied}>
                         {copied ? 'Copied!' : 'Copy to clipboard'}
                       </button>
@@ -3618,16 +3757,30 @@ export default function App() {
                     ) : (
                       <pre className="output-text">{generatedCopy}</pre>
                     )}
-                    <div className="output-actions">
+                    <div className="output-actions output-actions-inline">
+                      <button type="button" onClick={handleMeetupPageConcise} className="btn-section-action">
+                        Make concise
+                      </button>
+                      <button type="button" onClick={handleGenerate} className="btn-regenerate" title="Regenerate from form">
+                        🔄 Regenerate
+                      </button>
                       <button type="button" onClick={handleCopy} className="btn-copy" aria-pressed={copied}>
                         {copied ? 'Copied!' : 'Copy for Meetup (HTML + plain text)'}
                       </button>
                     </div>
+                    {!meetupPageHtml && generatedCopy ? (
+                      <p className="form-hint kbyg-plain-hint">HTML preview is off after concise edits. Copy plain text or Generate again to restore HTML.</p>
+                    ) : null}
                     <div className="linkedin-section">
                       <h3 className="linkedin-heading">📣 LinkedIn Promo Post</h3>
                       <pre className="linkedin-text">{linkedInPost || buildLinkedInPost(form)}</pre>
-                      <div className="output-actions">
-                        <button type="button" onClick={handleRegenLinkedIn} className="btn-regenerate" title="Regenerate this section">🔄 Regenerate</button>
+                      <div className="output-actions output-actions-inline">
+                        <button type="button" onClick={handleLinkedInConcise} className="btn-section-action">
+                          Make concise
+                        </button>
+                        <button type="button" onClick={handleRegenLinkedIn} className="btn-regenerate" title="Regenerate this section">
+                          🔄 Regenerate
+                        </button>
                         <button type="button" onClick={handleCopyLinkedIn} className="btn-copy btn-copy-linkedin" aria-pressed={linkedInCopied}>
                           {linkedInCopied ? 'Copied!' : 'Copy LinkedIn Post'}
                         </button>
@@ -3655,9 +3808,26 @@ export default function App() {
                       <div className="subject-line-section">
                         <h4 className="intuition-subheading">Preview Text</h4>
                         <pre className="output-text subject-line-text">{buildIntuitionPreviewText(form, 0)}</pre>
-                        <button type="button" onClick={copyIntuition(() => buildIntuitionPreviewText(form, 0), setIntuitionPreviewCopied)} className="btn-copy" aria-pressed={intuitionPreviewCopied}>
-                          {intuitionPreviewCopied ? 'Copied!' : 'Copy Preview Text'}
-                        </button>
+                        <div className="output-actions output-actions-inline">
+                          <button
+                            type="button"
+                            className="btn-section-action"
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(makeMoreConcise(buildIntuitionPreviewText(form, 0)))
+                                setIntuitionPreviewCopied(true)
+                                setTimeout(() => setIntuitionPreviewCopied(false), 2000)
+                              } catch (e) {
+                                console.error(e)
+                              }
+                            }}
+                          >
+                            Copy concise
+                          </button>
+                          <button type="button" onClick={copyIntuition(() => buildIntuitionPreviewText(form, 0), setIntuitionPreviewCopied)} className="btn-copy" aria-pressed={intuitionPreviewCopied}>
+                            {intuitionPreviewCopied ? 'Copied!' : 'Copy Preview Text'}
+                          </button>
+                        </div>
                       </div>
                       <div className="subject-line-section">
                         <h4 className="intuition-subheading">Why Attend</h4>
@@ -3666,34 +3836,72 @@ export default function App() {
                             <li key={i}>{bullet}</li>
                           ))}
                         </ul>
-                        <button
-                          type="button"
-                          onClick={copyIntuition(
-                            () => buildIntuitionWhyAttendText(buildIntuitionWhyAttend(form, emailBodyVariant)),
-                            setIntuitionWhyAttendCopied,
-                            () => `<div style="font-family:system-ui,-apple-system,sans-serif;"><ul>${buildIntuitionWhyAttend(form, emailBodyVariant).map((b) => `<li>${escapeHtml(b)}</li>`).join('')}</ul></div>`,
-                          )}
-                          className="btn-copy"
-                          aria-pressed={intuitionWhyAttendCopied}
-                        >
-                          {intuitionWhyAttendCopied ? 'Copied!' : 'Copy Why Attend'}
-                        </button>
+                        <div className="output-actions output-actions-inline">
+                          <button
+                            type="button"
+                            className="btn-section-action"
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(
+                                  makeMoreConcise(
+                                    buildIntuitionWhyAttendText(buildIntuitionWhyAttend(form, emailBodyVariant)),
+                                  ),
+                                )
+                                setIntuitionWhyAttendCopied(true)
+                                setTimeout(() => setIntuitionWhyAttendCopied(false), 2000)
+                              } catch (e) {
+                                console.error(e)
+                              }
+                            }}
+                          >
+                            Copy concise
+                          </button>
+                          <button
+                            type="button"
+                            onClick={copyIntuition(
+                              () => buildIntuitionWhyAttendText(buildIntuitionWhyAttend(form, emailBodyVariant)),
+                              setIntuitionWhyAttendCopied,
+                              () => `<div style="font-family:system-ui,-apple-system,sans-serif;"><ul>${buildIntuitionWhyAttend(form, emailBodyVariant).map((b) => `<li>${escapeHtml(b)}</li>`).join('')}</ul></div>`,
+                            )}
+                            className="btn-copy"
+                            aria-pressed={intuitionWhyAttendCopied}
+                          >
+                            {intuitionWhyAttendCopied ? 'Copied!' : 'Copy Why Attend'}
+                          </button>
+                        </div>
                       </div>
                       <div className="subject-line-section">
                         <h4 className="intuition-subheading">Email</h4>
                         <div className="meetup-page-preview output-text subject-line-text" dangerouslySetInnerHTML={{ __html: emailTextToHtml(buildIntuitionEmailBody(form, emailBodyVariant)) }} />
-                        <button
-                          type="button"
-                          onClick={copyIntuition(
-                            () => buildIntuitionEmailBody(form, emailBodyVariant),
-                            setIntuitionBodyCopied,
-                            () => emailTextToHtml(buildIntuitionEmailBody(form, emailBodyVariant)),
-                          )}
-                          className="btn-copy"
-                          aria-pressed={intuitionBodyCopied}
-                        >
-                          {intuitionBodyCopied ? 'Copied!' : 'Copy Email'}
-                        </button>
+                        <div className="output-actions output-actions-inline">
+                          <button
+                            type="button"
+                            className="btn-section-action"
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(makeMoreConcise(buildIntuitionEmailBody(form, emailBodyVariant)))
+                                setIntuitionBodyCopied(true)
+                                setTimeout(() => setIntuitionBodyCopied(false), 2000)
+                              } catch (e) {
+                                console.error(e)
+                              }
+                            }}
+                          >
+                            Copy concise
+                          </button>
+                          <button
+                            type="button"
+                            onClick={copyIntuition(
+                              () => buildIntuitionEmailBody(form, emailBodyVariant),
+                              setIntuitionBodyCopied,
+                              () => emailTextToHtml(buildIntuitionEmailBody(form, emailBodyVariant)),
+                            )}
+                            className="btn-copy"
+                            aria-pressed={intuitionBodyCopied}
+                          >
+                            {intuitionBodyCopied ? 'Copied!' : 'Copy Email'}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </>

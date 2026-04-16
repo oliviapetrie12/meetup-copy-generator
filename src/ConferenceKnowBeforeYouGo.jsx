@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { makeMoreConcise } from './outputHelpers.js'
 
 function escapeHtml(s) {
   if (s == null) return ''
@@ -1229,7 +1230,14 @@ export default function ConferenceKnowBeforeYouGo() {
             <div className="subject-line-section">
               <h3 className="subject-line-heading">Subject line</h3>
               <pre className="output-text subject-line-text">{subjectLine.trim()}</pre>
-              <div className="output-actions">
+              <div className="output-actions output-actions-inline">
+                <button
+                  type="button"
+                  className="btn-section-action"
+                  onClick={() => setSubjectLine(makeMoreConcise(subjectLine))}
+                >
+                  Make concise
+                </button>
                 <button type="button" onClick={copySubject} className="btn-copy" aria-pressed={subjectCopied}>
                   {subjectCopied ? 'Copied!' : 'Copy Subject'}
                 </button>
@@ -1244,7 +1252,17 @@ export default function ConferenceKnowBeforeYouGo() {
               ) : (
                 <pre className="output-text">{plain}</pre>
               )}
-              <div className="output-actions conference-kbyg-copy-actions">
+              <div className="output-actions conference-kbyg-copy-actions output-actions-inline">
+                <button
+                  type="button"
+                  className="btn-section-action"
+                  onClick={() => {
+                    setPlain(makeMoreConcise(plain))
+                    setHtml('')
+                  }}
+                >
+                  Make concise
+                </button>
                 <button type="button" onClick={copyForEmail} className="btn-copy" aria-pressed={emailCopied}>
                   {emailCopied ? 'Copied!' : '📧 Copy for Email'}
                 </button>
