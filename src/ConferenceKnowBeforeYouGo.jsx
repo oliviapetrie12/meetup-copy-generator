@@ -485,6 +485,7 @@ export default function ConferenceKnowBeforeYouGo() {
   const [plain, setPlain] = useState('')
   const [html, setHtml] = useState('')
   const [copied, setCopied] = useState(false)
+  const [emailCopied, setEmailCopied] = useState(false)
   const [subjectCopied, setSubjectCopied] = useState(false)
 
   const update = (key) => (e) => {
@@ -587,6 +588,31 @@ export default function ConferenceKnowBeforeYouGo() {
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {
       console.error('Copy failed', err)
+    }
+  }
+
+  /** Puts full body HTML on the clipboard for rich paste (e.g. Gmail). Falls back to writeText(html). */
+  const copyForEmail = async () => {
+    if (!html) return
+    try {
+      if (typeof ClipboardItem !== 'undefined') {
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({
+              'text/html': new Blob([html], { type: 'text/html' }),
+              'text/plain': new Blob([plain || ''], { type: 'text/plain' }),
+            }),
+          ])
+        } catch {
+          await navigator.clipboard.writeText(html)
+        }
+      } else {
+        await navigator.clipboard.writeText(html)
+      }
+      setEmailCopied(true)
+      setTimeout(() => setEmailCopied(false), 2000)
+    } catch (err) {
+      console.error('Copy for email failed', err)
     }
   }
 
@@ -853,6 +879,9 @@ export default function ConferenceKnowBeforeYouGo() {
               <div className="output-actions">
                 <button type="button" onClick={copyBody} className="btn-copy" aria-pressed={copied}>
                   {copied ? 'Copied!' : 'Copy to clipboard'}
+                </button>
+                <button type="button" onClick={copyForEmail} className="btn-copy" aria-pressed={emailCopied}>
+                  {emailCopied ? 'Copied!' : 'Copy for Email'}
                 </button>
               </div>
             </>
