@@ -306,6 +306,102 @@ body {
   color: #475569;
 }
 
+/* Meetup KBYG — Photo checklist card */
+.kbyg-photo-checklist-card {
+  margin-top: 0.25rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid #ddd6cc;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.kbyg-photo-checklist-card--on {
+  border-color: #c4b8a8;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.kbyg-photo-checklist-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.kbyg-photo-checklist-card-intro {
+  flex: 1;
+  min-width: 0;
+}
+
+.kbyg-photo-checklist-card-title {
+  margin: 0 0 0.3rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #1e293b;
+  line-height: 1.25;
+}
+
+.kbyg-photo-checklist-card-desc {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 400;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.kbyg-photo-checklist-include {
+  flex-shrink: 0;
+  margin: 0;
+  padding-top: 0.1rem;
+  font-weight: 500;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.form label.kbyg-photo-checklist-include {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 500;
+}
+
+.kbyg-photo-checklist-include input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+}
+
+.kbyg-photo-checklist-include-text {
+  font-weight: 500;
+  color: #64748b;
+}
+
+.kbyg-photo-checklist-preview {
+  margin: 0.65rem 0 0;
+  padding: 0.5rem 0.65rem;
+  list-style: none;
+  border-radius: 8px;
+  background: #f8f6f2;
+  border: 1px solid #ebe5dc;
+}
+
+.kbyg-photo-checklist-preview li {
+  position: relative;
+  padding: 0.15rem 0 0.15rem 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #475569;
+  line-height: 1.35;
+}
+
+.kbyg-photo-checklist-preview li::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
 .form label {
   display: flex;
   flex-direction: column;

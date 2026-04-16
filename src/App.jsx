@@ -3062,14 +3062,33 @@ export default function App() {
                   <input type="text" value={kbygForm.avNotes} onChange={updateKbyg('avNotes')} placeholder="e.g. HDMI adapter provided" />
                 </label>
               </div>
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={kbygForm.includeTakePhotos !== false}
-                  onChange={updateKbygCheckbox('includeTakePhotos')}
-                />
-                Include Take Photos section
-              </label>
+              <div
+                className={`kbyg-photo-checklist-card${kbygForm.includeTakePhotos !== false ? ' kbyg-photo-checklist-card--on' : ''}`}
+                aria-labelledby="kbyg-photo-checklist-title"
+              >
+                <div className="kbyg-photo-checklist-card-header">
+                  <div className="kbyg-photo-checklist-card-intro">
+                    <h3 id="kbyg-photo-checklist-title" className="kbyg-photo-checklist-card-title">
+                      📸 Photo checklist
+                    </h3>
+                    <p className="kbyg-photo-checklist-card-desc">Capture moments for post-event content</p>
+                  </div>
+                  <label className="kbyg-photo-checklist-include checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={kbygForm.includeTakePhotos !== false}
+                      onChange={updateKbygCheckbox('includeTakePhotos')}
+                      aria-describedby="kbyg-photo-checklist-title"
+                    />
+                    <span className="kbyg-photo-checklist-include-text">Include in email</span>
+                  </label>
+                </div>
+                <ul className="kbyg-photo-checklist-preview" aria-label="Take Photos section preview">
+                  <li>Setup + space</li>
+                  <li>Speaker + audience</li>
+                  <li>Networking moments</li>
+                </ul>
+              </div>
             </fieldset>
             <fieldset className="form-fieldset">
               <legend>TL;DR</legend>
