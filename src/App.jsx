@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import QRCodeStyling from "qr-code-styling"
 import elasticLogo from './logo.png'
+import ConferenceKnowBeforeYouGo from './ConferenceKnowBeforeYouGo.jsx'
 
 function SearchableSelect({ value, onChange, options, placeholder = 'Type to search…', id }) {
   const [open, setOpen] = useState(false)
@@ -385,6 +386,7 @@ const INITIAL_STATE = {
 const GENERATOR_TYPES = [
   { value: 'eventPromotion', label: 'Event Promotion' },
   { value: 'knowBeforeYouGo', label: 'Meetup Know Before You Go' },
+  { value: 'conferenceKnowBeforeYouGo', label: 'Conference Know Before You Go' },
   { value: 'speakerOutreach', label: 'Speaker Outreach' },
   { value: 'urlQrGenerator', label: 'URL with UTM Parameters' },
   { value: 'qrCodeGenerator', label: 'QR Code Generator' },
@@ -400,6 +402,12 @@ const GENERATOR_CARDS = [
     value: 'knowBeforeYouGo',
     title: '✉️ Meetup Know Before You Go',
     description: 'Generate the speaker and host logistics email, including TL;DR, agenda, and helpful contacts.',
+  },
+  {
+    value: 'conferenceKnowBeforeYouGo',
+    title: '🧳 Conference Know Before You Go',
+    description:
+      'Generate a conference booth logistics email for staff, including TL;DR, schedule, setup, and contacts.',
   },
   {
     value: 'speakerOutreach',
@@ -2367,6 +2375,9 @@ export default function App() {
         </nav>
         <div className="app-content">
         <div className="layout">
+        {generatorType === 'conferenceKnowBeforeYouGo' ? (
+          <ConferenceKnowBeforeYouGo />
+        ) : (
         <>
         <aside className="form-panel">
 
@@ -3294,6 +3305,7 @@ export default function App() {
           </div>
         </main>
         </>
+        )}
       </div>
       </div>
       </div>
