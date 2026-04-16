@@ -348,11 +348,11 @@ function emailTextToHtml(text, options = {}) {
         if (bm) tldrBullets.push(bm[1].trim())
         else break
       }
-      const ul = tldrBullets.length
-        ? `<ul style="margin-top:8px;padding-left:20px;">${tldrBullets.map((i) => `<li style="margin-bottom:4px;">${escapeHtml(i)}</li>`).join('')}</ul>`
+      const bulletsHtml = tldrBullets.length
+        ? tldrBullets.map((i) => `• ${escapeHtml(i)}`).join('<br>')
         : ''
       parts.push(
-        `<div style="margin:0 0 0.75em;"><p style="margin:0;"><span style="background-color:#FEF08A;font-weight:bold;">TL;DR</span></p>${ul}</div>`,
+        `<div style="margin:0 0 0.75em;"><p style="margin:0;"><span style="background-color: #FEF08A; font-weight: bold;">TL;DR</span><br><br>${bulletsHtml}</p></div>`,
       )
       idx = j - 1
       continue
