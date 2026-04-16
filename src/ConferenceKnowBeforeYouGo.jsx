@@ -49,6 +49,7 @@ const INITIAL_FORM = {
   locationAddress: '',
   contacts: [{ ...INITIAL_CONTACT }],
   boothSetupTeardown: '',
+  avSetupRequirements: '',
   swagText: '',
   parkingText: '',
   foodBeverageText: '',
@@ -285,7 +286,9 @@ function buildConferenceEmailHtml(form) {
   const parts = []
 
   parts.push(buildConferenceIntroHtml(form))
-  parts.push(`<strong>Title</strong><br><br>${escapeHtml(confName)}`)
+  if (has(form.conferenceName)) {
+    parts.push(`<strong>Title</strong><br><br>${escapeHtml(trim(form.conferenceName))}`)
+  }
 
   if (has(form.tldrText)) {
     const bullets = tldrTextToBulletsHtml(form.tldrText)
@@ -321,6 +324,11 @@ function buildConferenceEmailHtml(form) {
       `<strong>📢 Booth Setup &amp; Teardown</strong><br><br>${textToHtmlLines(form.boothSetupTeardown)}`,
     )
   }
+  if (has(form.avSetupRequirements)) {
+    parts.push(
+      `<strong>🔌 AV / Setup Requirements</strong><br><br>${linesToHtmlPreserve(form.avSetupRequirements)}`,
+    )
+  }
   if (has(form.swagText)) {
     parts.push(`<strong>🛍 Swag</strong><br><br>${textToHtmlLines(form.swagText)}`)
   }
@@ -334,11 +342,9 @@ function buildConferenceEmailHtml(form) {
   ;(form.additionalSections || []).forEach((sec) => {
     const t = trim(sec.title)
     const c = trim(sec.content)
-    if (!t && !c) return
+    if (!has(c)) return
     const title = escapeHtml(t || 'Section')
-    parts.push(
-      `<strong>➕ ${title}</strong><br><br>${c ? textToHtmlLines(sec.content) : ''}`,
-    )
+    parts.push(`<strong>➕ ${title}</strong><br><br>${textToHtmlLines(sec.content)}`)
   })
 
   parts.push(
@@ -346,7 +352,7 @@ function buildConferenceEmailHtml(form) {
   )
   parts.push(escapeHtml('Please reach out if anything changes on site or you need a hand.'))
 
-  const inner = parts.join('<br><br>')
+  const inner = parts.filter((p) => String(p).trim().length > 0).join('<br><br>')
   return `<div style="font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.5;color:#202124;">${inner}</div>`
 }
 
@@ -365,9 +371,11 @@ function generateConferenceEmailPlain(form) {
       '',
     )
   }
-  lines.push('Title')
-  lines.push(confName)
-  lines.push('')
+  if (has(form.conferenceName)) {
+    lines.push('Title')
+    lines.push(trim(form.conferenceName))
+    lines.push('')
+  }
 
   if (has(form.tldrText)) {
     lines.push('📝 TL;DR')
@@ -406,6 +414,11 @@ function generateConferenceEmailPlain(form) {
     lines.push(trim(form.boothSetupTeardown))
     lines.push('')
   }
+  if (has(form.avSetupRequirements)) {
+    lines.push('🔌 AV / Setup Requirements')
+    lines.push(trim(form.avSetupRequirements))
+    lines.push('')
+  }
   if (has(form.swagText)) {
     lines.push('🛍 Swag')
     lines.push(trim(form.swagText))
@@ -425,9 +438,9 @@ function generateConferenceEmailPlain(form) {
   ;(form.additionalSections || []).forEach((sec) => {
     const t = trim(sec.title)
     const c = trim(sec.content)
-    if (!t && !c) return
+    if (!has(c)) return
     lines.push(`➕ ${t || 'Section'}`)
-    if (c) lines.push(c)
+    lines.push(c)
     lines.push('')
   })
 
@@ -711,6 +724,19 @@ export default function ConferenceKnowBeforeYouGo() {
                 value={form.boothSetupTeardown}
                 onChange={update('boothSetupTeardown')}
                 placeholder="Build / strike times, deliveries, power, rigging…"
+                rows={4}
+              />
+            </label>
+          </fieldset>
+
+          <fieldset className="form-fieldset">
+            <legend>AV / Setup Requirements</legend>
+            <label>
+              AV / Setup Requirements
+              <textarea
+                value={form.avSetupRequirements}
+                onChange={update('avSetupRequirements')}
+                placeholder="Power, Wi‑Fi, displays, microphones, session AV…"
                 rows={4}
               />
             </label>
