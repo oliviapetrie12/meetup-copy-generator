@@ -43,6 +43,33 @@ function textToHtmlParagraphs(text) {
   return escapeHtml(trim(text)).replace(/\n/g, '<br>')
 }
 
+/** Non-TL;DR body: one line per paragraph block, joined with &lt;br&gt; */
+function textToHtmlLines(text) {
+  return escapeHtml(trim(text))
+    .split(/\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .join('<br>')
+}
+
+function tldrTextToBulletsHtml(text) {
+  return trim(text)
+    .split(/\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((l) => `• ${escapeHtml(l)}`)
+    .join('<br>')
+}
+
+function contactLineHtml(c) {
+  const bits = []
+  if (has(c.name)) bits.push(escapeHtml(trim(c.name)))
+  if (has(c.role)) bits.push(escapeHtml(trim(c.role)))
+  if (has(c.email)) bits.push(escapeHtml(trim(c.email)))
+  if (has(c.phone)) bits.push(escapeHtml(trim(c.phone)))
+  return bits.join(' – ')
+}
+
 function generateConferenceSubject(form) {
   const name = trim(form.conferenceName)
   const datesHint = trim(form.eventDatesHours)
@@ -57,65 +84,81 @@ function buildConferenceEmailHtml(form) {
   const confName = trim(form.conferenceName) || 'the conference'
   const parts = []
 
-  parts.push(`<p>Hi ${escapeHtml(names)},</p>`)
-  parts.push(`<p><strong>Title</strong><br>${escapeHtml(confName)}</p>`)
+  parts.push(`Hi ${escapeHtml(names)},`)
+  parts.push(`<strong>Title</strong><br><br>${escapeHtml(confName)}`)
 
   if (has(form.tldrText)) {
-    parts.push(`<p><strong>TL;DR</strong><br>${textToHtmlParagraphs(form.tldrText)}</p>`)
+    const bullets = tldrTextToBulletsHtml(form.tldrText)
+    parts.push(
+      `<strong>📝 <span style="background-color: #FEF08A; font-weight: bold;">TL;DR</span></strong><br><br>${bullets}`,
+    )
   }
+
   if (has(form.eventDatesHours)) {
-    parts.push(`<p><strong>Event dates &amp; hours</strong><br>${textToHtmlParagraphs(form.eventDatesHours)}</p>`)
+    parts.push(`<strong>🗓 Event Dates &amp; Hours</strong><br><br>${textToHtmlLines(form.eventDatesHours)}`)
   }
   if (has(form.ticketsText)) {
-    parts.push(`<p><strong>Tickets</strong><br>${textToHtmlParagraphs(form.ticketsText)}</p>`)
+    parts.push(`<strong>🎟 Tickets</strong><br><br>${textToHtmlLines(form.ticketsText)}`)
   }
+
   if (has(form.locationVenue) || has(form.locationAddress)) {
     let loc = ''
     if (has(form.locationVenue)) loc += escapeHtml(trim(form.locationVenue))
-    if (has(form.locationAddress)) loc += (loc ? '<br>' : '') + escapeHtml(trim(form.locationAddress))
-    parts.push(`<p><strong>Location</strong><br>${loc}</p>`)
+    if (has(form.locationAddress)) {
+      loc += (loc ? '<br>' : '') + escapeHtml(trim(form.locationAddress))
+    }
+    parts.push(`<strong>🏢 Location</strong><br><br>${loc}`)
   }
 
   const contactEntries = (form.contacts || []).filter(
     (c) => has(c.name) || has(c.role) || has(c.email) || has(c.phone),
   )
   if (contactEntries.length > 0) {
-    const rows = contactEntries.map((c) => {
-      const bits = []
-      if (has(c.name)) bits.push(escapeHtml(trim(c.name)))
-      if (has(c.role)) bits.push(escapeHtml(trim(c.role)))
-      if (has(c.email)) bits.push(escapeHtml(trim(c.email)))
-      if (has(c.phone)) bits.push(escapeHtml(trim(c.phone)))
-      return bits.join(' · ')
-    })
-    parts.push(`<p><strong>Contacts</strong><br>${rows.join('<br>')}</p>`)
+    const rows = contactEntries.map((c) => contactLineHtml(c)).join('<br>')
+    parts.push(`<strong>💬 Contacts</strong><br><br>${rows}`)
   }
 
   if (has(form.boothSetupTeardown)) {
-    parts.push(`<p><strong>Booth setup &amp; teardown</strong><br>${textToHtmlParagraphs(form.boothSetupTeardown)}</p>`)
+    parts.push(
+      `<strong>📢 Booth Setup &amp; Teardown</strong><br><br>${textToHtmlLines(form.boothSetupTeardown)}`,
+    )
   }
   if (has(form.swagText)) {
-    parts.push(`<p><strong>Swag</strong><br>${textToHtmlParagraphs(form.swagText)}</p>`)
+    parts.push(`<strong>🛍 Swag</strong><br><br>${textToHtmlLines(form.swagText)}`)
   }
   if (has(form.parkingText)) {
-    parts.push(`<p><strong>Parking</strong><br>${textToHtmlParagraphs(form.parkingText)}</p>`)
+    parts.push(`<strong>🚙 Parking</strong><br><br>${textToHtmlLines(form.parkingText)}`)
   }
   if (has(form.foodBeverageText)) {
-    parts.push(`<p><strong>Food &amp; beverage</strong><br>${textToHtmlParagraphs(form.foodBeverageText)}</p>`)
+    parts.push(`<strong>🍔 Food &amp; Beverage</strong><br><br>${textToHtmlLines(form.foodBeverageText)}`)
   }
 
   ;(form.additionalSections || []).forEach((sec) => {
     const t = trim(sec.title)
     const c = trim(sec.content)
     if (!t && !c) return
-    const title = t || 'Section'
-    parts.push(`<p><strong>${escapeHtml(title)}</strong><br>${c ? textToHtmlParagraphs(sec.content) : ''}</p>`)
+    const title = escapeHtml(t || 'Section')
+    parts.push(
+      `<strong>➕ ${title}</strong><br><br>${c ? textToHtmlLines(sec.content) : ''}`,
+    )
   })
 
-  parts.push(`<p><strong>Travel &amp; expenses</strong><br>${escapeHtml(STANDARD_TRAVEL_EXPENSES_TEXT)}</p>`)
-  parts.push(`<p>${escapeHtml('Please reach out if anything changes on site or you need a hand.')}</p>`)
+  parts.push(
+    `<strong>💵 Travel &amp; Expenses</strong><br><br>${escapeHtml(STANDARD_TRAVEL_EXPENSES_TEXT)}`,
+  )
+  parts.push(escapeHtml('Please reach out if anything changes on site or you need a hand.'))
 
-  return `<div>${parts.join('')}</div>`
+  const inner = parts.join('<br><br>')
+  return `<div style="font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.5;color:#202124;">${inner}</div>`
+}
+
+function contactLinePlain(c) {
+  const bits = []
+  if (has(c.name)) bits.push(trim(c.name))
+  if (has(c.role)) bits.push(trim(c.role))
+  if (has(c.email)) bits.push(trim(c.email))
+  if (has(c.phone)) bits.push(trim(c.phone))
+  return bits.join(' – ')
 }
 
 function generateConferenceEmailPlain(form) {
@@ -124,27 +167,31 @@ function generateConferenceEmailPlain(form) {
   const lines = []
 
   lines.push(`Hi ${names},`, '')
-  lines.push('**Title**')
+  lines.push('Title')
   lines.push(confName)
   lines.push('')
 
   if (has(form.tldrText)) {
-    lines.push('**TL;DR**')
-    lines.push(trim(form.tldrText))
+    lines.push('📝 TL;DR')
+    trim(form.tldrText)
+      .split(/\n/)
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .forEach((l) => lines.push(`• ${l}`))
     lines.push('')
   }
   if (has(form.eventDatesHours)) {
-    lines.push('**Event dates & hours**')
+    lines.push('🗓 Event Dates & Hours')
     lines.push(trim(form.eventDatesHours))
     lines.push('')
   }
   if (has(form.ticketsText)) {
-    lines.push('**Tickets**')
+    lines.push('🎟 Tickets')
     lines.push(trim(form.ticketsText))
     lines.push('')
   }
   if (has(form.locationVenue) || has(form.locationAddress)) {
-    lines.push('**Location**')
+    lines.push('🏢 Location')
     if (has(form.locationVenue)) lines.push(trim(form.locationVenue))
     if (has(form.locationAddress)) lines.push(trim(form.locationAddress))
     lines.push('')
@@ -154,35 +201,30 @@ function generateConferenceEmailPlain(form) {
     (c) => has(c.name) || has(c.role) || has(c.email) || has(c.phone),
   )
   if (contactEntries.length > 0) {
-    lines.push('**Contacts**')
+    lines.push('💬 Contacts')
     contactEntries.forEach((c) => {
-      const bits = []
-      if (has(c.name)) bits.push(trim(c.name))
-      if (has(c.role)) bits.push(trim(c.role))
-      if (has(c.email)) bits.push(trim(c.email))
-      if (has(c.phone)) bits.push(trim(c.phone))
-      lines.push(`- ${bits.join(' · ')}`)
+      lines.push(contactLinePlain(c))
     })
     lines.push('')
   }
 
   if (has(form.boothSetupTeardown)) {
-    lines.push('**Booth setup & teardown**')
+    lines.push('📢 Booth Setup & Teardown')
     lines.push(trim(form.boothSetupTeardown))
     lines.push('')
   }
   if (has(form.swagText)) {
-    lines.push('**Swag**')
+    lines.push('🛍 Swag')
     lines.push(trim(form.swagText))
     lines.push('')
   }
   if (has(form.parkingText)) {
-    lines.push('**Parking**')
+    lines.push('🚙 Parking')
     lines.push(trim(form.parkingText))
     lines.push('')
   }
   if (has(form.foodBeverageText)) {
-    lines.push('**Food & beverage**')
+    lines.push('🍔 Food & Beverage')
     lines.push(trim(form.foodBeverageText))
     lines.push('')
   }
@@ -191,12 +233,12 @@ function generateConferenceEmailPlain(form) {
     const t = trim(sec.title)
     const c = trim(sec.content)
     if (!t && !c) return
-    lines.push(`**${t || 'Section'}**`)
+    lines.push(`➕ ${t || 'Section'}`)
     if (c) lines.push(c)
     lines.push('')
   })
 
-  lines.push('**Travel & expenses**')
+  lines.push('💵 Travel & Expenses')
   lines.push(STANDARD_TRAVEL_EXPENSES_TEXT)
   lines.push('')
   lines.push('Please reach out if anything changes on site or you need a hand.')
