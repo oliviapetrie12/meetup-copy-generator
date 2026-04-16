@@ -1038,12 +1038,12 @@ export default function ConferenceKnowBeforeYouGo() {
               ) : (
                 <pre className="output-text">{plain}</pre>
               )}
-              <div className="output-actions">
+              <div className="output-actions conference-kbyg-copy-actions">
                 <button type="button" onClick={copyForEmail} className="btn-copy" aria-pressed={emailCopied}>
-                  {emailCopied ? 'Copied!' : 'Copy for Email'}
+                  {emailCopied ? 'Copied!' : '📧 Copy for Email'}
                 </button>
                 <button type="button" onClick={copyForGoogleDoc} className="btn-copy" aria-pressed={googleDocCopied}>
-                  {googleDocCopied ? 'Copied!' : 'Copy for Google Doc'}
+                  {googleDocCopied ? 'Copied!' : '📄 Copy for Google Doc'}
                 </button>
               </div>
             </>
