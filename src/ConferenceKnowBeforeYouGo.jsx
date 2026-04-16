@@ -169,7 +169,8 @@ function getInitialForm() {
     eventDatesBoothHours: '',
     eventDatesBoothCleanup: '',
     eventDatesNotes: '',
-    eventDatesStaffingSchedule: '',
+    staffingScheduleLink: '',
+    staffingScheduleNotes: '',
     ticketsText: '',
     locationVenue: '',
     locationAddress: '',
@@ -380,8 +381,59 @@ function hasEventDatesAndHoursContent(form) {
     has(form.eventDatesBoothHours) ||
     has(form.eventDatesBoothCleanup) ||
     has(form.eventDatesNotes) ||
-    has(form.eventDatesStaffingSchedule)
+    has(form.staffingScheduleLink) ||
+    has(form.staffingScheduleNotes)
   )
+}
+
+function hasStaffingScheduleContent(form) {
+  return has(form.staffingScheduleLink) || has(form.staffingScheduleNotes)
+}
+
+function buildStaffingScheduleSectionHtml(form) {
+  if (!hasStaffingScheduleContent(form)) return ''
+  const linkRaw = trim(form.staffingScheduleLink)
+  const notesRaw = trim(form.staffingScheduleNotes)
+
+  let block = '<strong>Staffing Schedule</strong>'
+
+  if (has(linkRaw)) {
+    const href = escapeHtmlAttr(linkRaw)
+    const display = escapeHtml(linkRaw)
+    block += `<br><br>Please refer to the staffing schedule here:<br><a href="${href}" style="color:#1D4ED8;text-decoration:underline;">${display}</a>`
+  }
+
+  if (has(notesRaw)) {
+    const bullets = notesRaw
+      .split(/\n/)
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .map((line) => `• ${escapeHtml(line)}`)
+      .join('<br>')
+    block += `<br><br>${bullets}`
+  }
+
+  return block
+}
+
+function appendStaffingSchedulePlain(lines, form) {
+  if (!hasStaffingScheduleContent(form)) return
+  lines.push('Staffing Schedule')
+  lines.push('')
+  const linkRaw = trim(form.staffingScheduleLink)
+  if (has(linkRaw)) {
+    lines.push('Please refer to the staffing schedule here:')
+    lines.push(linkRaw)
+    lines.push('')
+  }
+  if (has(form.staffingScheduleNotes)) {
+    trim(form.staffingScheduleNotes)
+      .split(/\n/)
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .forEach((line) => lines.push(`• ${line}`))
+    lines.push('')
+  }
 }
 
 function buildEventDatesAndHoursSectionHtml(form) {
@@ -405,8 +457,9 @@ function buildEventDatesAndHoursSectionHtml(form) {
   if (subs.length > 0) {
     html += `<br><br>${subs.join('<br><br>')}`
   }
-  if (has(form.eventDatesStaffingSchedule)) {
-    html += `<br><br><strong>Staffing Schedule</strong><br>${linesToHtmlPreserve(form.eventDatesStaffingSchedule)}`
+  const staffingHtml = buildStaffingScheduleSectionHtml(form)
+  if (staffingHtml) {
+    html += `<br><br>${staffingHtml}`
   }
   return html
 }
@@ -434,11 +487,7 @@ function buildEventDatesAndHoursSectionPlain(form) {
     lines.push(trim(form.eventDatesNotes))
     lines.push('')
   }
-  if (has(form.eventDatesStaffingSchedule)) {
-    lines.push('Staffing Schedule')
-    lines.push(trim(form.eventDatesStaffingSchedule))
-    lines.push('')
-  }
+  appendStaffingSchedulePlain(lines, form)
   return lines.join('\n')
 }
 
@@ -832,11 +881,22 @@ export default function ConferenceKnowBeforeYouGo() {
               <textarea value={form.eventDatesNotes} onChange={update('eventDatesNotes')} placeholder="Anything else for dates &amp; hours…" rows={3} />
             </label>
             <label>
-              Staffing Schedule <span className="form-hint">(optional)</span>
+              Staffing Schedule Link (Google Sheet)
+              <input
+                type="text"
+                inputMode="url"
+                value={form.staffingScheduleLink}
+                onChange={update('staffingScheduleLink')}
+                placeholder="https://docs.google.com/spreadsheets/…"
+                autoComplete="off"
+              />
+            </label>
+            <label>
+              Staffing Notes (optional)
               <textarea
-                value={form.eventDatesStaffingSchedule}
-                onChange={update('eventDatesStaffingSchedule')}
-                placeholder="Who is on booth when…"
+                value={form.staffingScheduleNotes}
+                onChange={update('staffingScheduleNotes')}
+                placeholder="One bullet per line; shown as • lines under the schedule link when provided."
                 rows={3}
               />
             </label>
