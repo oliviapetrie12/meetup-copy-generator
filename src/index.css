@@ -29,28 +29,24 @@ body {
   align-items: center;
   gap: 1.25rem;
   flex-shrink: 0;
-  white-space: nowrap;
+  flex-wrap: wrap;
 }
 
 .header h1 {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: 1.05rem;
   font-weight: 700;
   color: #f1f5f9;
   letter-spacing: -0.01em;
+  line-height: 1.35;
+  white-space: normal;
+  max-width: 100%;
 }
 
 .header-emoji {
   display: inline-block;
   margin-right: 0.3rem;
   font-style: normal;
-}
-
-.header .subtitle {
-  margin: 0;
-  font-size: 0.82rem;
-  color: #cbd5e1;
-  opacity: 0.9;
 }
 
 /* ===== APP BODY ===== */
