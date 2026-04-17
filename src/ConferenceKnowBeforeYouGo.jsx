@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { makeMoreConcise } from './outputHelpers.js'
 import { mergeOrganizerParsedIntoForm, processOrganizerImport } from './conferenceOrganizerImport.js'
+import { enhanceKbygOutput } from './kbygEnhanceOutput.js'
 
 function escapeHtml(s) {
   if (s == null) return ''
@@ -786,6 +787,11 @@ export default function ConferenceKnowBeforeYouGo() {
   const [structuredKbygPreview, setStructuredKbygPreview] = useState('')
   const [parsingDebugPreview, setParsingDebugPreview] = useState('')
   const [structuredKbygCopied, setStructuredKbygCopied] = useState(false)
+  const [kbygEnhanceExisting, setKbygEnhanceExisting] = useState('')
+  const [kbygEnhanceUpdates, setKbygEnhanceUpdates] = useState('')
+  const [kbygEnhanceMode, setKbygEnhanceMode] = useState('email')
+  const [kbygEnhanceOutput, setKbygEnhanceOutput] = useState('')
+  const [kbygEnhanceCopied, setKbygEnhanceCopied] = useState(false)
 
   useEffect(() => {
     if (subjectManuallyEditedRef.current) return
@@ -881,6 +887,10 @@ export default function ConferenceKnowBeforeYouGo() {
     setStructuredKbygPreview('')
     setParsingDebugPreview('')
     setOrganizerImportDebug(false)
+    setKbygEnhanceExisting('')
+    setKbygEnhanceUpdates('')
+    setKbygEnhanceMode('email')
+    setKbygEnhanceOutput('')
   }
 
   const handleParseOrganizerDetails = () => {
@@ -904,6 +914,27 @@ export default function ConferenceKnowBeforeYouGo() {
       setTimeout(() => setStructuredKbygCopied(false), 2000)
     } catch (err) {
       console.error('Copy structured KBYG failed', err)
+    }
+  }
+
+  const handleEnhanceKbyg = () => {
+    const { output } = enhanceKbygOutput({
+      existingStructuredKbyg: kbygEnhanceExisting,
+      optionalNewDetails: kbygEnhanceUpdates,
+      mode: kbygEnhanceMode,
+      eventName: form.conferenceName,
+    })
+    setKbygEnhanceOutput(output)
+  }
+
+  const copyKbygEnhanced = async () => {
+    if (!kbygEnhanceOutput.trim()) return
+    try {
+      await navigator.clipboard.writeText(kbygEnhanceOutput.trim())
+      setKbygEnhanceCopied(true)
+      setTimeout(() => setKbygEnhanceCopied(false), 2000)
+    } catch (err) {
+      console.error('Copy enhanced KBYG failed', err)
     }
   }
 
@@ -1031,6 +1062,70 @@ export default function ConferenceKnowBeforeYouGo() {
                 <div className="output-actions output-actions-inline structured-kbyg-copy">
                   <button type="button" className="btn-copy" onClick={copyStructuredKbyg} aria-pressed={structuredKbygCopied}>
                     {structuredKbygCopied ? 'Copied!' : 'Copy structured KBYG'}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </fieldset>
+
+          <fieldset className="form-fieldset">
+            <legend>Enhance KBYG (Slack / Email / Doc)</legend>
+            <p className="form-hint">
+              Start from structured KBYG text (parsed above or pasted). Optionally paste raw organizer updates — newer non-empty sections replace the matching section. Event name from the form is used for the email intro. Missing logistics (booth hours, setup, teardown, parking, key contacts) are listed at the bottom without inventing details.
+            </p>
+            <label>
+              Existing structured KBYG
+              <textarea
+                value={kbygEnhanceExisting}
+                onChange={(e) => setKbygEnhanceExisting(e.target.value)}
+                placeholder="Paste structured KBYG with emoji section headers, or load from parsed output…"
+                rows={8}
+                autoComplete="off"
+              />
+            </label>
+            {structuredKbygPreview ? (
+              <button type="button" className="btn-add-speaker" onClick={() => setKbygEnhanceExisting(structuredKbygPreview)}>
+                Use structured output from above
+              </button>
+            ) : null}
+            <label>
+              Optional new or updated details (raw paste)
+              <textarea
+                value={kbygEnhanceUpdates}
+                onChange={(e) => setKbygEnhanceUpdates(e.target.value)}
+                placeholder="Optional: paste new organizer notes — merged by section; newer content wins when both exist"
+                rows={5}
+                autoComplete="off"
+              />
+            </label>
+            <label>
+              Output mode
+              <select value={kbygEnhanceMode} onChange={(e) => setKbygEnhanceMode(e.target.value)}>
+                <option value="slack">Slack — compact, scannable</option>
+                <option value="email">Email — intro + spacing</option>
+                <option value="doc">Doc — plain headers, Google Docs–friendly</option>
+              </select>
+            </label>
+            <div className="quick-draft-stack">
+              <button type="button" className="btn-quick-draft" onClick={handleEnhanceKbyg}>
+                Generate enhanced output
+              </button>
+            </div>
+            {kbygEnhanceOutput ? (
+              <div className="structured-kbyg-preview">
+                <label>
+                  Enhanced output
+                  <textarea
+                    readOnly
+                    value={kbygEnhanceOutput}
+                    rows={14}
+                    className="structured-kbyg-textarea"
+                    aria-label="Enhanced KBYG output"
+                  />
+                </label>
+                <div className="output-actions output-actions-inline structured-kbyg-copy">
+                  <button type="button" className="btn-copy" onClick={copyKbygEnhanced} aria-pressed={kbygEnhanceCopied}>
+                    {kbygEnhanceCopied ? 'Copied!' : 'Copy enhanced output'}
                   </button>
                 </div>
               </div>
