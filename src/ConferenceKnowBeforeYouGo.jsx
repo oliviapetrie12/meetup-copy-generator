@@ -962,7 +962,7 @@ export default function ConferenceKnowBeforeYouGo() {
           <fieldset className="form-fieldset">
             <legend>Import organizer details</legend>
             <p className="form-hint">
-              Optional. Paste text from an exhibitor guide, organizer email, or notes — then parse to fill empty fields only (your edits are kept). The text is split into small chunks (headings, spacing, time blocks); each chunk is classified into one area (contacts, venue, parking, hours, setup, teardown, tickets, lead capture, logistics). Unclassified chunks go to &quot;Additional Notes&quot;; contacts may appear under &quot;Key Contacts&quot;.
+              Optional. Paste text from an exhibitor guide, organizer email, or notes — then parse to fill empty fields only (your edits are kept). Pipeline: split into chunks (headings, spacing, schedule lines grouped under a parent when clearly time-only), classify each chunk once with confidence thresholds, then map to fields. Synonymous headings are normalized; repeated lines are deduplicated. Ambiguous or low-confidence chunks go to &quot;Additional Notes&quot;; contacts may appear under &quot;Key Contacts&quot;.
             </p>
             <label>
               Organizer / exhibitor text
