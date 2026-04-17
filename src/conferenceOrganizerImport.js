@@ -1,7 +1,7 @@
 /**
  * Conference / sponsor paste → Conference KBYG
  *
- * Pipeline (strict order): CHUNK → NORMALIZE (for matching) → CLASSIFY (independent chunks) → ROUTE → DEDUPE → output form patch + structured KBYG plain text.
+ * Pipeline (strict order): CHUNK → NORMALIZE (for matching) → CLASSIFY (independent chunks) → ROUTE → DEDUPE → form field patch.
  * Chunks are never reclassified after the classify step.
  */
 
@@ -466,58 +466,10 @@ function bucketsToFormPatch(deduped) {
   return out
 }
 
-/** STEP 9: exact section order; emoji headers; bullets; skip empty. */
-const KBYG_SECTION_SPEC = [
-  { keys: ['keyContacts'], emoji: '🔑', title: 'Key Contacts' },
-  { keys: ['eventVenue', 'foodBeverage'], emoji: '📍', title: 'Event & Venue' },
-  { keys: ['boothHours'], emoji: '🕒', title: 'Booth Hours' },
-  { keys: ['setupMoveIn'], emoji: '🛠️', title: 'Setup & Move-in' },
-  { keys: ['teardownMoveOut'], emoji: '📦', title: 'Teardown / Move-out' },
-  { keys: ['parkingTransportation'], emoji: '🚗', title: 'Parking & Transportation' },
-  { keys: ['logisticsBoothInfo'], emoji: '📋', title: 'Logistics / Booth Info' },
-  { keys: ['tickets'], emoji: '🎟️', title: 'Tickets' },
-  { keys: ['leadCapture'], emoji: '📱', title: 'Lead Capture' },
-  { keys: ['additionalNotes'], emoji: '📎', title: 'Additional Notes' },
-]
-
-function chunkLinesToBullets(text) {
-  const lines = text.split(/\n/).map((l) => trim(l)).filter(Boolean)
-  if (lines.length === 0) return []
-  return lines.map((l) => (l.startsWith('•') || l.startsWith('-') ? `• ${l.replace(/^[\s•\-–—]+\s*/, '')}` : `• ${l}`))
-}
-
 /**
- * Build structured Know Before You Go plain text from classified rows (Wi‑Fi stays under Logistics for this view).
+ * Chunk → classify → form field patch (empty fields only via merge helper).
  */
-export function buildStructuredKbygPlain(classified) {
-  /** @type {Record<string, string[]>} */
-  const byCat = {}
-  for (const { chunk, category } of classified) {
-    if (!byCat[category]) byCat[category] = []
-    byCat[category].push(chunk)
-  }
-  for (const k of Object.keys(byCat)) {
-    byCat[k] = dedupeChunkListPreferComplete(byCat[k])
-  }
-
-  const parts = []
-  for (const spec of KBYG_SECTION_SPEC) {
-    const texts = spec.keys.flatMap((k) => byCat[k] || [])
-    if (texts.length === 0) continue
-    const block = [`${spec.emoji} ${spec.title}`, '']
-    for (const t of texts) {
-      block.push(...chunkLinesToBullets(t))
-      block.push('')
-    }
-    parts.push(block.join('\n').trimEnd())
-  }
-  return parts.join('\n\n').trim()
-}
-
-/**
- * Full pipeline: chunk → optional multi-concept split → classify each chunk once → form patch + structured KBYG.
- */
-export function processOrganizerImport(raw) {
+export function parseOrganizerDetails(raw) {
   const pass1 = splitIntoLogicalChunks(raw)
   const pass2 = splitMultiConceptChunks(pass1)
   /** @type {Array<{ chunk: string, category: OrganizerCategory }>} */
@@ -528,14 +480,7 @@ export function processOrganizerImport(raw) {
     classified.push({ chunk: clean, category })
   }
   const deduped = buildFormBucketsFromClassified(classified)
-  const formPatch = bucketsToFormPatch(deduped)
-  const structuredKbygPlain = buildStructuredKbygPlain(classified)
-  return { ...formPatch, structuredKbygPlain }
-}
-
-export function parseOrganizerDetails(raw) {
-  const { structuredKbygPlain, ...formPatch } = processOrganizerImport(raw)
-  return formPatch
+  return bucketsToFormPatch(deduped)
 }
 
 const ADDITIONAL_NOTES_TITLE = 'Additional Notes'
@@ -560,7 +505,7 @@ function mergeIntoNamedSection(prev, title, content) {
 export function mergeOrganizerParsedIntoForm(prev, parsed) {
   let next = { ...prev }
   for (const [key, val] of Object.entries(parsed)) {
-    if (key === 'additionalOrganizerNotes' || key === 'keyContactsSection' || key === 'structuredKbygPlain') continue
+    if (key === 'additionalOrganizerNotes' || key === 'keyContactsSection') continue
     if (val == null || trim(String(val)) === '') continue
     const cur = prev[key]
     if (typeof cur !== 'string' || trim(cur) !== '') continue

@@ -884,22 +884,6 @@ body {
   gap: 0.75rem;
 }
 
-.structured-kbyg-preview {
-  margin-top: 1rem;
-}
-
-.structured-kbyg-textarea {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
-  font-size: 0.875rem;
-  line-height: 1.45;
-  min-height: 12rem;
-  white-space: pre-wrap;
-}
-
-.structured-kbyg-copy {
-  margin-top: 0.5rem;
-}
-
 .url-output-actions {
   margin-top: 0.75rem;
 }
