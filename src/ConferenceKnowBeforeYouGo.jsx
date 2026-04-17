@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { makeMoreConcise } from './outputHelpers.js'
-import { mergeOrganizerParsedIntoForm, parseOrganizerDetails } from './conferenceOrganizerImport.js'
+import { mergeOrganizerParsedIntoForm, processOrganizerImport } from './conferenceOrganizerImport.js'
 
 function escapeHtml(s) {
   if (s == null) return ''
@@ -782,6 +782,8 @@ export default function ConferenceKnowBeforeYouGo() {
   const [googleDocCopied, setGoogleDocCopied] = useState(false)
   const [subjectCopied, setSubjectCopied] = useState(false)
   const [organizerImportText, setOrganizerImportText] = useState('')
+  const [structuredKbygPreview, setStructuredKbygPreview] = useState('')
+  const [structuredKbygCopied, setStructuredKbygCopied] = useState(false)
 
   useEffect(() => {
     if (subjectManuallyEditedRef.current) return
@@ -874,11 +876,24 @@ export default function ConferenceKnowBeforeYouGo() {
     setPlain('')
     setHtml('')
     setOrganizerImportText('')
+    setStructuredKbygPreview('')
   }
 
   const handleParseOrganizerDetails = () => {
-    const parsed = parseOrganizerDetails(organizerImportText)
-    setForm((prev) => mergeOrganizerParsedIntoForm(prev, parsed))
+    const { structuredKbygPlain, ...formPatch } = processOrganizerImport(organizerImportText)
+    setForm((prev) => mergeOrganizerParsedIntoForm(prev, formPatch))
+    setStructuredKbygPreview(structuredKbygPlain || '')
+  }
+
+  const copyStructuredKbyg = async () => {
+    if (!structuredKbygPreview.trim()) return
+    try {
+      await navigator.clipboard.writeText(structuredKbygPreview.trim())
+      setStructuredKbygCopied(true)
+      setTimeout(() => setStructuredKbygCopied(false), 2000)
+    } catch (err) {
+      console.error('Copy structured KBYG failed', err)
+    }
   }
 
   const copySubject = async () => {
@@ -962,7 +977,7 @@ export default function ConferenceKnowBeforeYouGo() {
           <fieldset className="form-fieldset">
             <legend>Import organizer details</legend>
             <p className="form-hint">
-              Optional. Paste text from an exhibitor guide, organizer email, or notes — then parse to fill empty fields only (your edits are kept). Pipeline: split into chunks (headings, spacing, schedule lines grouped under a parent when clearly time-only), classify each chunk once with confidence thresholds, then map to fields. Synonymous headings are normalized; repeated lines are deduplicated. Ambiguous or low-confidence chunks go to &quot;Additional Notes&quot;; contacts may appear under &quot;Key Contacts&quot;.
+              Optional. Paste organizer or sponsor text — parse fills empty form fields only, and builds a separate structured Know Before You Go (emoji section headers, bullets, fixed section order) you can copy. Chunks are classified independently with confidence thresholds; ambiguous text goes to Additional Notes. Duplicates collapse to the most complete version.
             </p>
             <label>
               Organizer / exhibitor text
@@ -982,6 +997,25 @@ export default function ConferenceKnowBeforeYouGo() {
                 Pulls useful details into relevant sections for review — you can edit everything after
               </p>
             </div>
+            {structuredKbygPreview ? (
+              <div className="structured-kbyg-preview">
+                <label>
+                  Structured Know Before You Go
+                  <textarea
+                    readOnly
+                    value={structuredKbygPreview}
+                    rows={14}
+                    className="structured-kbyg-textarea"
+                    aria-label="Structured Know Before You Go preview"
+                  />
+                </label>
+                <div className="output-actions output-actions-inline structured-kbyg-copy">
+                  <button type="button" className="btn-copy" onClick={copyStructuredKbyg} aria-pressed={structuredKbygCopied}>
+                    {structuredKbygCopied ? 'Copied!' : 'Copy structured KBYG'}
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </fieldset>
 
           <fieldset className="form-fieldset">
