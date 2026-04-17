@@ -1,7 +1,7 @@
 /**
  * Conference / sponsor paste → Conference KBYG
  *
- * Pipeline (strict order): CHUNK → NORMALIZE (for matching) → CLASSIFY (independent chunks) → ROUTE → DEDUPE → form field patch.
+ * Pipeline: CHUNK → NORMALIZE → CLASSIFY (independent; heading / keyword / time) → validation (STEP 9) → DEDUPE → form patch + structured KBYG (+ optional debug).
  * Chunks are never reclassified after the classify step.
  */
 
@@ -158,7 +158,17 @@ function computeCategoryScores(chunk) {
     add('tickets', 3)
   }
 
-  if (/\blead\s+capture\b/i.test(ll) || /\bbadge\s+scan/i.test(ll) || /\bcapture\s+leads\b/i.test(ll) || /\bscan\s+leads\b/i.test(ll) || /\bscanner\b/i.test(ll)) add('leadCapture', 6)
+  if (
+    /\blead\s+capture\b/i.test(ll) ||
+    /\bbadge\s+scan/i.test(ll) ||
+    /\bcapture\s+leads\b/i.test(ll) ||
+    /\bscan\s+leads\b/i.test(ll) ||
+    /\bscanner\b/i.test(ll) ||
+    /\bscanner\s+app\b/i.test(ll) ||
+    /\blead\s+[\w\s]{0,40}\bapp\b/i.test(ll)
+  ) {
+    add('leadCapture', 6)
+  }
   if (/\b(lead capture|scanner app|crm)\b/i.test(nm)) add('leadCapture', 2)
 
   if (/\b(shipping|freight|drayage|advance\s+warehouse|material\s+handling|marshalling|crate|pallet|return\s+(label|shipment))\b/i.test(ll)) add('logisticsBoothInfo', 5)
@@ -172,6 +182,9 @@ function computeCategoryScores(chunk) {
   return score
 }
 
+/**
+ * @returns {{ category: OrganizerCategory, score: number, ambiguous: boolean, weakMatch: boolean, reason: string }}
+ */
 export function classifyChunkWithConfidence(chunk) {
   const score = computeCategoryScores(chunk)
   const ll = chunk.toLowerCase()
@@ -190,22 +203,82 @@ export function classifyChunkWithConfidence(chunk) {
     .filter(([, s]) => s > 0)
     .sort((a, b) => b[1] - a[1])
   const secondScore = entries.length > 1 ? entries[1][1] : 0
+  const margin = secondScore > 0 ? bestScore - secondScore : 999
 
   let ambiguous = false
   if (bestScore < MIN_CLASSIFICATION_SCORE) ambiguous = true
-  else if (secondScore > 0 && bestScore - secondScore < MIN_SCORE_MARGIN) ambiguous = true
+  else if (secondScore > 0 && margin < MIN_SCORE_MARGIN) ambiguous = true
+
+  /** STEP 10: borderline scores → Additional Notes with ⚠️ */
+  const weakMargin = !ambiguous && secondScore > 0 && margin === MIN_SCORE_MARGIN
 
   if (ambiguous) {
-    return { category: /** @type {OrganizerCategory} */ ('additionalNotes'), score: bestScore, ambiguous: true }
+    return {
+      category: /** @type {OrganizerCategory} */ ('additionalNotes'),
+      score: bestScore,
+      ambiguous: true,
+      weakMatch: true,
+      reason: 'fallback',
+    }
   }
 
   if (score.tickets && score.setupMoveIn && score.tickets === score.setupMoveIn && best === 'tickets') {
     if (/\b(booth|exhibitor|move[\s-]?in|set[\s-]?up)\b/i.test(ll)) {
-      return { category: 'setupMoveIn', score: bestScore, ambiguous: false }
+      return {
+        category: 'setupMoveIn',
+        score: bestScore,
+        ambiguous: false,
+        weakMatch: false,
+        reason: inferClassificationReason(chunk, score, 'setupMoveIn'),
+      }
     }
   }
 
-  return { category: /** @type {OrganizerCategory} */ (best), score: bestScore, ambiguous: false }
+  if (weakMargin) {
+    return {
+      category: /** @type {OrganizerCategory} */ ('additionalNotes'),
+      score: bestScore,
+      ambiguous: false,
+      weakMatch: true,
+      reason: 'weak margin',
+    }
+  }
+
+  return {
+    category: /** @type {OrganizerCategory} */ (best),
+    score: bestScore,
+    ambiguous: false,
+    weakMatch: false,
+    reason: inferClassificationReason(chunk, score, best),
+  }
+}
+
+function inferClassificationReason(chunk, score, category) {
+  const firstRaw = firstNonEmptyLine(chunk)
+  const firstNorm = normalizeHeadingLineForMatch(firstRaw)
+  const headingRules = [
+    [/^(parking|transit|uber|lyft|taxi)/, 'parkingTransportation'],
+    [/^(venue|location|address)/, 'eventVenue'],
+    [/^(booth|demo|hall|exhibit).*(hours|times)/, 'boothHours'],
+    [/^(move-in|setup|set-up)/, 'setupMoveIn'],
+    [/^(teardown|move-out)/, 'teardownMoveOut'],
+    [/^(tickets|registration)/, 'tickets'],
+    [/^(lead|scanner)/, 'leadCapture'],
+    [/^(shipping|freight|logistics|wifi|wi-fi)/, 'logisticsBoothInfo'],
+    [/^(contacts?|key contacts)/, 'keyContacts'],
+  ]
+  for (const [re, cat] of headingRules) {
+    if (re.test(firstNorm) && cat === category) return 'heading'
+  }
+  const lines = chunk.split('\n')
+  for (const line of lines) {
+    if (!/\d{1,2}:\d{2}|\b(am|pm)\b/i.test(line)) continue
+    const low = line.toLowerCase()
+    if (category === 'setupMoveIn' && /\b(setup|check-in|move-in)\b/i.test(low)) return 'time'
+    if (category === 'boothHours' && /\b(demo|hours|exhibit|hall|show)\b/i.test(low)) return 'time'
+    if (category === 'teardownMoveOut' && /\b(teardown|move-out)\b/i.test(low)) return 'time'
+  }
+  return 'keyword'
 }
 
 export function classifyChunk(chunk) {
@@ -466,21 +539,186 @@ function bucketsToFormPatch(deduped) {
   return out
 }
 
+/** STEP 9: expected patterns per section — mismatch → Additional Notes */
+function passesSectionPattern(category, chunk) {
+  const ll = chunk.toLowerCase()
+  switch (category) {
+    case 'parkingTransportation':
+      return /\b(uber|lyft|taxi|rideshare|parking|garage|valet|shuttle|transit|public\s+transport|lot|deck|permits?)\b/i.test(ll)
+    case 'boothHours':
+      return (
+        /\d{1,2}:\d{2}/.test(chunk) ||
+        /\b(am|pm|hours?|monday|tuesday|wednesday|thursday|friday|saturday|sunday|schedule)\b/i.test(ll) ||
+        /\b(demo|exhibit|show|hall|booth|floor|expo).{0,48}\b(hours|times)\b/i.test(ll)
+      )
+    case 'teardownMoveOut':
+      return /\b(teardown|move-out|strike|dismantle|pack|remove|load-out|cleanup|end of|closing|crate|materials)\b/i.test(ll)
+    default:
+      return true
+  }
+}
+
 /**
- * Chunk → classify → form field patch (empty fields only via merge helper).
+ * @param {Array<{ chunk: string, category: OrganizerCategory, reason: string, weakMatch: boolean, ambiguous: boolean }>} rows
  */
-export function parseOrganizerDetails(raw) {
+function applyValidationSanity(rows) {
+  return rows.map((row) => {
+    if (row.category === 'additionalNotes') return { ...row, validationMoved: false }
+    if (!passesSectionPattern(row.category, row.chunk)) {
+      return {
+        ...row,
+        category: /** @type {OrganizerCategory} */ ('additionalNotes'),
+        validationMoved: true,
+        originalCategory: row.category,
+        reason: `${row.reason} → validation`,
+      }
+    }
+    return { ...row, validationMoved: false }
+  })
+}
+
+function dedupeClassifiedRowsPreferComplete(rows) {
+  const keyToRow = new Map()
+  const order = []
+  for (const row of rows) {
+    const k = normalizeForDedupe(row.chunk)
+    if (k.length < 8) {
+      order.push({ type: 'raw', row })
+      continue
+    }
+    const key = `${row.category}::${k}`
+    if (!keyToRow.has(key)) {
+      keyToRow.set(key, row)
+      order.push({ type: 'key', key })
+    } else {
+      const prev = keyToRow.get(key)
+      if (row.chunk.length > prev.chunk.length) keyToRow.set(key, row)
+    }
+  }
+  return order.map((e) => (e.type === 'raw' ? e.row : keyToRow.get(e.key)))
+}
+
+/**
+ * @typedef {{ chunk: string, category: OrganizerCategory, reason: string, weakMatch: boolean, ambiguous: boolean, validationMoved?: boolean, originalCategory?: OrganizerCategory }} ClassifiedRow
+ */
+
+/** STEP 11: section order and emojis (📋 = Logistics — 10 sections, 9 emojis in brief; Logistics uses 📋). */
+const KBYG_SECTION_SPEC = [
+  { cats: ['keyContacts'], emoji: '🔑', title: 'Key Contacts' },
+  { cats: ['eventVenue', 'foodBeverage'], emoji: '📍', title: 'Event & Venue' },
+  { cats: ['boothHours'], emoji: '🕒', title: 'Booth Hours' },
+  { cats: ['setupMoveIn'], emoji: '🛠️', title: 'Setup & Move-in' },
+  { cats: ['teardownMoveOut'], emoji: '📦', title: 'Teardown / Move-out' },
+  { cats: ['parkingTransportation'], emoji: '🚗', title: 'Parking & Transportation' },
+  { cats: ['logisticsBoothInfo'], emoji: '📋', title: 'Logistics / Booth Info' },
+  { cats: ['tickets'], emoji: '🎟️', title: 'Tickets' },
+  { cats: ['leadCapture'], emoji: '📱', title: 'Lead Capture' },
+  { cats: ['additionalNotes'], emoji: '📎', title: 'Additional Notes' },
+]
+
+function chunkLinesToBullets(text) {
+  const lines = text.split(/\n/).map((l) => trim(l)).filter(Boolean)
+  if (lines.length === 0) return []
+  return lines.map((l) => (l.startsWith('•') || l.startsWith('-') ? `• ${l.replace(/^[\s•\-–—]+\s*/, '')}` : `• ${l}`))
+}
+
+function formatChunkForStructuredKbyg(row) {
+  if (!row.weakMatch && !row.validationMoved) return row.chunk
+  const lines = row.chunk.split(/\n/)
+  if (lines.length === 0) return row.chunk
+  lines[0] = `⚠️ ${trim(lines[0])}`
+  return lines.join('\n')
+}
+
+/**
+ * Structured Know Before You Go plain text (STEP 11).
+ * @param {ClassifiedRow[]} rows
+ */
+export function buildStructuredKbygPlain(rows) {
+  const byCat = {}
+  for (const row of rows) {
+    const cat = row.category === 'foodBeverage' ? 'eventVenue' : row.category
+    if (!byCat[cat]) byCat[cat] = []
+    byCat[cat].push(formatChunkForStructuredKbyg(row))
+  }
+  for (const k of Object.keys(byCat)) {
+    byCat[k] = dedupeChunkListPreferComplete(byCat[k])
+  }
+
+  const parts = []
+  for (const spec of KBYG_SECTION_SPEC) {
+    const texts = spec.cats.flatMap((c) => byCat[c] || [])
+    if (texts.length === 0) continue
+    const block = [`${spec.emoji} ${spec.title}`, '']
+    for (const t of texts) {
+      block.push(...chunkLinesToBullets(t))
+      block.push('')
+    }
+    parts.push(block.join('\n').trimEnd())
+  }
+  return parts.join('\n\n').trim()
+}
+
+/** STEP 12 */
+export function buildParsingDebugPlain(rows) {
+  const lines = ['Parsing Debug Info', '']
+  rows.forEach((r, i) => {
+    const oneLine = r.chunk.replace(/\n/g, ' ↵ ')
+    lines.push(`--- Chunk ${i + 1} ---`)
+    lines.push(`Original: ${oneLine}`)
+    lines.push(
+      `Assigned section: ${r.category}${r.originalCategory ? ` (validation moved from ${r.originalCategory})` : ''}`,
+    )
+    lines.push(`Reason: ${r.reason}`)
+    lines.push('')
+  })
+  return lines.join('\n').trim()
+}
+
+function runPipelineClassifiedRows(raw) {
   const pass1 = splitIntoLogicalChunks(raw)
   const pass2 = splitMultiConceptChunks(pass1)
-  /** @type {Array<{ chunk: string, category: OrganizerCategory }>} */
+  /** @type {ClassifiedRow[]} */
   const classified = []
   for (const chunk of pass2) {
     const clean = formatChunkCleanly(chunk)
-    const { category } = classifyChunkWithConfidence(clean)
-    classified.push({ chunk: clean, category })
+    const meta = classifyChunkWithConfidence(clean)
+    classified.push({
+      chunk: clean,
+      category: meta.category,
+      weakMatch: meta.weakMatch,
+      ambiguous: meta.ambiguous,
+      reason: meta.reason,
+    })
   }
-  const deduped = buildFormBucketsFromClassified(classified)
-  return bucketsToFormPatch(deduped)
+  const validated = applyValidationSanity(classified)
+  return dedupeClassifiedRowsPreferComplete(validated)
+}
+
+/**
+ * Form patch + structured KBYG + optional debug (STEP 11–12).
+ * @param {{ debug?: boolean }} [options]
+ */
+export function processOrganizerImport(raw, options = {}) {
+  const rows = runPipelineClassifiedRows(raw)
+  const simple = rows.map((r) => ({ chunk: r.chunk, category: r.category }))
+  const deduped = buildFormBucketsFromClassified(simple)
+  const formPatch = bucketsToFormPatch(deduped)
+  const structuredKbygPlain = buildStructuredKbygPlain(rows)
+  const out = { ...formPatch, structuredKbygPlain }
+  if (options.debug) {
+    out.parsingDebugPlain = buildParsingDebugPlain(rows)
+  }
+  return out
+}
+
+/**
+ * Chunk → classify → validate → dedupe → form field patch (empty fields only via merge helper).
+ */
+export function parseOrganizerDetails(raw) {
+  const r = processOrganizerImport(raw)
+  const { structuredKbygPlain: _sk, parsingDebugPlain: _pd, ...formPatch } = r
+  return formPatch
 }
 
 const ADDITIONAL_NOTES_TITLE = 'Additional Notes'
@@ -505,7 +743,14 @@ function mergeIntoNamedSection(prev, title, content) {
 export function mergeOrganizerParsedIntoForm(prev, parsed) {
   let next = { ...prev }
   for (const [key, val] of Object.entries(parsed)) {
-    if (key === 'additionalOrganizerNotes' || key === 'keyContactsSection') continue
+    if (
+      key === 'additionalOrganizerNotes' ||
+      key === 'keyContactsSection' ||
+      key === 'structuredKbygPlain' ||
+      key === 'parsingDebugPlain'
+    ) {
+      continue
+    }
     if (val == null || trim(String(val)) === '') continue
     const cur = prev[key]
     if (typeof cur !== 'string' || trim(cur) !== '') continue

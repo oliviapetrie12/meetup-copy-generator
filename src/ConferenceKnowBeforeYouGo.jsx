@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { makeMoreConcise } from './outputHelpers.js'
-import { mergeOrganizerParsedIntoForm, parseOrganizerDetails } from './conferenceOrganizerImport.js'
+import { mergeOrganizerParsedIntoForm, processOrganizerImport } from './conferenceOrganizerImport.js'
 
 function escapeHtml(s) {
   if (s == null) return ''
@@ -782,6 +782,10 @@ export default function ConferenceKnowBeforeYouGo() {
   const [googleDocCopied, setGoogleDocCopied] = useState(false)
   const [subjectCopied, setSubjectCopied] = useState(false)
   const [organizerImportText, setOrganizerImportText] = useState('')
+  const [organizerImportDebug, setOrganizerImportDebug] = useState(false)
+  const [structuredKbygPreview, setStructuredKbygPreview] = useState('')
+  const [parsingDebugPreview, setParsingDebugPreview] = useState('')
+  const [structuredKbygCopied, setStructuredKbygCopied] = useState(false)
 
   useEffect(() => {
     if (subjectManuallyEditedRef.current) return
@@ -874,11 +878,33 @@ export default function ConferenceKnowBeforeYouGo() {
     setPlain('')
     setHtml('')
     setOrganizerImportText('')
+    setStructuredKbygPreview('')
+    setParsingDebugPreview('')
+    setOrganizerImportDebug(false)
   }
 
   const handleParseOrganizerDetails = () => {
-    const parsed = parseOrganizerDetails(organizerImportText)
-    setForm((prev) => mergeOrganizerParsedIntoForm(prev, parsed))
+    const result = processOrganizerImport(organizerImportText, { debug: organizerImportDebug })
+    const { structuredKbygPlain, parsingDebugPlain, ...formPatch } = result
+    setForm((prev) => mergeOrganizerParsedIntoForm(prev, formPatch))
+    setStructuredKbygPreview(structuredKbygPlain || '')
+    setParsingDebugPreview(parsingDebugPlain || '')
+  }
+
+  const structuredKbygDisplayText =
+    organizerImportDebug && parsingDebugPreview
+      ? `${structuredKbygPreview}\n\n${parsingDebugPreview}`
+      : structuredKbygPreview
+
+  const copyStructuredKbyg = async () => {
+    if (!structuredKbygDisplayText.trim()) return
+    try {
+      await navigator.clipboard.writeText(structuredKbygDisplayText.trim())
+      setStructuredKbygCopied(true)
+      setTimeout(() => setStructuredKbygCopied(false), 2000)
+    } catch (err) {
+      console.error('Copy structured KBYG failed', err)
+    }
   }
 
   const copySubject = async () => {
@@ -962,7 +988,7 @@ export default function ConferenceKnowBeforeYouGo() {
           <fieldset className="form-fieldset">
             <legend>Import organizer details</legend>
             <p className="form-hint">
-              Optional. Paste organizer or sponsor text to pre-fill empty fields only (your edits are kept). Classify each chunk with confidence thresholds; ambiguous text goes to Additional Notes. You can complete the rest of the form manually.
+              Optional. Paste organizer or sponsor text to pre-fill empty fields, and get a structured Know Before You Go (emoji sections, bullets) to copy. Enable debug to append per-chunk classification details. Ambiguous or weak-margin chunks and validation mismatches go to Additional Notes (⚠️ when flagged).
             </p>
             <label>
               Organizer / exhibitor text
@@ -974,6 +1000,14 @@ export default function ConferenceKnowBeforeYouGo() {
                 autoComplete="off"
               />
             </label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={organizerImportDebug}
+                onChange={(e) => setOrganizerImportDebug(e.target.checked)}
+              />
+              Parsing debug (append &quot;Parsing Debug Info&quot; to structured output)
+            </label>
             <div className="quick-draft-stack">
               <button type="button" className="btn-quick-draft" onClick={handleParseOrganizerDetails}>
                 Parse organizer details
@@ -982,6 +1016,25 @@ export default function ConferenceKnowBeforeYouGo() {
                 Pulls useful details into relevant sections for review — you can edit everything after
               </p>
             </div>
+            {structuredKbygPreview ? (
+              <div className="structured-kbyg-preview">
+                <label>
+                  Structured Know Before You Go
+                  <textarea
+                    readOnly
+                    value={structuredKbygDisplayText}
+                    rows={16}
+                    className="structured-kbyg-textarea"
+                    aria-label="Structured Know Before You Go"
+                  />
+                </label>
+                <div className="output-actions output-actions-inline structured-kbyg-copy">
+                  <button type="button" className="btn-copy" onClick={copyStructuredKbyg} aria-pressed={structuredKbygCopied}>
+                    {structuredKbygCopied ? 'Copied!' : 'Copy structured KBYG'}
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </fieldset>
 
           <fieldset className="form-fieldset">
