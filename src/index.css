@@ -49,6 +49,10 @@ body {
   font-style: normal;
 }
 
+.header-tagline {
+  font-weight: 400;
+}
+
 /* ===== APP BODY ===== */
 .app-body {
   display: flex;

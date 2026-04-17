@@ -2732,7 +2732,10 @@ export default function App() {
           <span className="header-emoji" role="img" aria-hidden="true">
             🧰
           </span>
-          Elastic DevRel (Programs) Toolkit - Everything needed for meetups and conference logistics, all in one place.
+          Elastic DevRel (Programs) Toolkit -{' '}
+          <span className="header-tagline">
+            Everything needed for meetups and conference logistics, all in one place.
+          </span>
         </h1>
       </header>
 
