@@ -343,6 +343,10 @@ function renderByMode(parsed, mode, eventName) {
     blocks.push(formatDynamicSection(mode, body, meta))
   }
 
+  if (blocks.length === 0) {
+    return ''
+  }
+
   const sep = mode === 'slack' ? '\n' : '\n\n'
   let core = blocks.join(sep)
 
@@ -354,6 +358,18 @@ function renderByMode(parsed, mode, eventName) {
   return core.trim()
 }
 
+/** Email body without the standard intro line (used to detect intro-only output). */
+function stripEmailIntro(text, mode) {
+  if (mode !== 'email' || !trim(text)) return trim(text || '')
+  return trim(
+    text.replace(/^Hi team, here's the Know Before You Go for [^:\n]+:\s*\n*/is, ''),
+  )
+}
+
+function isEffectivelyEmptyOutput(output, mode) {
+  return !trim(stripEmailIntro(output, mode))
+}
+
 /**
  * Full enhance pipeline.
  * @param {{ existingStructuredKbyg: string, optionalNewDetails?: string, mode: 'slack'|'email'|'doc', eventName?: string }} input
@@ -361,15 +377,34 @@ function renderByMode(parsed, mode, eventName) {
  * mergedSections includes known ids and dynamic keys (__dyn:…).
  */
 export function enhanceKbygOutput(input) {
+  const mode = input.mode || 'email'
+  const eventName = input.eventName || ''
+
   const rawExisting = stripParsingDebugBlock(input.existingStructuredKbyg || '')
-  let existing = parseStructuredKbygFromRaw(rawExisting)
-  if (!parsedHasContent(existing) && trim(rawExisting)) {
-    existing = wrapFullTextFallback(rawExisting, 'Existing KBYG')
+  let existingParsed = parseStructuredKbygFromRaw(rawExisting)
+  if (!parsedHasContent(existingParsed) && trim(rawExisting)) {
+    existingParsed = wrapFullTextFallback(rawExisting, 'Know Before You Go')
   }
 
-  const updates = parseOptionalDetailsToSections(input.optionalNewDetails || '')
-  const merged = mergeKbygSections(existing, updates, true)
+  const optRaw = trim(input.optionalNewDetails || '')
 
-  const output = renderByMode(merged, input.mode || 'email', input.eventName || '')
-  return { output: output.trim(), mergedSections: merged.sections }
+  /** Always base merge on existing sections; skip updates entirely when none pasted. */
+  let mergedParsed
+  if (!optRaw) {
+    mergedParsed = ensureParsed(existingParsed)
+  } else {
+    const updatesParsed = parseOptionalDetailsToSections(optRaw)
+    mergedParsed = mergeKbygSections(existingParsed, updatesParsed, true)
+  }
+
+  let output = renderByMode(mergedParsed, mode, eventName)
+
+  if (isEffectivelyEmptyOutput(output, mode)) {
+    output = renderByMode(ensureParsed(existingParsed), mode, eventName)
+  }
+  if (isEffectivelyEmptyOutput(output, mode) && trim(rawExisting)) {
+    output = renderByMode(wrapFullTextFallback(rawExisting, 'Know Before You Go'), mode, eventName)
+  }
+
+  return { output: trim(output), mergedSections: mergedParsed.sections }
 }
