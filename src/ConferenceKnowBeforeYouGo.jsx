@@ -623,7 +623,7 @@ function buildConferenceEmailHtml(form) {
 
   parts.push(buildConferenceIntroHtml(form))
   if (has(form.conferenceName)) {
-    parts.push(`<strong>Title</strong><br><br>${escapeHtml(trim(form.conferenceName))}`)
+    parts.push(`<strong>${escapeHtml(trim(form.conferenceName))}</strong>`)
   }
 
   const tldrBodyHtml = buildConferenceTldrBodyHtml(form)
@@ -705,7 +705,6 @@ function generateConferenceEmailPlain(form) {
     )
   }
   if (has(form.conferenceName)) {
-    lines.push('Title')
     lines.push(trim(form.conferenceName))
     lines.push('')
   }
