@@ -181,8 +181,74 @@ function getInitialForm() {
     swagText: DEFAULT_SWAG_TEXT,
     parkingText: '',
     foodBeverageText: '',
+    engagementType: 'none',
+    engagementDetails: '',
+    engagementPrize: '',
     additionalSections: [],
   }
+}
+
+function engagementShowsInEmailOutput(form) {
+  const t = trim(form.engagementType || 'none')
+  return t === 'kahoot' || t === 'raffle'
+}
+
+/** HTML block for Kahoot/Raffle engagement (matches KBYG spacing). */
+function buildEngagementSectionHtml(form) {
+  if (!engagementShowsInEmailOutput(form)) return ''
+  const t = trim(form.engagementType)
+  const detailsRaw = trim(form.engagementDetails || '')
+  const prizeRaw = trim(form.engagementPrize || '')
+  const detailLines = detailsRaw
+    .split('\n')
+    .map((l) => trim(l))
+    .filter(Boolean)
+
+  const bulletsHtml =
+    detailLines.length > 0 ? '<br><br>' + detailLines.map((l) => `• ${escapeHtml(l)}`).join('<br>') : ''
+
+  const prizeHtml =
+    prizeRaw.length > 0 ? `<br><br>Prize:<br>${escapeHtml(prizeRaw)}` : ''
+
+  if (t === 'kahoot') {
+    return `<strong>🎉 Engagement</strong><br><br><strong>Kahoot!</strong>${bulletsHtml}${prizeHtml}`
+  }
+  return `<strong>🎉 Raffle</strong>${bulletsHtml}${prizeHtml}`
+}
+
+/** Plain-text engagement block. */
+function appendEngagementPlain(lines, form) {
+  if (!engagementShowsInEmailOutput(form)) return
+
+  const detailsRaw = trim(form.engagementDetails || '')
+  const prizeRaw = trim(form.engagementPrize || '')
+  const detailLines = detailsRaw
+    .split('\n')
+    .map((l) => trim(l))
+    .filter(Boolean)
+
+  const pushPrize = () => {
+    if (!has(prizeRaw)) return
+    lines.push('')
+    lines.push('Prize:')
+    lines.push(prizeRaw)
+  }
+
+  if (trim(form.engagementType) === 'kahoot') {
+    lines.push('🎉 Engagement')
+    lines.push('')
+    lines.push('Kahoot!')
+    detailLines.forEach((l) => lines.push(`- ${l}`))
+    pushPrize()
+    lines.push('')
+    return
+  }
+
+  lines.push('🎉 Raffle')
+  lines.push('')
+  detailLines.forEach((l) => lines.push(`- ${l}`))
+  pushPrize()
+  lines.push('')
 }
 
 function trim(s) {
@@ -672,6 +738,11 @@ function buildConferenceEmailHtml(form) {
     parts.push(`<strong>🍔 Food &amp; Beverage</strong><br><br>${textToHtmlLines(form.foodBeverageText)}`)
   }
 
+  const engagementHtml = buildEngagementSectionHtml(form)
+  if (engagementHtml) {
+    parts.push(engagementHtml)
+  }
+
   ;(form.additionalSections || []).forEach((sec) => {
     const t = trim(sec.title)
     const c = trim(sec.content)
@@ -754,6 +825,8 @@ function generateConferenceEmailPlain(form) {
     lines.push(trim(form.foodBeverageText))
     lines.push('')
   }
+
+  appendEngagementPlain(lines, form)
 
   ;(form.additionalSections || []).forEach((sec) => {
     const t = trim(sec.title)
@@ -1360,6 +1433,45 @@ export default function ConferenceKnowBeforeYouGo() {
               <textarea value={form.foodBeverageText} onChange={update('foodBeverageText')} rows={3} />
               <span className="form-hint">Optional: Add notes if food is provided.</span>
             </label>
+          </fieldset>
+
+          <fieldset className="form-fieldset">
+            <legend>Engagement</legend>
+            <label>
+              Type
+              <select value={form.engagementType || 'none'} onChange={update('engagementType')} aria-label="Engagement type">
+                <option value="none">None</option>
+                <option value="kahoot">Kahoot</option>
+                <option value="raffle">Raffle</option>
+              </select>
+            </label>
+            {(form.engagementType === 'kahoot' || form.engagementType === 'raffle') && (
+              <>
+                <label>
+                  Details
+                  <textarea
+                    value={form.engagementDetails}
+                    onChange={update('engagementDetails')}
+                    placeholder={form.engagementType === 'kahoot' ? 'Timing, join code, prize rules…' : 'How to enter, drawing time…'}
+                    rows={4}
+                    autoComplete="off"
+                  />
+                </label>
+                <label>
+                  Prize
+                  <input
+                    type="text"
+                    value={form.engagementPrize}
+                    onChange={update('engagementPrize')}
+                    placeholder="e.g. Gift card, headphones"
+                    autoComplete="off"
+                  />
+                </label>
+              </>
+            )}
+            <span className="form-hint">
+              Included in the generated email only when Kahoot or Raffle is selected.
+            </span>
           </fieldset>
 
           <fieldset className="form-fieldset">
