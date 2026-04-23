@@ -23,8 +23,73 @@ export const KBYG_SECTION_DEFS = [
 ]
 
 const EMOJI_TO_ID = Object.fromEntries(KBYG_SECTION_DEFS.map((d) => [d.emoji, d.id]))
-const KNOWN_HEADER_RE = /^([🔑📍🕒🛠️📦🚗📋🎟️📱📎])\s+(.+)$/
 const KNOWN_ID_SET = new Set(KBYG_SECTION_DEFS.map((d) => d.id))
+
+/** Escape a string for safe use inside RegExp (including surrogate pairs). */
+function escapeRegExpString(s) {
+  return s.replace(/[\\^$*+?.()|[\]{}]/g, '\\$&')
+}
+
+const KNOWN_HEADER_RE = new RegExp(
+  `^(${Object.keys(EMOJI_TO_ID)
+    .map((e) => escapeRegExpString(e))
+    .join('|')})\\s+(.+)$`,
+)
+
+/**
+ * Emoji cluster at line start (supports compound sequences like 🏳️‍🌈, flags, skin tones).
+ * Group 1 = full emoji run, Group 2 = title text.
+ */
+const EMOJI_HEADER_RE =
+  /^((?:\p{Extended_Pictographic}(?:\u200D\p{Extended_Pictographic})*(?:\uFE0F)?)+)\s+(.+)$/u
+
+/**
+ * Map plain-language / alternate titles to canonical section ids (updates & text-only headers).
+ */
+const TITLE_TO_CANONICAL = [
+  { re: /^(key\s+)?contacts?$/i, id: 'keyContacts' },
+  { re: /^event\s*&?\s*venue$/i, id: 'eventVenue' },
+  { re: /^(booth|exhibit|hall|demo)\s+hours?$/i, id: 'boothHours' },
+  { re: /^hours?$/i, id: 'boothHours' },
+  { re: /^setup\s*&?\s*move[-\s]?in$/i, id: 'setupMoveIn' },
+  { re: /^move[-\s]?in$/i, id: 'setupMoveIn' },
+  { re: /^teardown\s*[\/]\s*move[-\s]?out$/i, id: 'teardownMoveOut' },
+  { re: /^move[-\s]?out$/i, id: 'teardownMoveOut' },
+  { re: /^parking\s*[&+]?\s*transportation$/i, id: 'parkingTransportation' },
+  { re: /^parking$/i, id: 'parkingTransportation' },
+  { re: /^transportation$/i, id: 'parkingTransportation' },
+  {
+    re: /^(logistics(\s|[\/]|$)|booth\s+info\b|wi-?fi\b|wifi\b|wi\s*fi\b|network\b|internet\b)/i,
+    id: 'logisticsBoothInfo',
+  },
+  { re: /^tickets?$/i, id: 'tickets' },
+  { re: /^lead\s+capture$/i, id: 'leadCapture' },
+  { re: /^additional\s+notes?$/i, id: 'additionalNotes' },
+]
+
+function matchCanonicalTitle(line) {
+  const t = trim(line)
+  if (!t) return null
+  const md = t.match(/^#{1,3}\s*(.+)$/)
+  const candidate = md ? trim(md[1]) : t
+  for (const { re, id } of TITLE_TO_CANONICAL) {
+    if (re.test(candidate)) return id
+  }
+  const bold = candidate.match(/^\*{1,2}([^*]+)\*{1,2}$/)
+  if (bold) {
+    const inner = trim(bold[1])
+    for (const { re, id } of TITLE_TO_CANONICAL) {
+      if (re.test(inner)) return id
+    }
+  }
+  return null
+}
+
+function normalizeTitleKey(title) {
+  return trim(title)
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '')
+}
 
 /** @typedef {{ sections: Record<string, string>, order: string[], dynMeta: Record<string, { emoji: string, title: string }> }} ParsedKbyg */
 
@@ -48,49 +113,104 @@ function slugTitle(title) {
   return s || 'section'
 }
 
+function nextDynamicKey(seq, emoji, title) {
+  return `__dyn:${seq}:${emoji}:${slugTitle(title)}`
+}
+
+function nextTextDynamicKey(seq, title) {
+  return `__dynTxt:${seq}:${slugTitle(title)}`
+}
+
 /**
- * Known emoji header first; otherwise any single extended pictographic + title → dynamic section.
+ * Known emoji header first; any emoji cluster + title → known id or dynamic;
+ * plain-language titles → canonical id.
+ * Optional plain standalone titles (e.g. "Raffle") only when allowPlainTitle (block fallback).
  */
-function parseHeaderLine(line) {
+function parseHeaderLine(line, opts = {}) {
+  const allowPlainTitle = opts.allowPlainTitle === true
   const t = trim(line)
   const known = t.match(KNOWN_HEADER_RE)
   if (known && EMOJI_TO_ID[known[1]]) {
     return { kind: 'known', id: EMOJI_TO_ID[known[1]] }
   }
 
-  const dyn = t.match(/^(\p{Extended_Pictographic})\uFE0F?\s+(.+)$/u)
-  if (!dyn) return null
-  const emoji = dyn[1]
-  const title = trim(dyn[2])
-  if (!title) return null
-  if (EMOJI_TO_ID[emoji]) return { kind: 'known', id: EMOJI_TO_ID[emoji] }
+  const emojiMatch = t.match(EMOJI_HEADER_RE)
+  if (emojiMatch) {
+    const emoji = emojiMatch[1]
+    const title = trim(emojiMatch[2])
+    if (!title) return null
+    if (EMOJI_TO_ID[emoji]) return { kind: 'known', id: EMOJI_TO_ID[emoji] }
 
-  return { kind: 'dynamic', emoji, title }
+    const canon = matchCanonicalTitle(title)
+    if (canon) return { kind: 'known', id: canon }
+
+    return { kind: 'dynamic', emoji, title }
+  }
+
+  const canonOnly = matchCanonicalTitle(t)
+  if (canonOnly) return { kind: 'known', id: canonOnly }
+
+  if (allowPlainTitle) {
+    const plain = looksLikePlainSectionTitle(t)
+    if (plain) return { kind: 'dynamicText', title: plain }
+  }
+
+  return null
 }
 
-function nextDynamicKey(seq, emoji, title) {
-  return `__dyn:${seq}:${emoji}:${slugTitle(title)}`
+/** Short title-only line for block-first-line detection (e.g. "Raffle", "Speaker Lineup"). */
+function looksLikePlainSectionTitle(line) {
+  const t = trim(line)
+  if (t.length < 2 || t.length > 72) return null
+  if (/^#{1,3}\s/.test(t)) return null
+  if (EMOJI_HEADER_RE.test(t)) return null
+  if (/^[•\-–—*]\s/.test(t)) return null
+  if (/^\d+\.\s/.test(t)) return null
+  if (/[\d:]/.test(t)) return null
+  const oneLine = !/[\r\n]/.test(t)
+  if (!oneLine) return null
+  const words = t.split(/\s+/).filter(Boolean)
+  if (words.length > 10) return null
+  if (/[.!?]\s*$/.test(t) && words.length > 6) return null
+
+  const particles = new Set(['a', 'an', 'the', 'of', 'and', 'or', 'in', 'on', 'at', 'for', 'to', 'vs'])
+  if (words.length >= 2) {
+    const ok = words.every((w, i) => {
+      if (particles.has(w.toLowerCase()) && i > 0) return true
+      return /^[A-Z][a-zA-Z'-]*$/.test(w) || /^[A-Z]{2,}$/.test(w)
+    })
+    if (!ok) return null
+  } else if (!/^[A-Za-z][a-zA-Z'-]{1,39}$/.test(t)) {
+    return null
+  }
+
+  return t
 }
 
-/**
- * Parse structured KBYG plain text into sections, preserving order (known + unknown emoji sections).
- * Unknown headers (e.g. 🎉 Raffle) become dynamic keys with metadata for rendering.
- * @returns {ParsedKbyg}
- */
-export function parseStructuredKbygToSections(text) {
-  const raw = stripParsingDebugBlock(text)
-  return parseStructuredKbygFromRaw(raw)
+function assignHeader(result, hdr, seqRef, addOrder) {
+  if (hdr.kind === 'known') {
+    return hdr.id
+  }
+  if (hdr.kind === 'dynamicText') {
+    seqRef[0] += 1
+    const key = nextTextDynamicKey(seqRef[0], hdr.title)
+    result.dynMeta[key] = { emoji: '📌', title: hdr.title }
+    addOrder(key)
+    return key
+  }
+  seqRef[0] += 1
+  const key = nextDynamicKey(seqRef[0], hdr.emoji, hdr.title)
+  result.dynMeta[key] = { emoji: hdr.emoji, title: hdr.title }
+  addOrder(key)
+  return key
 }
 
-function parseStructuredKbygFromRaw(raw) {
-  if (!trim(raw)) return emptyParsed()
-
-  const lines = raw.split(/\n/)
+function parseStructuredKbygFromLines(lines) {
   /** @type {ParsedKbyg} */
   const result = { sections: {}, order: [], dynMeta: {} }
   const seenOrder = new Set()
+  const seqRef = [0]
 
-  let seq = 0
   let currentKey = null
   /** @type {string[]} */
   let buf = []
@@ -100,6 +220,14 @@ function parseStructuredKbygFromRaw(raw) {
       seenOrder.add(key)
       result.order.push(key)
     }
+  }
+
+  const flushOrphanAsPreamble = (orphan) => {
+    seqRef[0] += 1
+    const introKey = nextDynamicKey(seqRef[0], '📌', 'Details')
+    result.sections[introKey] = orphan
+    result.dynMeta[introKey] = { emoji: '📌', title: 'Details' }
+    addOrder(introKey)
   }
 
   const flush = () => {
@@ -115,29 +243,31 @@ function parseStructuredKbygFromRaw(raw) {
   }
 
   for (const line of lines) {
+    const trimmedLine = trim(line)
+    const plainTitle = looksLikePlainSectionTitle(trimmedLine)
+    if (plainTitle && currentKey && buf.length > 0 && buf[buf.length - 1] === '') {
+      while (buf.length && buf[buf.length - 1] === '') buf.pop()
+      flush()
+      currentKey = assignHeader(
+        result,
+        { kind: 'dynamicText', title: plainTitle },
+        seqRef,
+        addOrder,
+      )
+      continue
+    }
+
     const hdr = parseHeaderLine(line)
     if (hdr) {
       flush()
       if (!currentKey && buf.length > 0) {
         const orphan = buf.join('\n').trim()
         buf = []
-        if (orphan) {
-          seq += 1
-          const introKey = nextDynamicKey(seq, '📝', 'Notes')
-          result.sections[introKey] = orphan
-          result.dynMeta[introKey] = { emoji: '📝', title: 'Notes' }
-          addOrder(introKey)
-        }
+        if (orphan) flushOrphanAsPreamble(orphan)
       }
 
-      if (hdr.kind === 'known') {
-        currentKey = hdr.id
-      } else {
-        seq += 1
-        currentKey = nextDynamicKey(seq, hdr.emoji, hdr.title)
-        result.dynMeta[currentKey] = { emoji: hdr.emoji, title: hdr.title }
-      }
-      addOrder(currentKey)
+      currentKey = assignHeader(result, hdr, seqRef, addOrder)
+      if (hdr.kind === 'known') addOrder(currentKey)
       continue
     }
 
@@ -149,30 +279,99 @@ function parseStructuredKbygFromRaw(raw) {
   if (!currentKey && buf.length > 0) {
     const orphan = buf.join('\n').trim()
     if (orphan) {
-      seq += 1
-      const k = nextDynamicKey(seq, '📎', 'Content')
+      seqRef[0] += 1
+      const k = nextDynamicKey(seqRef[0], '📌', 'Details')
       result.sections[k] = orphan
-      result.dynMeta[k] = { emoji: '📎', title: 'Content' }
+      result.dynMeta[k] = { emoji: '📌', title: 'Details' }
       addOrder(k)
     }
   }
 
+  return result
+}
+
+/**
+ * When no headers were found, split on blank lines and treat each block as a section if
+ * the first line looks like a header; otherwise keep one blob for last-resort handling.
+ */
+function parseFallbackBlocks(raw) {
+  const trimmed = trim(raw)
+  if (!trimmed) return emptyParsed()
+
+  const blocks = trimmed.split(/\n\s*\n+/).map((b) => trim(b)).filter(Boolean)
+  if (blocks.length === 0) return emptyParsed()
+
+  /** @type {ParsedKbyg} */
+  const result = { sections: {}, order: [], dynMeta: {} }
+  const seqRef = [0]
+  const seenOrder = new Set()
+  const addOrder = (key) => {
+    if (!seenOrder.has(key)) {
+      seenOrder.add(key)
+      result.order.push(key)
+    }
+  }
+
+  for (const block of blocks) {
+    const lines = block.split('\n')
+    const first = lines[0]
+    const rest = lines.slice(1)
+    const hdr = parseHeaderLine(first, { allowPlainTitle: true })
+    if (hdr) {
+      const key = assignHeader(result, hdr, seqRef, addOrder)
+      if (hdr.kind === 'known') addOrder(key)
+      const body = rest.join('\n').trim()
+      if (body) {
+        if (result.sections[key]) result.sections[key] += `\n\n${body}`
+        else result.sections[key] = body
+      }
+      continue
+    }
+
+    seqRef[0] += 1
+    const titleFromFirst = looksLikePlainSectionTitle(first)
+    if (titleFromFirst && rest.length > 0) {
+      const key = nextTextDynamicKey(seqRef[0], titleFromFirst)
+      result.dynMeta[key] = { emoji: '📌', title: titleFromFirst }
+      result.sections[key] = rest.join('\n').trim()
+      addOrder(key)
+    } else {
+      const key = nextDynamicKey(seqRef[0], '📌', `block-${seqRef[0]}`)
+      result.dynMeta[key] = { emoji: '📌', title: 'Details' }
+      result.sections[key] = block
+      addOrder(key)
+    }
+  }
+
+  return result
+}
+
+function parseStructuredKbygFromRaw(raw) {
+  if (!trim(raw)) return emptyParsed()
+
+  const lines = raw.split(/\n/)
+  let result = parseStructuredKbygFromLines(lines)
+
   if (result.order.length === 0 && trim(raw)) {
-    const k = `__dyn:${++seq}:📎:full-text`
+    result = parseFallbackBlocks(raw)
+  }
+
+  if (result.order.length === 0 && trim(raw)) {
+    const k = '__lastResort:notes'
     result.sections[k] = trim(raw)
-    result.dynMeta[k] = { emoji: '📎', title: 'Content' }
+    result.dynMeta[k] = { emoji: '📝', title: 'Notes' }
     result.order.push(k)
   }
 
   return result
 }
 
-function wrapFullTextFallback(text, title = 'Updates') {
-  const k = '__dyn:0:📎:pasted-update'
+function wrapFullTextFallback(text, title = 'Know Before You Go') {
+  const k = '__lastResort:wrapped'
   return {
     sections: { [k]: trim(text) },
     order: [k],
-    dynMeta: { [k]: { emoji: '📎', title } },
+    dynMeta: { [k]: { emoji: '📝', title } },
   }
 }
 
@@ -183,20 +382,25 @@ function parsedHasContent(p) {
 /**
  * Optional paste → sections. Prefer parsing the raw text first so emoji headers (e.g. 🎉 Raffle)
  * are preserved; the organizer import pipeline can fold unknown chunks into Additional Notes.
- * Falls back to importer output, then a single section so nothing is dropped.
+ * Falls back to importer output, then a single section only when nothing else works.
  */
 export function parseOptionalDetailsToSections(optionalDetailsRaw) {
   const t = trim(optionalDetailsRaw)
   if (!t) return emptyParsed()
 
   const rawParsed = parseStructuredKbygFromRaw(t)
-  if (parsedHasContent(rawParsed)) return rawParsed
+  if (parsedHasContent(rawParsed) && !isOnlyLastResortNotes(rawParsed)) return rawParsed
 
   const { structuredKbygPlain } = processOrganizerImport(t)
   const fromStructured = parseStructuredKbygFromRaw(structuredKbygPlain || '')
-  if (parsedHasContent(fromStructured)) return fromStructured
+  if (parsedHasContent(fromStructured) && !isOnlyLastResortNotes(fromStructured)) return fromStructured
 
-  return wrapFullTextFallback(t)
+  const wrapped = wrapFullTextFallback(t)
+  return wrapped
+}
+
+function isOnlyLastResortNotes(p) {
+  return p.order.length === 1 && p.order[0] === '__lastResort:notes'
 }
 
 function ensureParsed(v) {
@@ -233,8 +437,30 @@ function inferOrderFromLegacySections(sections) {
   return order
 }
 
+function canonicalIdForMeta(meta) {
+  if (!meta || !meta.title) return null
+  const id = matchCanonicalTitle(meta.title)
+  return id
+}
+
+function findExistingKeyByTitle(normalized, out) {
+  for (const def of KBYG_SECTION_DEFS) {
+    if (normalizeTitleKey(def.title) === normalized) return def.id
+  }
+  for (const key of out.order) {
+    const m = out.dynMeta[key]
+    if (m && normalizeTitleKey(m.title) === normalized) return key
+  }
+  for (const key of Object.keys(out.dynMeta)) {
+    const m = out.dynMeta[key]
+    if (m && normalizeTitleKey(m.title) === normalized) return key
+  }
+  return null
+}
+
 /**
  * Merge parsed KBYG: all section keys (known + dynamic). Newer non-empty updates replace by default.
+ * Maps duplicate titles / synonyms onto a single section key when possible.
  * @param {ParsedKbyg | Record<string, string>} existingInput
  * @param {ParsedKbyg | Record<string, string>} updatesInput
  */
@@ -251,11 +477,27 @@ export function mergeKbygSections(existingInput, updatesInput, preferNewer = tru
 
   const seen = new Set(out.order)
 
-  const applyKey = (key, uRaw) => {
+  const resolveTargetKey = (key, meta) => {
+    const canon = canonicalIdForMeta(meta)
+    if (canon && KNOWN_ID_SET.has(canon)) return canon
+    const titleNorm = meta && meta.title ? normalizeTitleKey(meta.title) : ''
+    if (titleNorm) {
+      const hit = findExistingKeyByTitle(titleNorm, out)
+      if (hit) return hit
+    }
+    if (EMOJI_TO_ID[meta?.emoji]) return EMOJI_TO_ID[meta.emoji]
+    return key
+  }
+
+  const applyKey = (rawKey, uRaw, meta) => {
     const u = trim(uRaw)
     if (!u) return
+    const key = resolveTargetKey(rawKey, meta)
     const e = trim(out.sections[key] || '')
     out.sections[key] = !preferNewer && e ? `${e}\n\n${u}` : u
+    if (meta && !out.dynMeta[key] && !KNOWN_ID_SET.has(key)) {
+      out.dynMeta[key] = meta
+    }
     if (!seen.has(key)) {
       seen.add(key)
       out.order.push(key)
@@ -264,83 +506,99 @@ export function mergeKbygSections(existingInput, updatesInput, preferNewer = tru
 
   for (const key of b.order) {
     const u = b.sections[key]
-    if (trim(u || '')) applyKey(key, u)
+    const meta = b.dynMeta[key]
+    if (trim(u || '')) applyKey(key, u, meta)
   }
 
   for (const key of Object.keys(b.sections)) {
     if (b.order.includes(key)) continue
     const u = b.sections[key]
-    if (trim(u || '')) applyKey(key, u)
+    const meta = b.dynMeta[key]
+    if (trim(u || '')) applyKey(key, u, meta)
   }
 
   return out
 }
 
-function bulletsToLines(body) {
-  const lines = body.split('\n').map((l) => trim(l)).filter(Boolean)
-  return lines.map((l) => {
-    const stripped = l.replace(/^[\s•\-–—*]+\s*/, '')
-    return `• ${stripped}`
-  })
+/** Preserve line breaks and existing bullets / numbering; light trim per line only. */
+function formatBodyLines(body) {
+  return trim(body)
+    .split('\n')
+    .map((l) => trim(l))
+    .join('\n')
 }
 
 function formatSectionSlack(def, body) {
-  const lines = bulletsToLines(body)
-  return [`${def.emoji} *${def.title}*`, ...lines].join('\n')
+  const formatted = formatBodyLines(body)
+  const lines = formatted.split('\n').filter((l) => trim(l))
+  const rendered = lines.map((l) => {
+    const t = trim(l)
+    if (!t) return ''
+    if (/^[•\-–—*]\s/.test(t) || /^\d+\.\s/.test(t)) return t
+    const stripped = t.replace(/^[\s•\-–—*]+\s*/, '')
+    return `• ${stripped}`
+  }).filter(Boolean)
+  return [`${def.emoji} *${def.title}*`, ...rendered].join('\n')
 }
 
 function formatSectionEmail(def, body) {
-  const lines = bulletsToLines(body)
-  return [`${def.emoji} ${def.title}`, '', ...lines].join('\n')
+  const formatted = formatBodyLines(body)
+  return [`${def.emoji} ${def.title}`, '', formatted].join('\n')
 }
 
 function formatSectionDoc(def, body) {
-  const lines = bulletsToLines(body)
-  return [`${def.title}`, '', ...lines].join('\n')
+  const formatted = formatBodyLines(body)
+  return [`${def.title}`, '', formatted].join('\n')
 }
 
 function formatDynamicSection(mode, body, meta) {
-  const emoji = meta.emoji || '📎'
+  const emoji = meta.emoji || '📌'
   const title = meta.title || 'Section'
-  const lines = bulletsToLines(body)
-  if (mode === 'slack') return [`${emoji} *${title}*`, ...lines].join('\n')
-  if (mode === 'email') return [`${emoji} ${title}`, '', ...lines].join('\n')
-  return [`${title}`, '', ...lines].join('\n')
+  const formatted = formatBodyLines(body)
+  if (mode === 'slack') {
+    const lines = formatted.split('\n').filter((l) => trim(l))
+    const rendered = lines.map((l) => {
+      const t = trim(l)
+      if (!t) return ''
+      if (/^[•\-–—*]\s/.test(t) || /^\d+\.\s/.test(t)) return t
+      const stripped = t.replace(/^[\s•\-–—*]+\s*/, '')
+      return `• ${stripped}`
+    }).filter(Boolean)
+    return [`${emoji} *${title}*`, ...rendered].join('\n')
+  }
+  if (mode === 'email') return [`${emoji} ${title}`, '', formatted].join('\n')
+  return [`${title}`, '', formatted].join('\n')
 }
 
-/** Render merged sections: canonical known order first, then dynamic sections in encounter order. */
+const DEF_BY_ID = Object.fromEntries(KBYG_SECTION_DEFS.map((d) => [d.id, d]))
+
+/** Render merged sections in encounter order (preserves pasted / merged structure). */
 function renderByMode(parsed, mode, eventName) {
   const { sections, order, dynMeta } = parsed
   const blocks = []
-  const knownIds = KNOWN_ID_SET
   const used = new Set()
 
-  for (const def of KBYG_SECTION_DEFS) {
-    const body = trim(sections[def.id] || '')
-    if (!body) continue
-    if (mode === 'slack') blocks.push(formatSectionSlack(def, body))
-    else if (mode === 'email') blocks.push(formatSectionEmail(def, body))
-    else blocks.push(formatSectionDoc(def, body))
-    used.add(def.id)
+  const pushKey = (key) => {
+    const body = trim(sections[key] || '')
+    if (!body || used.has(key)) return
+    used.add(key)
+    if (KNOWN_ID_SET.has(key)) {
+      const def = DEF_BY_ID[key]
+      if (mode === 'slack') blocks.push(formatSectionSlack(def, body))
+      else if (mode === 'email') blocks.push(formatSectionEmail(def, body))
+      else blocks.push(formatSectionDoc(def, body))
+      return
+    }
+    const meta = dynMeta[key] || { emoji: '📌', title: 'Section' }
+    blocks.push(formatDynamicSection(mode, body, meta))
   }
 
-  const seenDyn = new Set()
   for (const key of order) {
-    if (knownIds.has(key)) continue
-    const body = trim(sections[key] || '')
-    if (!body || seenDyn.has(key)) continue
-    seenDyn.add(key)
-    const meta = dynMeta[key] || { emoji: '📎', title: 'Section' }
-    blocks.push(formatDynamicSection(mode, body, meta))
-    used.add(key)
+    pushKey(key)
   }
 
   for (const key of Object.keys(sections)) {
-    if (used.has(key)) continue
-    const body = trim(sections[key] || '')
-    if (!body) continue
-    const meta = dynMeta[key] || { emoji: '📎', title: 'Section' }
-    blocks.push(formatDynamicSection(mode, body, meta))
+    pushKey(key)
   }
 
   if (blocks.length === 0) {
@@ -370,6 +628,13 @@ function isEffectivelyEmptyOutput(output, mode) {
   return !trim(stripEmailIntro(output, mode))
 }
 
+function shouldUseRawWrapFallback(parsed, raw) {
+  if (!trim(raw)) return false
+  if (!parsedHasContent(parsed)) return true
+  if (parsed.order.length === 1 && parsed.order[0] === '__lastResort:notes') return true
+  return false
+}
+
 /**
  * Full enhance pipeline.
  * @param {{ existingStructuredKbyg: string, optionalNewDetails?: string, mode: 'slack'|'email'|'doc', eventName?: string }} input
@@ -382,7 +647,7 @@ export function enhanceKbygOutput(input) {
 
   const rawExisting = stripParsingDebugBlock(input.existingStructuredKbyg || '')
   let existingParsed = parseStructuredKbygFromRaw(rawExisting)
-  if (!parsedHasContent(existingParsed) && trim(rawExisting)) {
+  if (shouldUseRawWrapFallback(existingParsed, rawExisting)) {
     existingParsed = wrapFullTextFallback(rawExisting, 'Know Before You Go')
   }
 
@@ -407,4 +672,14 @@ export function enhanceKbygOutput(input) {
   }
 
   return { output: trim(output), mergedSections: mergedParsed.sections }
+}
+
+/**
+ * Parse structured KBYG plain text into sections, preserving order (known + unknown emoji sections).
+ * Unknown headers (e.g. 🎉 Raffle) become dynamic keys with metadata for rendering.
+ * @returns {ParsedKbyg}
+ */
+export function parseStructuredKbygToSections(text) {
+  const raw = stripParsingDebugBlock(text)
+  return parseStructuredKbygFromRaw(raw)
 }
