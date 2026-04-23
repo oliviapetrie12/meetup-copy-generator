@@ -839,6 +839,344 @@ export function parseOrganizerDetails(raw) {
 const ADDITIONAL_NOTES_TITLE = 'Additional Notes'
 const KEY_CONTACTS_TITLE = 'Key Contacts'
 
+const EMAIL_RE_ONE =
+  /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?(?:\.[a-zA-Z]{2,})+/
+
+/** Map organizer labels to Conference KBYG contact group keys (matches CONTACT_GROUP_OPTIONS). */
+function labelToContactGroup(label) {
+  const l = trim(label)
+    .toLowerCase()
+    .replace(/:\s*$/, '')
+    .trim()
+  if (!l) return ''
+  if (
+    /\b(onsite|on-site|floor|day-of|booth\s+lead|show\s+floor|exhibitor\s+desk)\b/.test(l) ||
+    /^onsite\b/.test(l)
+  ) {
+    return 'devrel_onsite'
+  }
+  if (/\b(remote|virtual|slack)\b/.test(l)) return 'devrel_remote'
+  if (
+    /\b(organizer|program|show\s+manager|exhibitor\s+services|event\s+staff|registration\s+desk)\b/.test(l) ||
+    /^organizer\b/.test(l)
+  ) {
+    return 'conference_organizer'
+  }
+  return ''
+}
+
+function normalizePhoneDigits(phone) {
+  const d = trim(phone).replace(/\D/g, '')
+  return d.length >= 7 ? d : ''
+}
+
+function extractEmailFromLine(line) {
+  const m = trim(line).match(EMAIL_RE_ONE)
+  return m ? m[0] : ''
+}
+
+function extractPhoneFromLine(line) {
+  const t = trim(line)
+  if (!t) return ''
+  const patterns = [
+    /\+\d{1,3}[\s.-]?\d[\d\s().-]{8,}\d/,
+    /\(?\d{3}\)?[\s.-]*\d{3}[\s.-]*\d{4}\b/,
+    /\b\d{3}[\s.-]\d{3}[\s.-]\d{4}\b/,
+    /\b\d{10,11}\b/,
+  ]
+  for (const re of patterns) {
+    const m = t.match(re)
+    if (m) return trim(m[0])
+  }
+  return ''
+}
+
+function looksLikePersonName(line) {
+  const t = trim(line)
+  if (t.length < 2) return false
+  if (extractEmailFromLine(t) === t.replace(/\s/g, '')) return false
+  if (/^[\w.-]+@[\w.-]+\.\w+$/.test(t)) return false
+  const digitsOnly = t.replace(/\D/g, '')
+  if (digitsOnly.length >= 10 && /^[\d\s().+–—-]+$/.test(t)) return false
+  if (/^.{0,6}:\s*$/.test(t)) return false
+  const words = t.split(/\s+/).filter(Boolean)
+  if (words.length >= 2) {
+    const ok = (w) =>
+      /^[A-Z][a-z]{0,35}$/.test(w) ||
+      /^[A-Z]\.$/.test(w) ||
+      /^[A-Z][a-z]+-[A-Z][a-z]+$/.test(w)
+    if (words.every(ok)) return true
+  }
+  if (words.length === 2 && /^[A-Z]/.test(words[0]) && /^[A-Z]/.test(words[1])) return true
+  return false
+}
+
+function isContactSectionHeading(line) {
+  const t = trim(line).replace(/^[\s•\-–—*]+\s*/, '').replace(/^#{1,3}\s+/, '')
+  return /^(key\s+)?contacts?\s*:?\s*$/i.test(t)
+}
+
+/**
+ * Split a paragraph into line groups that each end with an email line (multi-contact blocks).
+ * @param {string[]} lines non-empty trimmed lines
+ * @returns {string[][]}
+ */
+function splitParagraphIntoContactLineGroups(lines) {
+  const blocks = []
+  let buf = []
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    buf.push(line)
+    if (extractEmailFromLine(line)) {
+      while (
+        i + 1 < lines.length &&
+        !extractEmailFromLine(lines[i + 1]) &&
+        extractPhoneFromLine(lines[i + 1]) &&
+        !looksLikePersonName(lines[i + 1])
+      ) {
+        i += 1
+        buf.push(lines[i])
+      }
+      blocks.push(buf)
+      buf = []
+    }
+  }
+  if (buf.length) blocks.push(buf)
+  return blocks.length ? blocks : [lines]
+}
+
+/**
+ * @typedef {{ name: string, email: string, phone: string, role: string, group: string }} ParsedOrganizerContact
+ */
+
+/**
+ * Parse lines from one contact block into structured fields.
+ * @param {string[]} rawLines
+ * @returns {ParsedOrganizerContact | null}
+ */
+function parseContactLines(rawLines) {
+  const lines = rawLines.map((l) => trim(l.replace(/^[\s•\-–—*]+\s*/, ''))).filter((l) => l !== '')
+  while (lines.length && isContactSectionHeading(lines[0])) lines.shift()
+  if (!lines.length) return null
+
+  let group = ''
+  let role = ''
+  let name = ''
+  let email = ''
+  let phone = ''
+
+  const first = lines[0]
+  const colonIdx = first.indexOf(':')
+  if (colonIdx > 1 && colonIdx < 52) {
+    const beforeColon = trim(first.slice(0, colonIdx))
+    const afterColon = trim(first.slice(colonIdx + 1))
+    if (/^[\w\s/&,'-]{2,55}$/.test(beforeColon) && !extractEmailFromLine(beforeColon)) {
+      const g = labelToContactGroup(beforeColon)
+      if (g) group = g
+      else role = beforeColon
+      lines.shift()
+      if (afterColon) lines.unshift(afterColon)
+    }
+  }
+
+  for (let idx = 0; idx < lines.length; idx++) {
+    const line = lines[idx]
+    const em = extractEmailFromLine(line)
+    const ph = extractPhoneFromLine(line)
+    if (em && !email) email = em
+    if (ph && !phone) phone = ph
+
+    if (em) {
+      let sans = trim(line.replace(em, ''))
+      const phIn = extractPhoneFromLine(sans)
+      if (phIn) sans = trim(sans.replace(phIn, ''))
+      if (sans && looksLikePersonName(sans) && !name) name = sans
+      continue
+    }
+
+    if (ph && !extractEmailFromLine(line)) {
+      const sans = trim(line.replace(ph, ''))
+      if (sans && looksLikePersonName(sans) && !name) name = sans
+      continue
+    }
+
+    if (looksLikePersonName(line) && !name) name = line
+  }
+
+  if (!name) {
+    for (const line of lines) {
+      let r = trim(line)
+      const em = extractEmailFromLine(r)
+      const ph = extractPhoneFromLine(r)
+      if (em) r = trim(r.replace(em, ''))
+      if (ph) r = trim(r.replace(ph, ''))
+      if (r && looksLikePersonName(r)) {
+        name = r
+        break
+      }
+    }
+  }
+
+  return {
+    name: trim(name),
+    email: trim(email),
+    phone: trim(phone),
+    role: trim(role),
+    group: trim(group),
+  }
+}
+
+function isMeaningfulParsedContact(c) {
+  const n = trim(c.name)
+  const e = trim(c.email)
+  const p = trim(c.phone)
+  if (n) return true
+  if (e && p) return true
+  return false
+}
+
+/**
+ * Extract structured contacts from pasted Key Contacts / organizer text.
+ * @param {string} text
+ * @returns {ParsedOrganizerContact[]}
+ */
+export function parseContactsFromKeyContactsText(text) {
+  const raw = trim(String(text).replace(/\r\n/g, '\n'))
+  if (!raw) return []
+
+  const paragraphs = raw.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean)
+  /** @type {ParsedOrganizerContact[]} */
+  const out = []
+
+  for (const para of paragraphs) {
+    let lines = para.split('\n').map((l) => trim(l)).filter(Boolean)
+    if (!lines.length) continue
+
+    const groups = splitParagraphIntoContactLineGroups(lines)
+    for (const g of groups) {
+      const c = parseContactLines(g)
+      if (c && isMeaningfulParsedContact(c)) out.push(c)
+    }
+  }
+
+  const deduped = []
+  for (const c of out) {
+    if (!deduped.some((x) => parsedContactsLookDuplicate(x, c))) deduped.push(c)
+  }
+  return deduped
+}
+
+function parsedContactsLookDuplicate(a, b) {
+  const ae = trim(a.email).toLowerCase()
+  const be = trim(b.email).toLowerCase()
+  if (ae && be && ae === be) return true
+  const an = trim(a.name).toLowerCase()
+  const bn = trim(b.name).toLowerCase()
+  if (!an || !bn || an !== bn) return false
+  const ap = normalizePhoneDigits(a.phone)
+  const bp = normalizePhoneDigits(b.phone)
+  if (ap && bp && ap === bp) return true
+  if (!ap && !bp) return true
+  return false
+}
+
+function contactsAreDuplicateFormRow(a, b) {
+  const ae = trim(a.email).toLowerCase()
+  const be = trim(b.email).toLowerCase()
+  if (ae && be && ae === be) return true
+
+  const an = trim(a.name).toLowerCase()
+  const bn = trim(b.name).toLowerCase()
+  if (!an || !bn || an !== bn) return false
+
+  const ap = normalizePhoneDigits(a.phone)
+  const bp = normalizePhoneDigits(b.phone)
+  if (ap && bp && ap === bp) return true
+  if (ae || be) return false
+  if (!ap && !bp) return true
+  return false
+}
+
+const EMPTY_CONTACT_ROW = { name: '', role: '', email: '', phone: '', group: '' }
+
+function contactRowIsBlank(c) {
+  return (
+    !trim(c.name) &&
+    !trim(c.email) &&
+    !trim(c.phone) &&
+    !trim(c.role) &&
+    !trim(c.group || '')
+  )
+}
+
+/**
+ * Merge parsed contacts into `form.contacts`; fills blank rows first, appends new rows.
+ * Skips duplicates vs existing rows.
+ */
+function mergeParsedContactsIntoForm(prev, incoming) {
+  let contacts = [...(prev.contacts || [])]
+  if (!contacts.length) contacts = [{ ...EMPTY_CONTACT_ROW }]
+
+  for (const inc of incoming) {
+    const merged = {
+      name: trim(inc.name),
+      role: trim(inc.role),
+      email: trim(inc.email),
+      phone: trim(inc.phone),
+      group: trim(inc.group || ''),
+    }
+    if (contacts.some((c) => contactsAreDuplicateFormRow(c, merged))) continue
+
+    const emptyIdx = contacts.findIndex(contactRowIsBlank)
+    if (emptyIdx >= 0) {
+      contacts[emptyIdx] = { ...contacts[emptyIdx], ...merged }
+    } else {
+      contacts.push({ ...EMPTY_CONTACT_ROW, ...merged })
+    }
+  }
+
+  return { ...prev, contacts }
+}
+
+function paragraphLooksLikeContactSnippet(p) {
+  const t = trim(p)
+  if (t.length > 900) return false
+  if (!EMAIL_RE_ONE.test(t) && !extractPhoneFromLine(t)) return false
+  const lineCount = t.split('\n').map((l) => trim(l)).filter(Boolean).length
+  if (lineCount > 16) return false
+  if (
+    /\b(however|therefore|please note that|due to|registration opens|badge pickup|travel and|we recommend|parking is|wi-?fi is)\b/i.test(
+      t,
+    )
+  ) {
+    return false
+  }
+  return true
+}
+
+/**
+ * Pull structured contacts out of Additional Notes paragraphs so they populate Contacts instead.
+ */
+function partitionNotesAndExtractContacts(notesText) {
+  const raw = trim(String(notesText).replace(/\r\n/g, '\n'))
+  if (!raw) return { contacts: [], remainder: '' }
+  const paras = raw.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean)
+  /** @type {ParsedOrganizerContact[]} */
+  const contacts = []
+  const rest = []
+  for (const p of paras) {
+    const fromP = parseContactsFromKeyContactsText(p)
+    if (fromP.length > 0 && paragraphLooksLikeContactSnippet(p)) {
+      for (const c of fromP) {
+        if (!contacts.some((x) => parsedContactsLookDuplicate(x, c))) contacts.push(c)
+      }
+    } else {
+      rest.push(p)
+    }
+  }
+  return { contacts, remainder: rest.join('\n\n').trim() }
+}
+
 function mergeIntoNamedSection(prev, title, content) {
   const incoming = trim(String(content))
   if (!incoming) return prev
@@ -871,13 +1209,26 @@ export function mergeOrganizerParsedIntoForm(prev, parsed) {
     next[key] = String(val).trim()
   }
 
-  if (parsed.keyContactsSection != null && trim(String(parsed.keyContactsSection)) !== '') {
-    next = mergeIntoNamedSection(next, KEY_CONTACTS_TITLE, parsed.keyContactsSection)
+  const kcRaw = parsed.keyContactsSection != null ? trim(String(parsed.keyContactsSection)) : ''
+  if (kcRaw) {
+    const parsedContacts = parseContactsFromKeyContactsText(kcRaw)
+    if (parsedContacts.length > 0) {
+      next = mergeParsedContactsIntoForm(next, parsedContacts)
+    } else {
+      next = mergeIntoNamedSection(next, KEY_CONTACTS_TITLE, kcRaw)
+    }
   }
 
   const notes = parsed.additionalOrganizerNotes
   if (notes != null && trim(String(notes)) !== '') {
-    next = mergeIntoNamedSection(next, ADDITIONAL_NOTES_TITLE, notes)
+    const notesRaw = trim(String(notes))
+    const { contacts: notesContacts, remainder } = partitionNotesAndExtractContacts(notesRaw)
+    if (notesContacts.length > 0) {
+      next = mergeParsedContactsIntoForm(next, notesContacts)
+    }
+    if (remainder) {
+      next = mergeIntoNamedSection(next, ADDITIONAL_NOTES_TITLE, remainder)
+    }
   }
 
   return next
