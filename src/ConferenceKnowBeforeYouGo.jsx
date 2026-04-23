@@ -36,7 +36,7 @@ function conferenceHtmlToGoogleDocPlain(htmlString) {
 
 /** Appended to every generated output (no form field). */
 const STANDARD_TRAVEL_EXPENSES_TEXT =
-  'Travel & expenses: follow your regional policy for submitting receipts and expense reports. Code charges to the project indicated by your manager. For policy questions, contact your People or Finance partner.'
+  "Be sure to keep your receipts throughout the event so you can expense via Concur. Feel free to refer to Elastic's travel and expense policy for additional guidance."
 
 const INITIAL_CONTACT = { name: '', role: '', email: '', phone: '', group: '' }
 
