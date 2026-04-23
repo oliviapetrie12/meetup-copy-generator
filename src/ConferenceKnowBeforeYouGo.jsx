@@ -1138,17 +1138,17 @@ export default function ConferenceKnowBeforeYouGo() {
             ) : null}
           </fieldset>
 
-          <fieldset className="form-fieldset">
-            <legend>Enhance KBYG (Slack / Email / Doc)</legend>
-            <p className="form-hint">
-              Start from structured KBYG text (parsed above or pasted). Optionally paste raw organizer updates — newer non-empty sections replace the matching section. Event name from the form is used for the email intro.
+          <fieldset className="form-fieldset form-fieldset-kbyg-enhance">
+            <legend>Update or Format Existing KBYG</legend>
+            <p className="form-hint form-hint-kbyg-enhance-lead">
+              Use this when you already have a Know Before You Go and want to update it with new details or format it for sharing.
             </p>
             <label>
-              Existing structured KBYG
+              Your current KBYG
               <textarea
                 value={kbygEnhanceExisting}
                 onChange={(e) => setKbygEnhanceExisting(e.target.value)}
-                placeholder="Paste structured KBYG with emoji section headers, or load from parsed output…"
+                placeholder="Paste your current Know Before You Go here (or load from parsed output)"
                 rows={8}
                 autoComplete="off"
               />
@@ -1159,15 +1159,18 @@ export default function ConferenceKnowBeforeYouGo() {
               </button>
             ) : null}
             <label>
-              Optional new or updated details (raw paste)
+              Paste updates (optional)
               <textarea
                 value={kbygEnhanceUpdates}
                 onChange={(e) => setKbygEnhanceUpdates(e.target.value)}
-                placeholder="Optional: paste new organizer notes — merged by section; newer content wins when both exist"
+                placeholder="Paste new details from Slack, email, or organizer updates. These will automatically replace or merge into your KBYG."
                 rows={5}
                 autoComplete="off"
               />
             </label>
+            <span className="form-hint form-hint-kbyg-enhance-sub">
+              Only include new or changed information. Newer details will overwrite older ones.
+            </span>
             <label>
               Output mode
               <select value={kbygEnhanceMode} onChange={(e) => setKbygEnhanceMode(e.target.value)}>
@@ -1178,7 +1181,7 @@ export default function ConferenceKnowBeforeYouGo() {
             </label>
             <div className="quick-draft-stack">
               <button type="button" className="btn-quick-draft" onClick={handleEnhanceKbyg}>
-                Generate enhanced output
+                Update & format KBYG
               </button>
             </div>
             {kbygEnhanceOutput ? (

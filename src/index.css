@@ -418,6 +418,21 @@ body {
   margin-top: 0.25rem;
 }
 
+/* Update / format KBYG: lead description + subtle merge hint */
+.form-fieldset-kbyg-enhance .form-hint-kbyg-enhance-lead {
+  margin-top: 0;
+  margin-bottom: 0.15rem;
+  line-height: 1.45;
+  max-width: 42rem;
+  color: #4b5563;
+}
+
+.form-fieldset-kbyg-enhance .form-hint-kbyg-enhance-sub {
+  margin-top: -0.25rem;
+  font-size: 0.78rem;
+  color: #8b9099;
+}
+
 .form input,
 .form textarea,
 .form select {
