@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { makeMoreConcise } from './outputHelpers.js'
+import { makeMoreConcise, prepareConferenceEmailClipboardHtml } from './outputHelpers.js'
 import { mergeOrganizerParsedIntoForm, processOrganizerImport } from './conferenceOrganizerImport.js'
 import { enhanceKbygOutput } from './kbygEnhanceOutput.js'
 
@@ -939,11 +939,27 @@ export default function ConferenceKnowBeforeYouGo() {
     }
   }
 
-  /** Full email body HTML (<br>, inline styles) for clients that accept pasted HTML. */
+  /** Rich HTML + plain text for Gmail / clients (not raw HTML string paste). */
   const copyForEmail = async () => {
     if (!html) return
+    const plainBody = trim(plain) || generateConferenceEmailPlain(form).trim()
     try {
-      await navigator.clipboard.writeText(html)
+      const { html: clipHtml } = prepareConferenceEmailClipboardHtml(html)
+      const payloadHtml = clipHtml || html
+      if (typeof ClipboardItem !== 'undefined') {
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({
+              'text/html': new Blob([payloadHtml], { type: 'text/html' }),
+              'text/plain': new Blob([plainBody], { type: 'text/plain' }),
+            }),
+          ])
+        } catch {
+          await navigator.clipboard.writeText(plainBody)
+        }
+      } else {
+        await navigator.clipboard.writeText(plainBody)
+      }
       setEmailCopied(true)
       setTimeout(() => setEmailCopied(false), 2000)
     } catch (err) {
