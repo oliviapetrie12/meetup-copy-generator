@@ -783,9 +783,7 @@ export default function ConferenceKnowBeforeYouGo() {
   const [googleDocCopied, setGoogleDocCopied] = useState(false)
   const [subjectCopied, setSubjectCopied] = useState(false)
   const [organizerImportText, setOrganizerImportText] = useState('')
-  const [organizerImportDebug, setOrganizerImportDebug] = useState(false)
   const [structuredKbygPreview, setStructuredKbygPreview] = useState('')
-  const [parsingDebugPreview, setParsingDebugPreview] = useState('')
   const [structuredKbygCopied, setStructuredKbygCopied] = useState(false)
   const [kbygEnhanceExisting, setKbygEnhanceExisting] = useState('')
   const [kbygEnhanceUpdates, setKbygEnhanceUpdates] = useState('')
@@ -885,8 +883,6 @@ export default function ConferenceKnowBeforeYouGo() {
     setHtml('')
     setOrganizerImportText('')
     setStructuredKbygPreview('')
-    setParsingDebugPreview('')
-    setOrganizerImportDebug(false)
     setKbygEnhanceExisting('')
     setKbygEnhanceUpdates('')
     setKbygEnhanceMode('email')
@@ -894,22 +890,16 @@ export default function ConferenceKnowBeforeYouGo() {
   }
 
   const handleParseOrganizerDetails = () => {
-    const result = processOrganizerImport(organizerImportText, { debug: organizerImportDebug })
-    const { structuredKbygPlain, parsingDebugPlain, ...formPatch } = result
+    const result = processOrganizerImport(organizerImportText)
+    const { structuredKbygPlain, ...formPatch } = result
     setForm((prev) => mergeOrganizerParsedIntoForm(prev, formPatch))
     setStructuredKbygPreview(structuredKbygPlain || '')
-    setParsingDebugPreview(parsingDebugPlain || '')
   }
 
-  const structuredKbygDisplayText =
-    organizerImportDebug && parsingDebugPreview
-      ? `${structuredKbygPreview}\n\n${parsingDebugPreview}`
-      : structuredKbygPreview
-
   const copyStructuredKbyg = async () => {
-    if (!structuredKbygDisplayText.trim()) return
+    if (!structuredKbygPreview.trim()) return
     try {
-      await navigator.clipboard.writeText(structuredKbygDisplayText.trim())
+      await navigator.clipboard.writeText(structuredKbygPreview.trim())
       setStructuredKbygCopied(true)
       setTimeout(() => setStructuredKbygCopied(false), 2000)
     } catch (err) {
@@ -1019,7 +1009,7 @@ export default function ConferenceKnowBeforeYouGo() {
           <fieldset className="form-fieldset">
             <legend>Import organizer details</legend>
             <p className="form-hint">
-              Optional. Paste organizer or sponsor text to pre-fill empty fields, and get a structured Know Before You Go (emoji sections, bullets) to copy. Enable debug to append per-chunk classification details. Ambiguous or weak-margin chunks and validation mismatches go to Additional Notes (⚠️ when flagged).
+              Optional. Paste organizer or sponsor text to pre-fill empty fields, and get a structured Know Before You Go (emoji sections, bullets) to copy. Ambiguous or weak-margin chunks and validation mismatches go to Additional Notes (⚠️ when flagged).
             </p>
             <label>
               Organizer / exhibitor text
@@ -1030,14 +1020,6 @@ export default function ConferenceKnowBeforeYouGo() {
                 rows={10}
                 autoComplete="off"
               />
-            </label>
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={organizerImportDebug}
-                onChange={(e) => setOrganizerImportDebug(e.target.checked)}
-              />
-              Parsing debug (append &quot;Parsing Debug Info&quot; to structured output)
             </label>
             <div className="quick-draft-stack">
               <button type="button" className="btn-quick-draft" onClick={handleParseOrganizerDetails}>
@@ -1053,7 +1035,7 @@ export default function ConferenceKnowBeforeYouGo() {
                   Structured Know Before You Go
                   <textarea
                     readOnly
-                    value={structuredKbygDisplayText}
+                    value={structuredKbygPreview}
                     rows={16}
                     className="structured-kbyg-textarea"
                     aria-label="Structured Know Before You Go"

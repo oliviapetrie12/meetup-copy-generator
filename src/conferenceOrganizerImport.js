@@ -659,22 +659,6 @@ export function buildStructuredKbygPlain(rows) {
   return parts.join('\n\n').trim()
 }
 
-/** STEP 12 */
-export function buildParsingDebugPlain(rows) {
-  const lines = ['Parsing Debug Info', '']
-  rows.forEach((r, i) => {
-    const oneLine = r.chunk.replace(/\n/g, ' ↵ ')
-    lines.push(`--- Chunk ${i + 1} ---`)
-    lines.push(`Original: ${oneLine}`)
-    lines.push(
-      `Assigned section: ${r.category}${r.originalCategory ? ` (validation moved from ${r.originalCategory})` : ''}`,
-    )
-    lines.push(`Reason: ${r.reason}`)
-    lines.push('')
-  })
-  return lines.join('\n').trim()
-}
-
 function runPipelineClassifiedRows(raw) {
   const pass1 = splitIntoLogicalChunks(raw)
   const pass2 = splitMultiConceptChunks(pass1)
@@ -696,20 +680,15 @@ function runPipelineClassifiedRows(raw) {
 }
 
 /**
- * Form patch + structured KBYG + optional debug (STEP 11–12).
- * @param {{ debug?: boolean }} [options]
+ * Form patch + structured KBYG (STEP 11).
  */
-export function processOrganizerImport(raw, options = {}) {
+export function processOrganizerImport(raw) {
   const rows = runPipelineClassifiedRows(raw)
   const simple = rows.map((r) => ({ chunk: r.chunk, category: r.category }))
   const deduped = buildFormBucketsFromClassified(simple)
   const formPatch = bucketsToFormPatch(deduped)
   const structuredKbygPlain = buildStructuredKbygPlain(rows)
-  const out = { ...formPatch, structuredKbygPlain }
-  if (options.debug) {
-    out.parsingDebugPlain = buildParsingDebugPlain(rows)
-  }
-  return out
+  return { ...formPatch, structuredKbygPlain }
 }
 
 /**
@@ -717,7 +696,7 @@ export function processOrganizerImport(raw, options = {}) {
  */
 export function parseOrganizerDetails(raw) {
   const r = processOrganizerImport(raw)
-  const { structuredKbygPlain: _sk, parsingDebugPlain: _pd, ...formPatch } = r
+  const { structuredKbygPlain: _sk, ...formPatch } = r
   return formPatch
 }
 
@@ -746,8 +725,7 @@ export function mergeOrganizerParsedIntoForm(prev, parsed) {
     if (
       key === 'additionalOrganizerNotes' ||
       key === 'keyContactsSection' ||
-      key === 'structuredKbygPlain' ||
-      key === 'parsingDebugPlain'
+      key === 'structuredKbygPlain'
     ) {
       continue
     }

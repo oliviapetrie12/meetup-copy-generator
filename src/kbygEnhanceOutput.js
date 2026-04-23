@@ -103,7 +103,7 @@ export function mergeKbygSections(existing, updates, preferNewer = true) {
 export function parseOptionalDetailsToSections(optionalDetailsRaw) {
   const t = trim(optionalDetailsRaw)
   if (!t) return {}
-  const { structuredKbygPlain } = processOrganizerImport(t, { debug: false })
+  const { structuredKbygPlain } = processOrganizerImport(t)
   return parseStructuredKbygToSections(structuredKbygPlain || '')
 }
 
