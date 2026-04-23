@@ -1,7 +1,7 @@
 /**
  * Conference / sponsor paste → Conference KBYG
  *
- * Pipeline: CHUNK → NORMALIZE → CLASSIFY (independent; heading / keyword / time) → validation (STEP 9) → DEDUPE → form patch + structured KBYG (+ optional debug).
+ * Pipeline: CHUNK → split mixed setup/teardown blocks → NORMALIZE → CLASSIFY (heading / keyword / time) → validation → DEDUPE → form patch + structured KBYG.
  * Chunks are never reclassified after the classify step.
  */
 
@@ -392,6 +392,141 @@ export function splitMultiConceptChunks(chunks) {
   return out
 }
 
+/** First line is a combined setup + teardown heading (strip optional markdown # and bullets). */
+const COMBINED_SETUP_TEARDOWN_HEADER =
+  /^(setup\s*&\s*teardown|setup\s+and\s+teardown|setup\s*\/\s*teardown|move[\s-]?in\s*\/\s*move[\s-]?out|move[\s-]?in\s*&\s*move[\s-]?out)\s*:?\s*$/i
+
+/** Strip list markers and bold/italic markers for heading / role detection only (output keeps original lines). */
+function stripForSetupTeardownRole(line) {
+  let s = trim(line).replace(/^#{1,3}\s+/, '').replace(/^[\s•\-–—*]+\s*/, '')
+  s = s.replace(/^\*{1,2}|_{1,2}/, '').replace(/\*{1,2}$|_{1,2}$/, '').trim()
+  return s
+}
+
+function chunkLikelyMixedSetupAndTeardown(chunk) {
+  const low = chunk.toLowerCase()
+  const firstRaw = firstNonEmptyLine(chunk)
+  const firstStripped = stripForSetupTeardownRole(firstRaw)
+  if (COMBINED_SETUP_TEARDOWN_HEADER.test(firstStripped)) return true
+
+  const hasSetup =
+    /\b(setup|set[\s-]?up|move[\s-]?in|installation)\b/i.test(low) ||
+    /\b(exhibitor|booth)\s+check[\s-]?in\b/i.test(low)
+  const hasTeardown =
+    /\b(teardown|move[\s-]?out|strike|dismantle|load[\s-]?out|pack[\s-]?out)\b/i.test(low)
+  return hasSetup && hasTeardown
+}
+
+/**
+ * Classify a single line as setup-oriented, teardown-oriented, combined heading, or unknown.
+ * @returns {'setup' | 'teardown' | 'header' | null}
+ */
+function lineSetupTeardownRole(line) {
+  const s = stripForSetupTeardownRole(line)
+  if (!s) return null
+  if (COMBINED_SETUP_TEARDOWN_HEADER.test(s)) return 'header'
+  // Teardown before setup so phrases like "teardown setup window" resolve to teardown when line starts accordingly
+  if (/^(teardown|move[\s-]?out|strike|dismantle|load[\s-]?out|pack[\s-]?out)\b/i.test(s)) return 'teardown'
+  if (/^(setup|move[\s-]?in|set[\s-]?up|installation)\b/i.test(s)) return 'setup'
+  return null
+}
+
+/**
+ * Split a chunk that mixes setup + teardown into separate texts for Booth Setup vs Booth Cleanup.
+ * Does not infer missing sides — only splits when labeled lines or a combined heading structure supports it.
+ * @returns {string[]} one or two formatted chunks
+ */
+export function splitCombinedSetupTeardownChunk(chunk) {
+  const cleaned = formatChunkCleanly(chunk)
+  if (!cleaned) return []
+
+  if (!chunkLikelyMixedSetupAndTeardown(cleaned)) return [cleaned]
+
+  const lines = cleaned.split('\n')
+  /** @type {string[]} */
+  const setupLines = []
+  /** @type {string[]} */
+  const teardownLines = []
+  /** @type {string[]} */
+  const orphanLead = []
+  /** @type {'setup' | 'teardown' | null} */
+  let current = null
+
+  const flushOrphansTo = (target) => {
+    if (!orphanLead.length) return
+    const joined = orphanLead.join('\n')
+    orphanLead.length = 0
+    const j = trim(joined)
+    if (!j) return
+    const dest = target === 'setup' ? setupLines : teardownLines
+    if (dest.length) dest.push('')
+    dest.push(joined.trimEnd())
+  }
+
+  for (const line of lines) {
+    const trimmed = trim(line)
+    if (!trimmed) {
+      if (current === 'setup') setupLines.push('')
+      else if (current === 'teardown') teardownLines.push('')
+      continue
+    }
+
+    const role = lineSetupTeardownRole(trimmed)
+
+    if (role === 'header') {
+      current = null
+      continue
+    }
+
+    if (role === 'setup') {
+      flushOrphansTo('setup')
+      current = 'setup'
+      setupLines.push(trimmed)
+      continue
+    }
+
+    if (role === 'teardown') {
+      flushOrphansTo('teardown')
+      current = 'teardown'
+      teardownLines.push(trimmed)
+      continue
+    }
+
+    if (current === 'setup') setupLines.push(trimmed)
+    else if (current === 'teardown') teardownLines.push(trimmed)
+    else orphanLead.push(trimmed)
+  }
+
+  if (orphanLead.length) {
+    if (current === 'setup') {
+      flushOrphansTo('setup')
+    } else if (current === 'teardown') {
+      flushOrphansTo('teardown')
+    } else if (teardownLines.length) {
+      flushOrphansTo('teardown')
+    } else if (setupLines.length) {
+      flushOrphansTo('setup')
+    }
+  }
+
+  const setupText = formatChunkCleanly(setupLines.join('\n'))
+  const teardownText = formatChunkCleanly(teardownLines.join('\n'))
+
+  if (setupText && teardownText) return [setupText, teardownText]
+  if (setupText) return [setupText]
+  if (teardownText) return [teardownText]
+  return [cleaned]
+}
+
+/** @param {string[]} chunks */
+export function splitCombinedSetupTeardownChunks(chunks) {
+  const out = []
+  for (const c of chunks) {
+    out.push(...splitCombinedSetupTeardownChunk(c))
+  }
+  return out
+}
+
 function normalizeForDedupe(s) {
   return s
     .toLowerCase()
@@ -662,9 +797,10 @@ export function buildStructuredKbygPlain(rows) {
 function runPipelineClassifiedRows(raw) {
   const pass1 = splitIntoLogicalChunks(raw)
   const pass2 = splitMultiConceptChunks(pass1)
+  const pass3 = splitCombinedSetupTeardownChunks(pass2)
   /** @type {ClassifiedRow[]} */
   const classified = []
-  for (const chunk of pass2) {
+  for (const chunk of pass3) {
     const clean = formatChunkCleanly(chunk)
     const meta = classifyChunkWithConfidence(clean)
     classified.push({
