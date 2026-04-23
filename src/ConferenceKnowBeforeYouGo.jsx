@@ -1053,7 +1053,7 @@ export default function ConferenceKnowBeforeYouGo() {
           <fieldset className="form-fieldset">
             <legend>Enhance KBYG (Slack / Email / Doc)</legend>
             <p className="form-hint">
-              Start from structured KBYG text (parsed above or pasted). Optionally paste raw organizer updates — newer non-empty sections replace the matching section. Event name from the form is used for the email intro. Missing logistics (booth hours, setup, teardown, parking, key contacts) are listed at the bottom without inventing details.
+              Start from structured KBYG text (parsed above or pasted). Optionally paste raw organizer updates — newer non-empty sections replace the matching section. Event name from the form is used for the email intro.
             </p>
             <label>
               Existing structured KBYG

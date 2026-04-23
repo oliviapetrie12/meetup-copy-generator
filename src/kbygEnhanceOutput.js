@@ -1,5 +1,5 @@
 /**
- * Enhance structured Know Before You Go: merge with optional updates, detect gaps, format for Slack / Email / Doc.
+ * Enhance structured Know Before You Go: merge with optional updates, format for Slack / Email / Doc.
  */
 
 import { processOrganizerImport } from './conferenceOrganizerImport.js'
@@ -23,17 +23,6 @@ export const KBYG_SECTION_DEFS = [
 ]
 
 const EMOJI_TO_ID = Object.fromEntries(KBYG_SECTION_DEFS.map((d) => [d.emoji, d.id]))
-
-/** Logistics checklist — must not invent content; only list absent sections. */
-const LOGISTICS_REQUIRED_IDS = ['boothHours', 'setupMoveIn', 'teardownMoveOut', 'parkingTransportation', 'keyContacts']
-
-const MISSING_LABELS = {
-  boothHours: 'Booth Hours',
-  setupMoveIn: 'Setup / Move-in time',
-  teardownMoveOut: 'Teardown / Move-out time',
-  parkingTransportation: 'Parking / Transportation details',
-  keyContacts: 'Key Contact(s)',
-}
 
 function stripParsingDebugBlock(text) {
   const t = trim(text)
@@ -107,29 +96,6 @@ export function parseOptionalDetailsToSections(optionalDetailsRaw) {
   return parseStructuredKbygToSections(structuredKbygPlain || '')
 }
 
-function sectionLooksEmptyOrUnclear(body) {
-  const b = trim(body)
-  if (!b) return true
-  if (b.length < 4) return true
-  if (/^(tbd|n\/a|tba|unknown|none)\.?$/i.test(b)) return true
-  return false
-}
-
-/**
- * STEP 2: List missing logistics fields (no fabrication).
- * @param {Record<string, string>} sections
- * @returns {string[]}
- */
-export function detectMissingLogistics(sections) {
-  const missing = []
-  for (const id of LOGISTICS_REQUIRED_IDS) {
-    if (sectionLooksEmptyOrUnclear(sections[id])) {
-      missing.push(MISSING_LABELS[id] || id)
-    }
-  }
-  return missing
-}
-
 function bulletsToLines(body) {
   const lines = body.split(/\n/).map((l) => trim(l)).filter(Boolean)
   return lines.map((l) => {
@@ -153,10 +119,8 @@ function formatSectionDoc(def, body) {
   return [`${def.title}`, '', ...lines].join('\n')
 }
 
-/**
- * STEP 3–4: Render merged sections in order; omit empty.
- */
-function renderByMode(sections, mode, eventName, missingItems) {
+/** Render merged sections in order; omit empty. */
+function renderByMode(sections, mode, eventName) {
   const blocks = []
   for (const def of KBYG_SECTION_DEFS) {
     const body = trim(sections[def.id] || '')
@@ -164,17 +128,6 @@ function renderByMode(sections, mode, eventName, missingItems) {
     if (mode === 'slack') blocks.push(formatSectionSlack(def, body))
     else if (mode === 'email') blocks.push(formatSectionEmail(def, body))
     else blocks.push(formatSectionDoc(def, body))
-  }
-
-  if (missingItems.length) {
-    const missLines = missingItems.map((m) => `• ${m}`)
-    if (mode === 'slack') {
-      blocks.push(['⚠️ *Missing or Unclear Information*', ...missLines].join('\n'))
-    } else if (mode === 'email') {
-      blocks.push(['⚠️ Missing or Unclear Information', '', ...missLines].join('\n'))
-    } else {
-      blocks.push(['Missing or Unclear Information', '', ...missLines].join('\n'))
-    }
   }
 
   const sep = mode === 'slack' ? '\n' : '\n\n'
@@ -191,13 +144,12 @@ function renderByMode(sections, mode, eventName, missingItems) {
 /**
  * Full enhance pipeline.
  * @param {{ existingStructuredKbyg: string, optionalNewDetails?: string, mode: 'slack'|'email'|'doc', eventName?: string }} input
- * @returns {{ output: string, mergedSections: Record<string, string>, missingItems: string[] }}
+ * @returns {{ output: string, mergedSections: Record<string, string> }}
  */
 export function enhanceKbygOutput(input) {
   const existing = parseStructuredKbygToSections(input.existingStructuredKbyg || '')
   const updates = parseOptionalDetailsToSections(input.optionalNewDetails || '')
   const merged = mergeKbygSections(existing, updates, true)
-  const missingItems = detectMissingLogistics(merged)
-  const output = renderByMode(merged, input.mode || 'email', input.eventName || '', missingItems)
-  return { output, mergedSections: merged, missingItems }
+  const output = renderByMode(merged, input.mode || 'email', input.eventName || '')
+  return { output, mergedSections: merged }
 }
