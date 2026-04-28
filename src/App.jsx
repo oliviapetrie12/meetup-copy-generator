@@ -15,11 +15,16 @@ import {
   getMeetupKbygStrings,
   getMeetupKbygTldrLabels,
   getMeetupKbygPhotoLines,
-  getEventPageFieldDefaults,
   getEventPageAgendaFallbackLines,
   getAgendaLineLabels,
   buildEventPageWhatToExpectQuickDraft,
 } from './generationLanguage.js'
+import {
+  getEventPageFieldDefaults,
+  getGeneratorUiTranslations,
+  getKbygSpeakerArrivalQuickFill,
+  getKbygAvQuickFill,
+} from './formTranslations.js'
 import {
   tryRemoteGenerate,
   applyRemoteEventPageResult,
@@ -499,19 +504,6 @@ function getInitialKbygTldrInclude() {
     custom_note: false,
   }
 }
-
-const KBYG_SPEAKER_ARRIVAL_QUICK_FILL = [
-  'Please arrive 30 minutes early.',
-  'Please arrive 15 minutes early.',
-  'Please arrive by 5:00 PM for setup and AV check.',
-]
-
-const KBYG_AV_QUICK_FILL = [
-  'A TV/screen will be available.',
-  'A TV/screen will be available. It is recommended to bring a backup HDMI adapter.',
-  'Please bring your laptop and any adapters you may need.',
-  'HDMI connection will be available.',
-]
 
 const KBYG_INITIAL_STATE = {
   recipients: '',
@@ -2030,14 +2022,13 @@ function buildQuickMeetupEventPageDraft(form, language = 'en') {
   const n = normalizeLanguage(language)
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const out = {}
-  const fieldDefaults = getEventPageFieldDefaults(n)
 
   if (meetupEventPageFieldIsEmpty(form.meetupPageWhyAttend)) {
     if (n === 'en') {
       const bullets = buildIntuitionWhyAttend(form, 0)
       out.meetupPageWhyAttend = bullets.map((b) => `- ${trim(b).replace(/^[-•]\s*/, '')}`).join('\n')
     } else {
-      out.meetupPageWhyAttend = fieldDefaults.meetupPageWhyAttend
+      out.meetupPageWhyAttend = ''
     }
   }
 
@@ -2055,7 +2046,7 @@ function buildQuickMeetupEventPageDraft(form, language = 'en') {
   }
 
   if (meetupEventPageFieldIsEmpty(form.meetupPageClosing)) {
-    out.meetupPageClosing = fieldDefaults.meetupPageClosing
+    out.meetupPageClosing = getGeneratorUiTranslations(n).quickClosing
   }
 
   return out
@@ -2310,6 +2301,8 @@ export default function App() {
   const [kbygTldrRotation, setKbygTldrRotation] = useState(0)
   const [eventPageLanguage, setEventPageLanguage] = useState('en')
   const [meetupKbygLanguage, setMeetupKbygLanguage] = useState('en')
+  const tEvent = useMemo(() => getGeneratorUiTranslations(eventPageLanguage), [eventPageLanguage])
+  const tKbyg = useMemo(() => getGeneratorUiTranslations(meetupKbygLanguage), [meetupKbygLanguage])
   const [translateMessage, setTranslateMessage] = useState(null)
   const [kbygSectionCopiedId, setKbygSectionCopiedId] = useState(null)
   const [comboboxOpen, setComboboxOpen] = useState(false)
@@ -2335,6 +2328,17 @@ export default function App() {
     if (!comboboxOpen) return
     setComboboxHighlight(0)
   }, [form.chapterOrCity, comboboxOpen])
+
+  useEffect(() => {
+    const d = getEventPageFieldDefaults(eventPageLanguage)
+    setForm((prev) => {
+      const next = { ...prev }
+      if (!String(prev.meetupPageWhyAttend || '').trim()) next.meetupPageWhyAttend = d.meetupPageWhyAttend
+      if (!String(prev.meetupPageWhatToExpect || '').trim()) next.meetupPageWhatToExpect = d.meetupPageWhatToExpect
+      if (!String(prev.meetupPageClosing || '').trim()) next.meetupPageClosing = d.meetupPageClosing
+      return next
+    })
+  }, [eventPageLanguage])
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -3183,54 +3187,54 @@ export default function App() {
             )}
 
             <label>
-              Host or sponsor
+              {tEvent.hostOrSponsor}
               <input
                 type="text"
                 value={form.hostOrSponsor}
                 onChange={update('hostOrSponsor')}
-                placeholder="e.g. Sponsored by Acme"
+                placeholder={tEvent.phHostOrSponsor}
               />
             </label>
             <label>
-              RSVP instructions
+              {tEvent.rsvpInstructions}
               <input
                 type="text"
                 value={form.rsvpInstructions}
                 onChange={update('rsvpInstructions')}
-                placeholder="e.g. RSVP on this page to get the link"
+                placeholder={tEvent.phRsvp}
               />
             </label>
             <label>
-              Arrival instructions
+              {tEvent.arrivalInstructions}
               <input
                 type="text"
                 value={form.arrivalInstructions}
                 onChange={update('arrivalInstructions')}
-                placeholder="e.g. Check in at front desk"
+                placeholder={tEvent.phArrival}
               />
             </label>
             <label>
-              Parking notes
+              {tEvent.parkingNotes}
               <input
                 type="text"
                 value={form.parkingNotes}
                 onChange={update('parkingNotes')}
-                placeholder="e.g. Free street parking after 6 PM"
+                placeholder={tEvent.phParking}
               />
             </label>
             <fieldset className="form-fieldset">
-              <legend>Meetup event page sections</legend>
+              <legend>{tEvent.meetupPageSectionsLegend}</legend>
               <p className="form-hint kbyg-quick-fill-hint">
-                Optional copy for the generated Meetup page. Quick generate draft fills only empty fields and does not overwrite what you already typed.
+                {tEvent.meetupPageSectionsHint}
               </p>
               <div className="quick-draft-stack">
                 <button type="button" className="btn-quick-draft" onClick={handleQuickMeetupDraft}>
-                  Quick generate draft
+                  {tEvent.quickGenerateDraft}
                 </button>
-                <p className="form-hint">Fills in missing sections — you can edit everything after</p>
+                <p className="form-hint">{tEvent.quickGenerateDraftSub}</p>
               </div>
-              <div className="event-page-section-toggles" role="group" aria-label="Include sections on generated Meetup page">
-                <span className="form-hint tldr-include-heading">Include on generated page</span>
+              <div className="event-page-section-toggles" role="group" aria-label={tEvent.includeOnPage}>
+                <span className="form-hint tldr-include-heading">{tEvent.includeOnPage}</span>
                 <div className="tldr-include-checkboxes">
                   <label className="checkbox-label tldr-include-option">
                     <input
@@ -3238,7 +3242,7 @@ export default function App() {
                       checked={form.eventPageIncludeWhyAttend !== false}
                       onChange={(e) => setForm((prev) => ({ ...prev, eventPageIncludeWhyAttend: e.target.checked }))}
                     />
-                    Why Attend section
+                    {tEvent.whyAttendSection}
                   </label>
                   <label className="checkbox-label tldr-include-option">
                     <input
@@ -3246,7 +3250,7 @@ export default function App() {
                       checked={form.eventPageIncludeWhatToExpect !== false}
                       onChange={(e) => setForm((prev) => ({ ...prev, eventPageIncludeWhatToExpect: e.target.checked }))}
                     />
-                    What to Expect section
+                    {tEvent.whatToExpectSection}
                   </label>
                   <label className="checkbox-label tldr-include-option">
                     <input
@@ -3254,56 +3258,56 @@ export default function App() {
                       checked={form.eventPageIncludeSpeakerSection !== false}
                       onChange={(e) => setForm((prev) => ({ ...prev, eventPageIncludeSpeakerSection: e.target.checked }))}
                     />
-                    Speaker section (talk abstracts)
+                    {tEvent.speakerSection}
                   </label>
                 </div>
               </div>
               <label>
-                Why Attend
+                {tEvent.labelWhyAttend}
                 <textarea
                   value={form.meetupPageWhyAttend}
                   onChange={update('meetupPageWhyAttend')}
-                  placeholder="e.g. bullets on learning goals and community"
+                  placeholder={tEvent.phWhyAttend}
                   rows={4}
                 />
               </label>
               <label>
-                What to Expect
+                {tEvent.labelWhatToExpect}
                 <textarea
                   value={form.meetupPageWhatToExpect}
                   onChange={update('meetupPageWhatToExpect')}
-                  placeholder="e.g. format of the evening, refreshments, Q&A"
+                  placeholder={tEvent.phWhatToExpect}
                   rows={3}
                 />
               </label>
               <label>
-                Agenda
+                {tEvent.labelAgenda}
                 <textarea
                   value={form.meetupPageAgenda}
                   onChange={update('meetupPageAgenda')}
-                  placeholder="Leave empty to use the timed agenda from event time and speakers above"
+                  placeholder={tEvent.phAgenda}
                   rows={5}
                 />
               </label>
               <label>
-                Closing
+                {tEvent.labelClosing}
                 <textarea
                   value={form.meetupPageClosing}
                   onChange={update('meetupPageClosing')}
-                  placeholder="e.g. closing line about networking or seeing attendees there"
+                  placeholder={tEvent.phClosing}
                   rows={2}
                 />
               </label>
             </fieldset>
             <fieldset className="form-fieldset">
-              <legend>Intuition Email Details</legend>
-              <label>Audience / who this is for (optional) <input type="text" value={form.intuitionAudience} onChange={update('intuitionAudience')} placeholder="e.g. developers interested in search" /></label>
-              <label>Why attend / key value <input type="text" value={form.intuitionWhyAttend} onChange={update('intuitionWhyAttend')} placeholder="e.g. hands-on tips and peer learning" /></label>
-              <label>Key takeaway or benefit (optional) <input type="text" value={form.intuitionKeyTakeaway} onChange={update('intuitionKeyTakeaway')} placeholder="e.g. leave with a working demo" /></label>
+              <legend>{tEvent.intuitionLegend}</legend>
+              <label>{tEvent.audienceLabel} <input type="text" value={form.intuitionAudience} onChange={update('intuitionAudience')} placeholder={tEvent.phAudience} /></label>
+              <label>{tEvent.intuitionWhyLabel} <input type="text" value={form.intuitionWhyAttend} onChange={update('intuitionWhyAttend')} placeholder={tEvent.phIntuitionWhy} /></label>
+              <label>{tEvent.intuitionKeyLabel} <input type="text" value={form.intuitionKeyTakeaway} onChange={update('intuitionKeyTakeaway')} placeholder={tEvent.phIntuitionKey} /></label>
             </fieldset>
-            <div className="form-language-row" role="group" aria-label="Output language">
+            <div className="form-language-row" role="group" aria-label={tEvent.languageLabel}>
               <label>
-                Language
+                {tEvent.languageLabel}
                 <select
                   value={eventPageLanguage}
                   onChange={(e) => setEventPageLanguage(e.target.value)}
@@ -3317,10 +3321,10 @@ export default function App() {
               </label>
             </div>
             <button type="submit" className="btn-generate">
-              Generate Meetup Copy
+              {tEvent.btnGenerateMeetupCopy}
             </button>
             <button type="button" onClick={handleReset} className="btn-reset">
-              🔄 Reset Form
+              🔄 {tEvent.btnResetForm}
             </button>
           </form>
           )}
@@ -3331,54 +3335,54 @@ export default function App() {
             className="form"
           >
             <fieldset className="form-fieldset">
-              <legend>Email Details</legend>
-              <label>Recipients <input type="text" value={kbygForm.recipients} onChange={updateKbyg('recipients')} placeholder="e.g. Speakers, hosts" /></label>
-              <label>Greeting names <input type="text" value={kbygForm.greetingNames} onChange={updateKbyg('greetingNames')} placeholder="e.g. everyone" /></label>
+              <legend>{tKbyg.kbyg_emailDetails}</legend>
+              <label>{tKbyg.kbyg_recipients} <input type="text" value={kbygForm.recipients} onChange={updateKbyg('recipients')} placeholder={tKbyg.kbyg_ph_recipients} /></label>
+              <label>{tKbyg.kbyg_greetingNames} <input type="text" value={kbygForm.greetingNames} onChange={updateKbyg('greetingNames')} placeholder={tKbyg.kbyg_ph_greeting} /></label>
             </fieldset>
             <fieldset className="form-fieldset">
-              <legend>Event Details</legend>
-              <label>Event title <input type="text" value={kbygForm.eventTitle} onChange={updateKbyg('eventTitle')} placeholder="e.g. March Meetup" /></label>
-              <label>Event date <input type="text" value={kbygForm.eventDate} onChange={updateKbyg('eventDate')} placeholder="e.g. Tuesday, March 18" /></label>
-              <label>Event time <input type="text" value={kbygForm.eventTime} onChange={updateKbyg('eventTime')} placeholder="e.g. 6:00 PM" /></label>
-              <label>Arrival time <input type="text" value={kbygForm.arrivalTime} onChange={updateKbyg('arrivalTime')} placeholder="e.g. 5:45 PM" /></label>
+              <legend>{tKbyg.kbyg_eventDetails}</legend>
+              <label>{tKbyg.kbyg_eventTitle} <input type="text" value={kbygForm.eventTitle} onChange={updateKbyg('eventTitle')} placeholder={tKbyg.kbyg_ph_eventTitle} /></label>
+              <label>{tKbyg.kbyg_eventDate} <input type="text" value={kbygForm.eventDate} onChange={updateKbyg('eventDate')} placeholder={tKbyg.kbyg_ph_eventDate} /></label>
+              <label>{tKbyg.kbyg_eventTime} <input type="text" value={kbygForm.eventTime} onChange={updateKbyg('eventTime')} placeholder={tKbyg.kbyg_ph_eventTime} /></label>
+              <label>{tKbyg.kbyg_arrivalTime} <input type="text" value={kbygForm.arrivalTime} onChange={updateKbyg('arrivalTime')} placeholder={tKbyg.kbyg_ph_arrivalTime} /></label>
             </fieldset>
             <fieldset className="form-fieldset">
-              <legend>Location</legend>
-              <label>Venue name <input type="text" value={kbygForm.venueName} onChange={updateKbyg('venueName')} placeholder="e.g. WeWork Downtown" /></label>
-              <label>Venue address <input type="text" value={kbygForm.venueAddress} onChange={updateKbyg('venueAddress')} placeholder="e.g. 123 Main St" /></label>
+              <legend>{tKbyg.kbyg_location}</legend>
+              <label>{tKbyg.kbyg_venueName} <input type="text" value={kbygForm.venueName} onChange={updateKbyg('venueName')} placeholder={tKbyg.kbyg_ph_venueName} /></label>
+              <label>{tKbyg.kbyg_venueAddress} <input type="text" value={kbygForm.venueAddress} onChange={updateKbyg('venueAddress')} placeholder={tKbyg.kbyg_ph_venueAddress} /></label>
               <label>
-                Parking <span className="form-hint">(optional)</span>
+                {tKbyg.kbyg_parkingLabel} <span className="form-hint">({tKbyg.kbyg_optional})</span>
                 <input type="text" value={kbygForm.parkingNotes} onChange={updateKbyg('parkingNotes')} />
               </label>
             </fieldset>
             <fieldset className="form-fieldset">
-              <legend>Event Links</legend>
-              <label>Meetup link <input type="text" value={kbygForm.meetupLink} onChange={updateKbyg('meetupLink')} placeholder="https://..." /></label>
-              <label>Luma link <input type="text" value={kbygForm.lumaLink} onChange={updateKbyg('lumaLink')} placeholder="https://..." /></label>
+              <legend>{tKbyg.kbyg_eventLinks}</legend>
+              <label>{tKbyg.kbyg_meetupLink} <input type="text" value={kbygForm.meetupLink} onChange={updateKbyg('meetupLink')} placeholder="https://..." /></label>
+              <label>{tKbyg.kbyg_lumaLink} <input type="text" value={kbygForm.lumaLink} onChange={updateKbyg('lumaLink')} placeholder="https://..." /></label>
             </fieldset>
             <fieldset className="form-fieldset">
-              <legend>Helpful Contacts</legend>
+              <legend>{tKbyg.kbyg_helpfulContacts}</legend>
               {(kbygForm.contacts || []).map((contact, index) => (
                 <div key={index} className="contact-row">
-                  <label>Contact Name <input type="text" value={contact.name} onChange={updateKbygContact(index, 'name')} placeholder="e.g. Jane Smith" /></label>
-                  <label>Role / Description <input type="text" value={contact.role} onChange={updateKbygContact(index, 'role')} placeholder="e.g. onsite host, program manager, venue contact" /></label>
-                  <label>Contact Info (email or Slack) <input type="text" value={contact.contactInfo} onChange={updateKbygContact(index, 'contactInfo')} placeholder="e.g. jane@example.com or @jane" /></label>
+                  <label>{tKbyg.kbyg_contactName} <input type="text" value={contact.name} onChange={updateKbygContact(index, 'name')} placeholder={tKbyg.kbyg_ph_contactName} /></label>
+                  <label>{tKbyg.kbyg_contactRole} <input type="text" value={contact.role} onChange={updateKbygContact(index, 'role')} placeholder={tKbyg.kbyg_ph_contactRole} /></label>
+                  <label>{tKbyg.kbyg_contactInfo} <input type="text" value={contact.contactInfo} onChange={updateKbygContact(index, 'contactInfo')} placeholder={tKbyg.kbyg_ph_contactInfo} /></label>
                 </div>
               ))}
-              <button type="button" onClick={addKbygContact} className="btn-add-speaker">+ Add Contact</button>
+              <button type="button" onClick={addKbygContact} className="btn-add-speaker">{tKbyg.kbyg_addContact}</button>
             </fieldset>
             <fieldset className="form-fieldset">
-              <legend>Speakers</legend>
-              <label>Speaker 1 name <input type="text" value={kbygForm.speaker1Name} onChange={updateKbyg('speaker1Name')} placeholder="e.g. Jane Smith" /></label>
-              <label>Speaker 1 title <input type="text" value={kbygForm.speaker1Title} onChange={updateKbyg('speaker1Title')} placeholder="e.g. Staff Engineer" /></label>
-              <label>Speaker 1 talk title <input type="text" value={kbygForm.speaker1TalkTitle} onChange={updateKbyg('speaker1TalkTitle')} placeholder="Talk title" /></label>
-              <label>Speaker 2 name <input type="text" value={kbygForm.speaker2Name} onChange={updateKbyg('speaker2Name')} placeholder="e.g. John Doe" /></label>
-              <label>Speaker 2 title <input type="text" value={kbygForm.speaker2Title} onChange={updateKbyg('speaker2Title')} placeholder="e.g. Principal Engineer" /></label>
-              <label>Speaker 2 talk title <input type="text" value={kbygForm.speaker2TalkTitle} onChange={updateKbyg('speaker2TalkTitle')} placeholder="Talk title" /></label>
+              <legend>{tKbyg.kbyg_speakers}</legend>
+              <label>{tKbyg.kbyg_speaker1Name} <input type="text" value={kbygForm.speaker1Name} onChange={updateKbyg('speaker1Name')} placeholder={tKbyg.kbyg_ph_speakerName} /></label>
+              <label>{tKbyg.kbyg_speaker1Title} <input type="text" value={kbygForm.speaker1Title} onChange={updateKbyg('speaker1Title')} placeholder={tKbyg.kbyg_ph_speakerTitle} /></label>
+              <label>{tKbyg.kbyg_speaker1Talk} <input type="text" value={kbygForm.speaker1TalkTitle} onChange={updateKbyg('speaker1TalkTitle')} placeholder={tKbyg.kbyg_ph_talkTitle} /></label>
+              <label>{tKbyg.kbyg_speaker2Name} <input type="text" value={kbygForm.speaker2Name} onChange={updateKbyg('speaker2Name')} placeholder={tKbyg.kbyg_ph_speakerName} /></label>
+              <label>{tKbyg.kbyg_speaker2Title} <input type="text" value={kbygForm.speaker2Title} onChange={updateKbyg('speaker2Title')} placeholder={tKbyg.kbyg_ph_speakerTitle} /></label>
+              <label>{tKbyg.kbyg_speaker2Talk} <input type="text" value={kbygForm.speaker2TalkTitle} onChange={updateKbyg('speaker2TalkTitle')} placeholder={tKbyg.kbyg_ph_talkTitle} /></label>
               <div className="kbyg-quick-fill-wrap">
-                <span className="form-hint kbyg-quick-fill-hint">Quick fill</span>
-                <div className="quick-fill-chips" role="group" aria-label="Speaker arrival quick fill">
-                  {KBYG_SPEAKER_ARRIVAL_QUICK_FILL.map((text) => (
+                <span className="form-hint kbyg-quick-fill-hint">{tKbyg.kbyg_quickFill}</span>
+                <div className="quick-fill-chips" role="group" aria-label={tKbyg.kbyg_speakerArrival}>
+                  {getKbygSpeakerArrivalQuickFill(meetupKbygLanguage).map((text) => (
                     <button
                       key={text}
                       type="button"
@@ -3390,21 +3394,21 @@ export default function App() {
                   ))}
                 </div>
                 <label>
-                  Speaker arrival note <span className="form-hint">(optional)</span>
+                  {tKbyg.kbyg_speakerArrival} <span className="form-hint">({tKbyg.kbyg_optional})</span>
                   <input type="text" value={kbygForm.speakerArrivalNote} onChange={updateKbyg('speakerArrivalNote')} />
                 </label>
               </div>
             </fieldset>
             <fieldset className="form-fieldset">
-              <legend>Logistics</legend>
-              <label>Food details <input type="text" value={kbygForm.foodDetails} onChange={updateKbyg('foodDetails')} placeholder="e.g. Pizza and snacks" /></label>
-              <label>Drink details <input type="text" value={kbygForm.drinkDetails} onChange={updateKbyg('drinkDetails')} placeholder="e.g. Coffee, water, soda" /></label>
-              <label>Swag notes <input type="text" value={kbygForm.swagNotes} onChange={updateKbyg('swagNotes')} placeholder="e.g. T-shirts for attendees" /></label>
-              <label>Setup notes <input type="text" value={kbygForm.setupNotes} onChange={updateKbyg('setupNotes')} placeholder="e.g. Tables and signage" /></label>
+              <legend>{tKbyg.kbyg_logistics}</legend>
+              <label>{tKbyg.kbyg_food} <input type="text" value={kbygForm.foodDetails} onChange={updateKbyg('foodDetails')} placeholder={tKbyg.kbyg_ph_food} /></label>
+              <label>{tKbyg.kbyg_drink} <input type="text" value={kbygForm.drinkDetails} onChange={updateKbyg('drinkDetails')} placeholder={tKbyg.kbyg_ph_drink} /></label>
+              <label>{tKbyg.kbyg_swag} <input type="text" value={kbygForm.swagNotes} onChange={updateKbyg('swagNotes')} placeholder={tKbyg.kbyg_ph_swag} /></label>
+              <label>{tKbyg.kbyg_setup} <input type="text" value={kbygForm.setupNotes} onChange={updateKbyg('setupNotes')} placeholder={tKbyg.kbyg_ph_setup} /></label>
               <div className="kbyg-quick-fill-wrap">
-                <span className="form-hint kbyg-quick-fill-hint">Quick fill</span>
-                <div className="quick-fill-chips" role="group" aria-label="AV and presentation setup quick fill">
-                  {KBYG_AV_QUICK_FILL.map((text) => (
+                <span className="form-hint kbyg-quick-fill-hint">{tKbyg.kbyg_quickFill}</span>
+                <div className="quick-fill-chips" role="group" aria-label={tKbyg.kbyg_av}>
+                  {getKbygAvQuickFill(meetupKbygLanguage).map((text) => (
                     <button
                       key={text}
                       type="button"
@@ -3416,8 +3420,8 @@ export default function App() {
                   ))}
                 </div>
                 <label>
-                  AV / presentation setup
-                  <input type="text" value={kbygForm.avNotes} onChange={updateKbyg('avNotes')} placeholder="e.g. HDMI adapter provided" />
+                  {tKbyg.kbyg_av}
+                  <input type="text" value={kbygForm.avNotes} onChange={updateKbyg('avNotes')} placeholder={tKbyg.kbyg_ph_av} />
                 </label>
               </div>
               <div
@@ -3427,9 +3431,9 @@ export default function App() {
                 <div className="kbyg-photo-checklist-card-header">
                   <div className="kbyg-photo-checklist-card-intro">
                     <h3 id="kbyg-photo-checklist-title" className="kbyg-photo-checklist-card-title">
-                      📸 Photo checklist
+                      {tKbyg.kbyg_photoTitle}
                     </h3>
-                    <p className="kbyg-photo-checklist-card-desc">Capture moments for post-event content</p>
+                    <p className="kbyg-photo-checklist-card-desc">{tKbyg.kbyg_photoDesc}</p>
                   </div>
                   <label className="kbyg-photo-checklist-include checkbox-label">
                     <input
@@ -3438,29 +3442,29 @@ export default function App() {
                       onChange={updateKbygCheckbox('includePhotos')}
                       aria-describedby="kbyg-photo-checklist-title"
                     />
-                    <span className="kbyg-photo-checklist-include-text">Include in email</span>
+                    <span className="kbyg-photo-checklist-include-text">{tKbyg.kbyg_includeEmail}</span>
                   </label>
                 </div>
-                <ul className="kbyg-photo-checklist-preview" aria-label="Take Photos section preview">
-                  <li>Setup + space</li>
-                  <li>Speaker + audience</li>
-                  <li>Networking moments</li>
+                <ul className="kbyg-photo-checklist-preview" aria-label={tKbyg.kbyg_photoTitle}>
+                  <li>{tKbyg.kbyg_photoLi1}</li>
+                  <li>{tKbyg.kbyg_photoLi2}</li>
+                  <li>{tKbyg.kbyg_photoLi3}</li>
                 </ul>
               </div>
             </fieldset>
             <fieldset className="form-fieldset">
-              <legend>TL;DR</legend>
+              <legend>{tKbyg.kbyg_tldr}</legend>
               <label className="checkbox-label">
                 <input
                   type="checkbox"
                   checked={kbygForm.generateTldr !== false}
                   onChange={updateKbygCheckbox('generateTldr')}
                 />
-                Generate TL;DR
+                {tKbyg.kbyg_generateTldr}
               </label>
               {kbygForm.generateTldr !== false && (
-                <div className="tldr-include-group" role="group" aria-label="Include these callouts in the TL;DR">
-                  <span className="tldr-include-heading">Include these callouts in the TL;DR</span>
+                <div className="tldr-include-group" role="group" aria-label={tKbyg.kbyg_tldrCallouts}>
+                  <span className="tldr-include-heading">{tKbyg.kbyg_tldrCallouts}</span>
                   <div className="tldr-include-checkboxes">
                     {KBYG_TLDR_ITEM_ORDER.map((id) => (
                       <label key={id} className="checkbox-label tldr-include-option">
@@ -3477,16 +3481,16 @@ export default function App() {
               )}
             </fieldset>
             <fieldset className="form-fieldset">
-              <legend>Agenda</legend>
-              <label>Internal agenda <textarea value={kbygForm.internalAgenda} onChange={updateKbyg('internalAgenda')} placeholder="Paste or type agenda..." rows={4} /></label>
+              <legend>{tKbyg.kbyg_agenda}</legend>
+              <label>{tKbyg.kbyg_internalAgenda} <textarea value={kbygForm.internalAgenda} onChange={updateKbyg('internalAgenda')} placeholder={tKbyg.kbyg_ph_internalAgenda} rows={4} /></label>
             </fieldset>
             <fieldset className="form-fieldset">
-              <legend>Additional</legend>
-              <label>Additional notes <textarea value={kbygForm.additionalNotes} onChange={updateKbyg('additionalNotes')} placeholder="Any other logistics..." rows={3} /></label>
+              <legend>{tKbyg.kbyg_additional}</legend>
+              <label>{tKbyg.kbyg_additionalNotes} <textarea value={kbygForm.additionalNotes} onChange={updateKbyg('additionalNotes')} placeholder={tKbyg.kbyg_ph_additionalNotes} rows={3} /></label>
             </fieldset>
-            <div className="form-language-row" role="group" aria-label="Output language">
+            <div className="form-language-row" role="group" aria-label={tKbyg.languageLabel}>
               <label>
-                Language
+                {tKbyg.languageLabel}
                 <select
                   value={meetupKbygLanguage}
                   onChange={(e) => setMeetupKbygLanguage(e.target.value)}
@@ -3499,8 +3503,8 @@ export default function App() {
                 </select>
               </label>
             </div>
-            <button type="submit" className="btn-generate">Generate Email</button>
-            <button type="button" onClick={handleReset} className="btn-reset">🔄 Reset Form</button>
+            <button type="submit" className="btn-generate">{tKbyg.kbyg_btnGenerate}</button>
+            <button type="button" onClick={handleReset} className="btn-reset">🔄 {tKbyg.kbyg_btnReset}</button>
           </form>
           )}
 

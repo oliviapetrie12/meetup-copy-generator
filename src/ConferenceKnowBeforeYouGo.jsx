@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
+import { getGeneratorUiTranslations } from './formTranslations.js'
 import { makeMoreConcise, prepareConferenceEmailClipboardHtml } from './outputHelpers.js'
 import { mergeOrganizerParsedIntoForm, processOrganizerImport } from './conferenceOrganizerImport.js'
 import { enhanceKbygOutput } from './kbygEnhanceOutput.js'
@@ -808,8 +809,16 @@ export default function ConferenceKnowBeforeYouGo() {
   const [conferenceLanguage, setConferenceLanguage] = useState('en')
   const [translateMessage, setTranslateMessage] = useState(null)
 
+  const t = useMemo(() => getGeneratorUiTranslations(conferenceLanguage), [conferenceLanguage])
   const tldrIncludeLabels = getConferenceTldrIncludeLabels(conferenceLanguage)
-  const boothDeliveryOptionsEn = useMemo(() => getConferenceStrings('en').boothDelivery, [])
+  const boothDeliveryOptions = useMemo(
+    () => getConferenceStrings(normalizeLanguage(conferenceLanguage)).boothDelivery,
+    [conferenceLanguage],
+  )
+  const confUiStrings = useMemo(
+    () => getConferenceStrings(normalizeLanguage(conferenceLanguage)),
+    [conferenceLanguage],
+  )
 
   useEffect(() => {
     if (subjectManuallyEditedRef.current) return
@@ -1034,9 +1043,9 @@ export default function ConferenceKnowBeforeYouGo() {
       <aside className="form-panel conference-kbyg-form-panel">
         <form onSubmit={handleGenerate} className="form">
           <fieldset className="form-fieldset">
-            <legend>Email</legend>
+            <legend>{t.conf_email}</legend>
             <label>
-              Subject line
+              {t.conf_subjectLine}
               <input
                 type="text"
                 value={subjectLine}
@@ -1048,11 +1057,9 @@ export default function ConferenceKnowBeforeYouGo() {
                 autoComplete="off"
               />
             </label>
-            <span className="form-hint">
-              Auto-fills from event name and location; if you edit this field, it won&apos;t auto-update until you reset the form.
-            </span>
+            <span className="form-hint">{t.conf_subjectHint}</span>
             <label>
-              Event name
+              {t.conf_eventName}
               <input
                 type="text"
                 value={form.conferenceName}
@@ -1061,7 +1068,7 @@ export default function ConferenceKnowBeforeYouGo() {
               />
             </label>
             <label>
-              Know Before You Go Deck URL
+              {t.conf_kbygDeckUrl}
               <input
                 type="url"
                 value={form.knowBeforeYouGoDeckUrl}
@@ -1070,16 +1077,16 @@ export default function ConferenceKnowBeforeYouGo() {
                 autoComplete="off"
               />
             </label>
-            <span className="form-hint">If provided, the generated email links to this deck. Leave blank to omit that sentence.</span>
+            <span className="form-hint">{t.conf_kbygDeckHint}</span>
           </fieldset>
 
           <fieldset className="form-fieldset">
-            <legend>Import organizer details</legend>
+            <legend>{t.conf_importLegend}</legend>
             <p className="form-hint">
-              Optional. Paste organizer or sponsor text to pre-fill empty fields, and get a structured Know Before You Go (emoji sections, bullets) to copy. Ambiguous or weak-margin chunks and validation mismatches go to Additional Notes (⚠️ when flagged).
+              {t.conf_importLead}
             </p>
             <label>
-              Organizer / exhibitor text
+              {t.conf_organizerText}
               <textarea
                 value={organizerImportText}
                 onChange={(e) => setOrganizerImportText(e.target.value)}
@@ -1090,27 +1097,27 @@ export default function ConferenceKnowBeforeYouGo() {
             </label>
             <div className="quick-draft-stack">
               <button type="button" className="btn-quick-draft" onClick={handleParseOrganizerDetails}>
-                Parse organizer details
+                {t.conf_parseBtn}
               </button>
               <p className="form-hint">
-                Pulls useful details into relevant sections for review — you can edit everything after
+                {t.conf_parseHint}
               </p>
             </div>
             {structuredKbygPreview ? (
               <div className="structured-kbyg-preview">
                 <label>
-                  Structured Know Before You Go
+                  {t.conf_structuredLabel}
                   <textarea
                     readOnly
                     value={structuredKbygPreview}
                     rows={16}
                     className="structured-kbyg-textarea"
-                    aria-label="Structured Know Before You Go"
+                    aria-label={t.conf_structuredLabel}
                   />
                 </label>
                 <div className="output-actions output-actions-inline structured-kbyg-copy">
                   <button type="button" className="btn-copy" onClick={copyStructuredKbyg} aria-pressed={structuredKbygCopied}>
-                    {structuredKbygCopied ? 'Copied!' : 'Copy structured KBYG'}
+                    {structuredKbygCopied ? 'Copied!' : t.conf_copyStructured}
                   </button>
                 </div>
               </div>
@@ -1118,12 +1125,12 @@ export default function ConferenceKnowBeforeYouGo() {
           </fieldset>
 
           <fieldset className="form-fieldset form-fieldset-kbyg-enhance">
-            <legend>Update or Format Existing KBYG</legend>
+            <legend>{t.conf_enhanceLegend}</legend>
             <p className="form-hint form-hint-kbyg-enhance-lead">
-              Use this when you already have a Know Before You Go and want to update it with new details or format it for sharing.
+              {t.conf_enhanceLead}
             </p>
             <label>
-              Your current KBYG
+              {t.conf_currentKbyg}
               <textarea
                 value={kbygEnhanceExisting}
                 onChange={(e) => setKbygEnhanceExisting(e.target.value)}
@@ -1134,11 +1141,11 @@ export default function ConferenceKnowBeforeYouGo() {
             </label>
             {structuredKbygPreview ? (
               <button type="button" className="btn-add-speaker" onClick={() => setKbygEnhanceExisting(structuredKbygPreview)}>
-                Use structured output from above
+                {t.conf_useStructured}
               </button>
             ) : null}
             <label>
-              Paste updates (optional)
+              {t.conf_pasteUpdates}
               <textarea
                 value={kbygEnhanceUpdates}
                 onChange={(e) => setKbygEnhanceUpdates(e.target.value)}
@@ -1148,10 +1155,10 @@ export default function ConferenceKnowBeforeYouGo() {
               />
             </label>
             <span className="form-hint form-hint-kbyg-enhance-sub">
-              Only include new or changed information. Newer details will overwrite older ones.
+              {t.conf_enhanceSub}
             </span>
             <label>
-              Output mode
+              {t.conf_outputMode}
               <select value={kbygEnhanceMode} onChange={(e) => setKbygEnhanceMode(e.target.value)}>
                 <option value="slack">Slack — compact, scannable</option>
                 <option value="email">Email — intro + spacing</option>
@@ -1160,24 +1167,24 @@ export default function ConferenceKnowBeforeYouGo() {
             </label>
             <div className="quick-draft-stack">
               <button type="button" className="btn-quick-draft" onClick={handleEnhanceKbyg}>
-                Update & format KBYG
+                {t.conf_updateFormatBtn}
               </button>
             </div>
             {kbygEnhanceOutput ? (
               <div className="structured-kbyg-preview">
                 <label>
-                  Enhanced output
+                  {t.conf_enhancedOutput}
                   <textarea
                     readOnly
                     value={kbygEnhanceOutput}
                     rows={14}
                     className="structured-kbyg-textarea"
-                    aria-label="Enhanced KBYG output"
+                    aria-label={t.conf_enhancedOutput}
                   />
                 </label>
                 <div className="output-actions output-actions-inline structured-kbyg-copy">
                   <button type="button" className="btn-copy" onClick={copyKbygEnhanced} aria-pressed={kbygEnhanceCopied}>
-                    {kbygEnhanceCopied ? 'Copied!' : 'Copy enhanced output'}
+                    {kbygEnhanceCopied ? 'Copied!' : t.conf_copyEnhanced}
                   </button>
                 </div>
               </div>
@@ -1185,16 +1192,16 @@ export default function ConferenceKnowBeforeYouGo() {
           </fieldset>
 
           <fieldset className="form-fieldset">
-            <legend>TL;DR</legend>
+            <legend>{t.conf_tldrLegend}</legend>
             <label className="checkbox-label">
               <input type="checkbox" checked={form.generateTldr !== false} onChange={updateGenerateTldr} />
-              Generate TL;DR
+              {t.conf_generateTldr}
             </label>
             <span className="form-hint">
-              Short bullets only. Check what to include; empty fields are skipped. Turn off to omit the TL;DR block entirely.
+              {t.conf_tldrHint}
             </span>
-            <div className="tldr-include-group" role="group" aria-label="Include in TL;DR">
-              <span className="tldr-include-heading">Include in TL;DR</span>
+            <div className="tldr-include-group" role="group" aria-label={t.conf_includeTldr}>
+              <span className="tldr-include-heading">{t.conf_includeTldr}</span>
               <div className="tldr-include-checkboxes">
                 {TLDR_ITEM_ORDER.map((id) => (
                   <label key={id} className="checkbox-label tldr-include-option">
@@ -1205,7 +1212,7 @@ export default function ConferenceKnowBeforeYouGo() {
               </div>
             </div>
             <label>
-              Lead capture (for TL;DR)
+              {t.conf_leadCapture}
               <input
                 type="text"
                 value={form.leadCaptureText}
@@ -1215,7 +1222,7 @@ export default function ConferenceKnowBeforeYouGo() {
               />
             </label>
             <label>
-              Custom note (for TL;DR)
+              {t.conf_customTldr}
               <textarea
                 value={form.customTldrNotes}
                 onChange={update('customTldrNotes')}
@@ -1226,9 +1233,9 @@ export default function ConferenceKnowBeforeYouGo() {
           </fieldset>
 
           <fieldset className="form-fieldset">
-            <legend>Event dates &amp; hours</legend>
+            <legend>{t.conf_eventDatesHours}</legend>
             <label>
-              Booth Setup
+              {t.conf_boothSetup}
               <textarea
                 value={form.eventDatesBoothSetup}
                 onChange={update('eventDatesBoothSetup')}
@@ -1237,7 +1244,7 @@ export default function ConferenceKnowBeforeYouGo() {
               />
             </label>
             <label>
-              Booth Hours
+              {t.conf_boothHours}
               <textarea
                 value={form.eventDatesBoothHours}
                 onChange={update('eventDatesBoothHours')}
@@ -1246,7 +1253,7 @@ export default function ConferenceKnowBeforeYouGo() {
               />
             </label>
             <label>
-              Booth Cleanup
+              {t.conf_boothCleanup}
               <textarea
                 value={form.eventDatesBoothCleanup}
                 onChange={update('eventDatesBoothCleanup')}
@@ -1255,11 +1262,11 @@ export default function ConferenceKnowBeforeYouGo() {
               />
             </label>
             <label>
-              Notes
+              {t.conf_notes}
               <textarea value={form.eventDatesNotes} onChange={update('eventDatesNotes')} placeholder="Anything else for dates &amp; hours…" rows={3} />
             </label>
             <label>
-              Staffing Schedule Link (Google Sheet)
+              {t.conf_staffingLink}
               <input
                 type="text"
                 inputMode="url"
@@ -1270,7 +1277,7 @@ export default function ConferenceKnowBeforeYouGo() {
               />
             </label>
             <label>
-              Staffing Notes (optional)
+              {t.conf_staffingNotes}
               <textarea
                 value={form.staffingScheduleNotes}
                 onChange={update('staffingScheduleNotes')}
@@ -1281,32 +1288,32 @@ export default function ConferenceKnowBeforeYouGo() {
           </fieldset>
 
           <fieldset className="form-fieldset">
-            <legend>Tickets</legend>
+            <legend>{t.conf_tickets}</legend>
             <label>
-              Tickets
+              {t.conf_tickets}
               <textarea value={form.ticketsText} onChange={update('ticketsText')} placeholder="Badge pickup, exhibitor passes, guest list…" rows={3} />
             </label>
           </fieldset>
 
           <fieldset className="form-fieldset">
-            <legend>Location</legend>
+            <legend>{t.conf_location}</legend>
             <label>
-              Venue
+              {t.conf_venue}
               <input type="text" value={form.locationVenue} onChange={update('locationVenue')} placeholder="e.g. Moscone South" />
             </label>
             <label>
-              Address
+              {t.conf_address}
               <input type="text" value={form.locationAddress} onChange={update('locationAddress')} placeholder="Street, city, region" />
             </label>
           </fieldset>
 
           <fieldset className="form-fieldset">
-            <legend>Contacts</legend>
-            <p className="form-hint">Only contacts with a name are included in the email. Use groups to organize onsite, remote, and organizer contacts.</p>
+            <legend>{t.conf_contacts}</legend>
+            <p className="form-hint">{t.conf_contactsHint}</p>
             {(form.contacts || []).map((contact, index) => (
               <div key={index} className="contact-row">
                 <label>
-                  Name <span className="form-hint">(required)</span>
+                  {t.conf_nameReq} <span className="form-hint">({t.conf_required})</span>
                   <input
                     type="text"
                     value={contact.name}
@@ -1316,54 +1323,54 @@ export default function ConferenceKnowBeforeYouGo() {
                   />
                 </label>
                 <label>
-                  Group (optional)
+                  {t.conf_group}
                   <select value={contact.group || ''} onChange={updateContact(index, 'group')} aria-label="Contact group">
                     {CONTACT_GROUP_OPTIONS.map((opt) => (
                       <option key={opt.value || 'none'} value={opt.value}>
-                        {opt.label}
+                        {!opt.value ? t.conf_noContactGroup : confUiStrings.contactGroups[opt.value] || opt.label}
                       </option>
                     ))}
                   </select>
                 </label>
                 <label>
-                  Role (optional)
+                  {t.conf_role}
                   <input type="text" value={contact.role} onChange={updateContact(index, 'role')} placeholder="e.g. booth lead" />
                 </label>
                 <label>
-                  Email (optional)
+                  {t.conf_emailLabel}
                   <input type="email" value={contact.email} onChange={updateContact(index, 'email')} placeholder="e.g. jane@example.com" autoComplete="off" />
                 </label>
                 <label>
-                  Phone (optional)
+                  {t.conf_phone}
                   <input type="text" value={contact.phone} onChange={updateContact(index, 'phone')} placeholder="e.g. +1 …" autoComplete="off" />
                 </label>
                 {(form.contacts || []).length > 1 && (
                   <button type="button" className="btn-reset" onClick={() => removeContact(index)}>
-                    Remove contact
+                    {t.conf_removeContact}
                   </button>
                 )}
               </div>
             ))}
             <button type="button" onClick={addContact} className="btn-add-speaker">
-              Add Contact
+              {t.conf_addContact}
             </button>
           </fieldset>
 
           <fieldset className="form-fieldset">
-            <legend>Booth setup &amp; logistics</legend>
+            <legend>{t.conf_boothLogistics}</legend>
             <label>
-              Booth Materials Delivery Method
+              {t.conf_boothDelivery}
               <select value={normalizeBoothDeliveryMethodKey(form.boothMaterialsDeliveryMethod)} onChange={updateBoothDeliveryMethod}>
                 {BOOTH_DELIVERY_METHOD_ORDER.map((value) => (
                   <option key={value} value={value}>
-                    {boothDeliveryOptionsEn[value]?.label || value}
+                    {boothDeliveryOptions[value]?.label || value}
                   </option>
                 ))}
               </select>
             </label>
             {normalizeBoothDeliveryMethodKey(form.boothMaterialsDeliveryMethod) === 'shipped_to_individual' && (
               <label>
-                Who were materials shipped to?
+                {t.conf_shippedTo}
                 <input
                   type="text"
                   value={form.boothMaterialsShippedToName}
@@ -1374,14 +1381,14 @@ export default function ConferenceKnowBeforeYouGo() {
               </label>
             )}
             <span className="form-hint">
-              Generated email includes scenario-specific instructions plus shared guidance on furniture, roles, and swag.
+              {t.conf_boothGenHint}
             </span>
           </fieldset>
 
           <fieldset className="form-fieldset">
-            <legend>AV / Setup Requirements</legend>
+            <legend>{t.conf_avLegend}</legend>
             <label>
-              AV / Setup Requirements
+              {t.conf_avLegend}
               <textarea
                 value={form.avSetupRequirements}
                 onChange={update('avSetupRequirements')}
@@ -1392,45 +1399,45 @@ export default function ConferenceKnowBeforeYouGo() {
           </fieldset>
 
           <fieldset className="form-fieldset">
-            <legend>Swag</legend>
+            <legend>{t.conf_swagLegend}</legend>
             <label>
-              Swag
+              {t.conf_swagLegend}
               <textarea value={form.swagText} onChange={update('swagText')} placeholder="What to bring, inventory, giveaways…" rows={3} />
             </label>
           </fieldset>
 
           <fieldset className="form-fieldset">
-            <legend>Parking</legend>
+            <legend>{t.conf_parkingLegend}</legend>
             <label>
-              Parking <span className="form-hint">(optional)</span>
+              {t.conf_parkingLegend} <span className="form-hint">{t.conf_optionalMark}</span>
               <textarea value={form.parkingText} onChange={update('parkingText')} rows={3} />
-              <span className="form-hint">Optional: Add any parking details or leave blank.</span>
+              <span className="form-hint">{t.conf_parkingOptionalNote}</span>
             </label>
           </fieldset>
 
           <fieldset className="form-fieldset">
-            <legend>Food &amp; beverage</legend>
+            <legend>{t.conf_foodBev}</legend>
             <label>
-              Food &amp; beverage <span className="form-hint">(optional)</span>
+              {t.conf_foodBev} <span className="form-hint">{t.conf_optionalMark}</span>
               <textarea value={form.foodBeverageText} onChange={update('foodBeverageText')} rows={3} />
-              <span className="form-hint">Optional: Add notes if food is provided.</span>
+              <span className="form-hint">{t.conf_foodOptionalNote}</span>
             </label>
           </fieldset>
 
           <fieldset className="form-fieldset">
-            <legend>Engagement</legend>
+            <legend>{t.conf_engagement}</legend>
             <label>
-              Type
+              {t.conf_type}
               <select value={form.engagementType || 'none'} onChange={update('engagementType')} aria-label="Engagement type">
-                <option value="none">None</option>
-                <option value="kahoot">Kahoot</option>
-                <option value="raffle">Raffle</option>
+                <option value="none">{t.conf_engNone}</option>
+                <option value="kahoot">{t.conf_engKahoot}</option>
+                <option value="raffle">{t.conf_engRaffle}</option>
               </select>
             </label>
             {(form.engagementType === 'kahoot' || form.engagementType === 'raffle') && (
               <>
                 <label>
-                  Details
+                  {t.conf_details}
                   <textarea
                     value={form.engagementDetails}
                     onChange={update('engagementDetails')}
@@ -1440,7 +1447,7 @@ export default function ConferenceKnowBeforeYouGo() {
                   />
                 </label>
                 <label>
-                  Prize
+                  {t.conf_prize}
                   <input
                     type="text"
                     value={form.engagementPrize}
@@ -1452,17 +1459,17 @@ export default function ConferenceKnowBeforeYouGo() {
               </>
             )}
             <span className="form-hint">
-              Included in the generated email only when Kahoot or Raffle is selected.
+              {t.conf_engagementHint}
             </span>
           </fieldset>
 
           <fieldset className="form-fieldset">
-            <legend>Additional sections</legend>
-            <p className="form-hint">Optional custom sections (title + content). Travel &amp; expenses are added automatically to the output.</p>
+            <legend>{t.conf_additionalSections}</legend>
+            <p className="form-hint">{t.conf_additionalLead}</p>
             {(form.additionalSections || []).map((sec, index) => (
               <div key={index} className="contact-row conference-additional-section">
                 <label>
-                  Section title
+                  {t.conf_sectionTitle}
                   <input
                     type="text"
                     value={sec.title}
@@ -1471,22 +1478,22 @@ export default function ConferenceKnowBeforeYouGo() {
                   />
                 </label>
                 <label>
-                  Content
+                  {t.conf_content}
                   <textarea value={sec.content} onChange={updateAdditionalSection(index, 'content')} placeholder="Details…" rows={3} />
                 </label>
                 <button type="button" className="btn-reset" onClick={() => removeAdditionalSection(index)}>
-                  Remove section
+                  {t.conf_removeSection}
                 </button>
               </div>
             ))}
             <button type="button" onClick={addAdditionalSection} className="btn-add-speaker">
-              + Add section
+              {t.conf_addSection}
             </button>
           </fieldset>
 
-          <div className="form-language-row" role="group" aria-label="Output language">
+          <div className="form-language-row" role="group" aria-label={t.languageLabel}>
             <label>
-              Language
+              {t.languageLabel}
               <select value={conferenceLanguage} onChange={(e) => setConferenceLanguage(e.target.value)}>
                 {LANGUAGE_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -1497,22 +1504,22 @@ export default function ConferenceKnowBeforeYouGo() {
             </label>
           </div>
           <button type="submit" className="btn-generate">
-            Generate email
+            {t.conf_btnGenerate}
           </button>
           <button type="button" onClick={handleReset} className="btn-reset">
-            🔄 Reset form
+            🔄 {t.conf_btnReset}
           </button>
         </form>
       </aside>
 
       <main className="output-panel conference-kbyg-output-panel">
         <div className="output-header">
-          <h2>Generated email</h2>
+          <h2>{t.conf_outputTitle}</h2>
         </div>
         <div className="output-content">
           {subjectLine.trim() ? (
             <div className="subject-line-section">
-              <h3 className="subject-line-heading">Subject line</h3>
+              <h3 className="subject-line-heading">{t.conf_outputSubject}</h3>
               <pre className="output-text subject-line-text">{subjectLine.trim()}</pre>
               <div className="output-actions output-actions-inline">
                 <button

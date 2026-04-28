@@ -8,18 +8,35 @@ export const LANGUAGE_OPTIONS = [
   { value: 'pt', label: 'Portuguese' },
 ]
 
-export const FORMAT_RULE = 'Preserve formatting, emojis, and structure.'
+export const FORMAT_RULE =
+  'Preserve formatting, emojis, bullet points, and section headers.'
 
-/** Strict rule for event-page remote prompts (full localization). */
-export const STRICT_LOCALIZATION_RULE =
-  'Generate ALL content entirely in the selected language. Do not include any English unless the selected language is English.'
-
-/** Instruction fragment for prompts / API (English default = structure-only reminder). */
-export function languageInstruction(lang) {
+/** Display / prompt target name for the selected locale. */
+export function getPromptLanguageName(lang) {
   const n = normalizeLanguage(lang)
-  if (n === 'es') return `Generate the content in Spanish. ${FORMAT_RULE}`
-  if (n === 'pt') return `Generate the content in Brazilian Portuguese. ${FORMAT_RULE}`
-  return FORMAT_RULE
+  if (n === 'es') return 'Spanish'
+  if (n === 'pt') return 'Brazilian Portuguese'
+  return 'English'
+}
+
+/**
+ * Shared remote-generation preamble: single language, no mixed output, no English stock examples.
+ */
+export function baseGenerationPrompt(lang) {
+  const name = getPromptLanguageName(lang)
+  return [
+    `Generate ALL content entirely in ${name}.`,
+    '',
+    'CRITICAL:',
+    '- Do NOT include any English unless the selected language is English',
+    '- Translate ALL sections, headers, and bullet points',
+    '- Do NOT reuse or copy English examples',
+  ].join('\n')
+}
+
+/** Fallback instruction for translate and unknown generators. */
+export function languageInstruction(lang) {
+  return `${baseGenerationPrompt(lang)}\n\n${FORMAT_RULE}`
 }
 
 export function normalizeLanguage(lang) {
@@ -27,40 +44,58 @@ export function normalizeLanguage(lang) {
   return 'en'
 }
 
-/** Full instruction for Meetup event page remote generation—no mixed-language output. */
+/** Meetup event page — remote API prompt. */
 export function eventPageRemotePrompt(lang) {
   const n = normalizeLanguage(lang)
-  const lines = [STRICT_LOCALIZATION_RULE, '']
-  if (n === 'es') {
-    lines.push('Generate the Meetup event page copy entirely in Spanish (neutral Latin American).')
-  } else if (n === 'pt') {
-    lines.push('Generate the Meetup event page copy entirely in Brazilian Portuguese.')
-  } else {
-    lines.push('Generate the Meetup event page copy in English.')
-  }
-  lines.push(
+  const variant =
+    n === 'es'
+      ? 'Generate the Meetup event page copy entirely in Spanish (neutral Latin American).'
+      : n === 'pt'
+        ? 'Generate the Meetup event page copy entirely in Brazilian Portuguese.'
+        : 'Generate the Meetup event page copy in English.'
+  return [
+    baseGenerationPrompt(lang),
     '',
-    'CRITICAL:',
+    variant,
+    '',
+    'Additional requirements:',
     '- Translate ALL bullet points across every section.',
     '- Do NOT leave any bullet points in English when the selected language is not English.',
     '- Do NOT reuse or echo English example phrasing; write original copy in the target language.',
     '',
-    'For the "Why attend" section:',
-    '- Write exactly 3 bullet points in the selected language.',
-    '- Do not copy, paraphrase, or translate from English template examples—generate the three reasons natively from the event details.',
+    'For the “Why attend” section: include exactly 3 bullet points written in the selected language. Describe value using event details only—do not copy or translate canned English example bullets.',
     '',
-    'Explicitly include and localize when applicable:',
-    '- Agenda (every line, including times and activity labels, in the selected language).',
-    '- A short closing sentence inviting attendees to join (fresh copy in the selected language—no canned English).',
-    '- "Who this is for" / audience-oriented framing when the input implies an audience, theme, or target attendee.',
-    '- "What to expect" when relevant.',
-    'Do not hardcode English section titles, agenda lines, or sample closings—translate all labels and body copy to the selected language.',
-    'Include a short closing sentence inviting attendees to join, in the selected language.',
-    'Ensure section headers and bullet points are also translated.',
+    'Explicitly include and localize when applicable: agenda; a short closing sentence inviting attendees; “Who this is for” / audience copy; “Why attend”; “What to expect”.',
+    'Ensure section headers and bullet points match the selected language.',
     '',
     FORMAT_RULE,
-  )
-  return lines.join('\n')
+  ].join('\n')
+}
+
+/** Meetup Know Before You Go email — remote API prompt. */
+export function meetupKbygRemotePrompt(lang) {
+  return [
+    baseGenerationPrompt(lang),
+    '',
+    'Generate the Meetup Know Before You Go organizer email from the form.',
+    'Localize every section title, paragraph, and bullet. Use only information implied by the form fields.',
+    'Do not paste English template logistics sentences—write natural copy in the selected language.',
+    '',
+    FORMAT_RULE,
+  ].join('\n')
+}
+
+/** Conference Know Before You Go email — remote API prompt. */
+export function conferenceKbygRemotePrompt(lang) {
+  return [
+    baseGenerationPrompt(lang),
+    '',
+    'Generate the Conference Know Before You Go email for onsite staff from the form.',
+    'Localize all sections (TL;DR, dates, tickets, location, contacts, booth logistics, AV, swag, parking, food, engagement, travel, etc.).',
+    'Do not leave English headers or bullets when the selected language is not English. Do not reuse canned English paragraphs—compose from the provided fields.',
+    '',
+    FORMAT_RULE,
+  ].join('\n')
 }
 
 export function getAgendaLineLabels(lang) {
@@ -90,35 +125,6 @@ export function getEventPageAgendaFallbackLines(lang) {
     en: `6:00 PM ${L.doors}\n6:30 PM Talks\n8:00 PM ${L.concludes}`,
     es: `6:00 p. m. ${L.doors}\n6:30 p. m. Charlas\n8:00 p. m. ${L.concludes}`,
     pt: `18:00 ${L.doors}\n18:30 Palestras\n20:00 ${L.concludes}`,
-  }
-  return M[n] || M.en
-}
-
-/** Default copy for Meetup event page fields (UI initial state + quick draft for non-English). */
-export function getEventPageFieldDefaults(lang) {
-  const n = normalizeLanguage(lang)
-  const M = {
-    en: {
-      meetupPageWhyAttend:
-        '- Learn from community talks and real-world Elastic use cases\n- Network with other practitioners\n- All experience levels welcome',
-      meetupPageWhatToExpect: 'Talks + networking\nFood and drinks will be provided',
-      meetupPageClosing:
-        'Come hang out, learn something new, and connect with others in the Elastic community.',
-    },
-    es: {
-      meetupPageWhyAttend:
-        '- Aprende con charlas de la comunidad y casos reales con Elastic\n- Conecta con otras personas de la práctica\n- Todos los niveles de experiencia son bienvenidos',
-      meetupPageWhatToExpect: 'Charlas + networking\nHabrá comida y bebidas',
-      meetupPageClosing:
-        'Únete, aprende algo nuevo y conecta con la comunidad Elastic.',
-    },
-    pt: {
-      meetupPageWhyAttend:
-        '- Aprenda com palestras da comunidade e casos reais com Elastic\n- Faça networking com outras pessoas da área\n- Todos os níveis de experiência são bem-vindos',
-      meetupPageWhatToExpect: 'Palestras + networking\nComida e bebidas serão oferecidas',
-      meetupPageClosing:
-        'Venha, aprenda algo novo e conecte-se com a comunidade Elastic.',
-    },
   }
   return M[n] || M.en
 }
