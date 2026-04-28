@@ -109,6 +109,8 @@ export function eventPageRemotePrompt(lang) {
     '- If arrival instructions or parking notes are missing or blank in the form data, infer sensible content from venue name, venue address, date/time, timezone, RSVP instructions, and related fields—still fully in the selected language.',
     '- If the form contains English for those fields, rewrite the substance in the selected language for the generated output (do not leave English when Spanish or Portuguese is selected).',
     '',
+    'API JSON (recommended): Return `plain` (full page as plain text) and optionally `html`. You may also return structured fields so the UI does not fall back to English form defaults: `arrivalInstructions` (string), `parking` (string), `agenda` (array of lines or one string). You may nest these under `sections` if preferred.',
+    '',
     FORMAT_RULE,
   ].join('\n')
 }

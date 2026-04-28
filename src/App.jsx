@@ -31,6 +31,7 @@ import {
 import {
   tryRemoteGenerate,
   applyRemoteEventPageResult,
+  meetupPlainTextToHtml,
   applyRemoteKbygResult,
   tryRemoteTranslate,
 } from './generateApi.js'
@@ -2070,11 +2071,35 @@ function buildIntro(form, lang = 'en') {
   return normalizeElastiFlow(S.introNone(groupName, when))
 }
 
+/** @param {Record<string, unknown> | null | undefined} rs */
+function resolveAgendaBodyForEventPage(form, lang, trim, has, rs) {
+  if (rs && Object.prototype.hasOwnProperty.call(rs, 'agenda') && rs.agenda != null) {
+    const g = rs.agenda
+    const joined = Array.isArray(g)
+      ? g.map((x) => String(x).trim()).filter(Boolean).join('\n')
+      : String(g).trim()
+    if (joined) return normalizeElastiFlow(joined)
+  }
+  if (rs && Object.prototype.hasOwnProperty.call(rs, 'meetupPageAgenda') && rs.meetupPageAgenda != null) {
+    const t = String(rs.meetupPageAgenda).trim()
+    if (t) return normalizeElastiFlow(t)
+  }
+  if (has(form.meetupPageAgenda)) return normalizeElastiFlow(trim(form.meetupPageAgenda))
+  return normalizeElastiFlow(buildAgenda(form, lang))
+}
+
 function generateMeetupCopy(form, opts = {}) {
   const lang = normalizeLanguage(opts.language)
   const S = getEventPageStrings(lang)
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const has = (s) => trim(s).length > 0
+  const rs = opts.remoteSections
+  const arrivalField =
+    rs && Object.prototype.hasOwnProperty.call(rs, 'arrivalInstructions')
+      ? rs.arrivalInstructions
+      : form.arrivalInstructions
+  const parkingField =
+    rs && Object.prototype.hasOwnProperty.call(rs, 'parking') ? rs.parking : form.parkingNotes
   const hasSpeaker1 = [
     form.speaker1Name,
     form.speaker1Title,
@@ -2128,12 +2153,12 @@ function generateMeetupCopy(form, opts = {}) {
     sections.push({ title: S.rsvp, body: normalizeElastiFlow(trim(form.rsvpInstructions)) })
   }
 
-  if (has(form.arrivalInstructions)) {
-    sections.push({ title: S.arrival, body: normalizeElastiFlow(trim(form.arrivalInstructions)) })
+  if (has(arrivalField)) {
+    sections.push({ title: S.arrival, body: normalizeElastiFlow(trim(arrivalField)) })
   }
 
-  if (has(form.parkingNotes)) {
-    sections.push({ title: S.parking, body: normalizeElastiFlow(trim(form.parkingNotes)) })
+  if (has(parkingField)) {
+    sections.push({ title: S.parking, body: normalizeElastiFlow(trim(parkingField)) })
   }
 
   if (form.eventPageIncludeWhyAttend !== false && has(form.meetupPageWhyAttend)) {
@@ -2147,9 +2172,7 @@ function generateMeetupCopy(form, opts = {}) {
     })
   }
 
-  const agendaBody = has(form.meetupPageAgenda)
-    ? normalizeElastiFlow(trim(form.meetupPageAgenda))
-    : normalizeElastiFlow(buildAgenda(form, lang))
+  const agendaBody = resolveAgendaBodyForEventPage(form, lang, trim, has, rs)
   sections.push({
     title: S.agenda,
     body: agendaBody,
@@ -2275,6 +2298,8 @@ export default function App() {
   const [shortenCopied, setShortenCopied] = useState(false)
   const [generatedCopy, setGeneratedCopy] = useState('')
   const [meetupPageHtml, setMeetupPageHtml] = useState('')
+  /** Last successful /api/generate structured fields for event page (arrival, parking, agenda); drives preview merge over form. */
+  const [eventPageGeneratedContent, setEventPageGeneratedContent] = useState(null)
   const [kbygEmailHtml, setKbygEmailHtml] = useState('')
   const [generatedSubject, setGeneratedSubject] = useState('')
   const [generatedOutreachLinkedIn, setGeneratedOutreachLinkedIn] = useState('')
@@ -2485,15 +2510,42 @@ export default function App() {
     if (!text) return
     setTranslateMessage(null)
     const data = await tryRemoteTranslate(text, targetLang)
-    const applied = applyRemoteKbygResult(data)
-    if (applied?.plain) {
-      setGeneratedCopy(applied.plain)
-      if (applied.html) {
-        if (generatorType === 'knowBeforeYouGo') setKbygEmailHtml(applied.html)
-        if (generatorType === 'eventPromotion') setMeetupPageHtml(applied.html)
+    const n = normalizeLanguage(targetLang)
+
+    if (generatorType === 'eventPromotion') {
+      const applied = applyRemoteEventPageResult(data)
+      if (applied) {
+        const structured = applied.structured
+        setEventPageGeneratedContent(structured)
+        const mergedPage = generateMeetupCopy(form, {
+          language: n,
+          remoteSections: structured || undefined,
+        })
+        const finalPlain = applied.plain.trim() || mergedPage.plain
+        let finalHtml = (applied.html && applied.html.trim()) || ''
+        if (!finalHtml) {
+          if (structured && Object.keys(structured).length > 0) {
+            finalHtml = mergedPage.html
+          } else {
+            finalHtml = meetupPlainTextToHtml(finalPlain)
+          }
+        }
+        setGeneratedCopy(finalPlain)
+        setMeetupPageHtml(finalHtml)
+        setEventPageLanguage(n)
+        return
       }
-      return
+    } else {
+      const applied = applyRemoteKbygResult(data)
+      if (applied?.plain) {
+        setGeneratedCopy(applied.plain)
+        if (applied.html) {
+          if (generatorType === 'knowBeforeYouGo') setKbygEmailHtml(applied.html)
+        }
+        return
+      }
     }
+
     setTranslateMessage(
       'Translation needs your /api/generate backend (POST with action: translate). Output was not changed.',
     )
@@ -2557,14 +2609,30 @@ export default function App() {
         form,
       })
       const applied = applyRemoteEventPageResult(remote)
-      if (applied?.plain) {
-        setGeneratedCopy(applied.plain)
-        setMeetupPageHtml(applied.html || generateMeetupCopy(form, { language: eventPageLanguage }).html)
+      if (applied) {
+        const structured = applied.structured
+        setEventPageGeneratedContent(structured)
+        const mergedPage = generateMeetupCopy(form, {
+          language: eventPageLanguage,
+          remoteSections: structured || undefined,
+        })
+        const finalPlain = applied.plain.trim() || mergedPage.plain
+        let finalHtml = (applied.html && applied.html.trim()) || ''
+        if (!finalHtml) {
+          if (structured && Object.keys(structured).length > 0) {
+            finalHtml = mergedPage.html
+          } else {
+            finalHtml = meetupPlainTextToHtml(finalPlain)
+          }
+        }
+        setGeneratedCopy(finalPlain)
+        setMeetupPageHtml(finalHtml)
         setKbygEmailHtml('')
         setGeneratedOutreachLinkedIn('')
         setLinkedInPost(buildLinkedInPost(form, linkedinVariant))
         return
       }
+      setEventPageGeneratedContent(null)
       const page = generateMeetupCopy(form, { language: eventPageLanguage })
       setGeneratedCopy(page.plain)
       setMeetupPageHtml(page.html)
@@ -2709,6 +2777,7 @@ export default function App() {
     }
     setGeneratedCopy('')
     setMeetupPageHtml('')
+    setEventPageGeneratedContent(null)
     setKbygEmailHtml('')
     setGeneratedSubject('')
     setGeneratedOutreachLinkedIn('')
@@ -2804,6 +2873,7 @@ export default function App() {
                   setGeneratorType(card.value)
                   setGeneratedCopy('')
                   setMeetupPageHtml('')
+                  setEventPageGeneratedContent(null)
                   setKbygEmailHtml('')
                   setGeneratedSubject('')
                   setGeneratedOutreachLinkedIn('')
@@ -3868,6 +3938,9 @@ export default function App() {
                       </div>
                     ) : null}
                     <p className="form-hint" style={{ marginTop: 0 }}>Preview below. Copy pastes HTML with bold headings into editors that support rich paste (e.g. Meetup).</p>
+                    {eventPageGeneratedContent ? (
+                      <p className="form-hint">Preview merges API fields (arrival, parking, agenda when returned) with your form so translated logistics are not replaced by English defaults.</p>
+                    ) : null}
                     {meetupPageHtml ? (
                       <div className="meetup-page-preview output-text" dangerouslySetInnerHTML={{ __html: meetupPageHtml }} />
                     ) : (
