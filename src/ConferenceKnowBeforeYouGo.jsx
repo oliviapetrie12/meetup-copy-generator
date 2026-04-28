@@ -1,7 +1,14 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { makeMoreConcise, prepareConferenceEmailClipboardHtml } from './outputHelpers.js'
 import { mergeOrganizerParsedIntoForm, processOrganizerImport } from './conferenceOrganizerImport.js'
 import { enhanceKbygOutput } from './kbygEnhanceOutput.js'
+import {
+  getConferenceStrings,
+  getConferenceTldrIncludeLabels,
+  normalizeLanguage,
+  LANGUAGE_OPTIONS,
+} from './generationLanguage.js'
+import { tryRemoteGenerate, applyRemoteKbygResult, tryRemoteTranslate } from './generateApi.js'
 
 function escapeHtml(s) {
   if (s == null) return ''
@@ -34,10 +41,6 @@ function conferenceHtmlToGoogleDocPlain(htmlString) {
   }
 }
 
-/** Appended to every generated output (no form field). */
-const STANDARD_TRAVEL_EXPENSES_TEXT =
-  "Be sure to keep your receipts throughout the event so you can expense via Concur. Feel free to refer to Elastic's travel and expense policy for additional guidance."
-
 const INITIAL_CONTACT = { name: '', role: '', email: '', phone: '', group: '' }
 
 const CONTACT_GROUP_OPTIONS = [
@@ -47,48 +50,9 @@ const CONTACT_GROUP_OPTIONS = [
   { value: 'conference_organizer', label: 'Conference Organizer' },
 ]
 
-const CONTACT_GROUP_LABELS = {
-  devrel_onsite: 'DevRel Onsite Support',
-  devrel_remote: 'DevRel Remote Support',
-  conference_organizer: 'Conference Organizer',
-}
-
 const CONTACT_GROUP_ORDER = ['devrel_onsite', 'devrel_remote', 'conference_organizer']
 
-/** Booth materials delivery: one scenario block + shared bullets in Booth Setup &amp; Logistics. */
-const BOOTH_MATERIALS_DELIVERY = {
-  shipped_to_individual: {
-    label: 'Shipped to individual',
-    bullets: [
-      'Plan for luggage, shipping boxes, and weight limits when transporting items to the venue.',
-      'Arrive with enough time to move everything to the booth and finish setup before the floor opens.',
-    ],
-  },
-  shipped_to_venue: {
-    label: 'Shipped to venue',
-    bullets: [
-      'Coordinate with event staff on receiving, storage, and where crates or pallets will be staged.',
-      'After you arrive, check in with registration or ops to locate your delivered materials before you start building the booth.',
-    ],
-  },
-  minimal_setup: {
-    label: 'No shipped materials / minimal setup',
-    bullets: [
-      'Expect a light footprint (e.g. laptop, small signage, swag); confirm ahead of time what the venue provides.',
-      'Keep setup and teardown quick—focus on essentials and leave the space clean and complete.',
-    ],
-  },
-}
-
 const BOOTH_DELIVERY_METHOD_ORDER = ['shipped_to_individual', 'shipped_to_venue', 'minimal_setup']
-
-function getFixedBoothLogisticsBullets() {
-  return [
-    'Table and chairs are typically provided onsite—confirm placement with venue or event staff if anything is unclear.',
-    'Assign setup and cleanup roles: who opens the booth, who covers sessions, and who does the final sweep and pack-out.',
-    'Place swag where it is visible from the aisle; keep backup stock behind or under the table and replenish as needed.',
-  ]
-}
 
 function normalizeBoothDeliveryMethodKey(raw) {
   const k = trim(raw)
@@ -97,57 +61,52 @@ function normalizeBoothDeliveryMethodKey(raw) {
 }
 
 /** Intro line for "Shipped to individual" (name optional). */
-function shippedToIndividualIntroPlain(form) {
+function shippedToIndividualIntroPlain(form, strings) {
   const name = trim(form.boothMaterialsShippedToName)
   if (name) {
-    return `All booth materials were shipped to ${name}, so please bring everything with you to the event, including:`
+    return strings.shippedToIndividualIntroNamed(name)
   }
-  return 'All booth materials were shipped to the onsite contact, so please bring everything with you to the event, including:'
+  return strings.shippedToIndividualIntroGeneric
 }
 
-function shippedToIndividualIntroHtml(form) {
-  const name = trim(form.boothMaterialsShippedToName)
-  if (name) {
-    return `All booth materials were shipped to ${escapeHtml(name)}, so please bring everything with you to the event, including:`
-  }
-  return escapeHtml(
-    'All booth materials were shipped to the onsite contact, so please bring everything with you to the event, including:',
-  )
+function shippedToIndividualIntroHtml(form, strings) {
+  return escapeHtml(shippedToIndividualIntroPlain(form, strings))
 }
 
-function buildBoothSetupLogisticsSectionHtml(form) {
+function buildBoothSetupLogisticsSectionHtml(form, strings) {
   const key = normalizeBoothDeliveryMethodKey(form.boothMaterialsDeliveryMethod)
-  const scenario = BOOTH_MATERIALS_DELIVERY[key]
+  const scenario = strings.boothDelivery[key]
   if (!scenario) return ''
 
-  const fixedBulletsHtml = getFixedBoothLogisticsBullets()
+  const fixedBulletsHtml = strings.boothFixedBullets
     .map((l) => `• ${escapeHtml(l)}`)
     .join('<br>')
+  const titleStrong = `<strong>${escapeHtml(strings.boothSetupLogisticsTitle)}</strong>`
 
   if (key === 'shipped_to_individual') {
-    const intro = shippedToIndividualIntroHtml(form)
+    const intro = shippedToIndividualIntroHtml(form, strings)
     const scenarioBullets = scenario.bullets.map((l) => `• ${escapeHtml(l)}`).join('<br>')
     const body = `${intro}<br><br>${scenarioBullets}<br><br>${fixedBulletsHtml}`
-    return `<strong>📢 Booth Setup &amp; Logistics</strong><br><br>${body}`
+    return `${titleStrong}<br><br>${body}`
   }
 
   const scenarioBullets = scenario.bullets.map((l) => `• ${escapeHtml(l)}`).join('<br>')
   const body = `${scenarioBullets}<br><br>${fixedBulletsHtml}`
-  return `<strong>📢 Booth Setup &amp; Logistics</strong><br><br>${body}`
+  return `${titleStrong}<br><br>${body}`
 }
 
-function appendBoothSetupLogisticsPlain(lines, form) {
+function appendBoothSetupLogisticsPlain(lines, form, strings) {
   const key = normalizeBoothDeliveryMethodKey(form.boothMaterialsDeliveryMethod)
-  const scenario = BOOTH_MATERIALS_DELIVERY[key]
+  const scenario = strings.boothDelivery[key]
   if (!scenario) return
-  lines.push('📢 Booth Setup & Logistics')
+  lines.push(strings.boothSetupLogisticsTitle)
   if (key === 'shipped_to_individual') {
-    lines.push(shippedToIndividualIntroPlain(form))
+    lines.push(shippedToIndividualIntroPlain(form, strings))
     scenario.bullets.forEach((l) => lines.push(`• ${l}`))
   } else {
     scenario.bullets.forEach((l) => lines.push(`• ${l}`))
   }
-  getFixedBoothLogisticsBullets().forEach((l) => lines.push(`• ${l}`))
+  strings.boothFixedBullets.forEach((l) => lines.push(`• ${l}`))
   lines.push('')
 }
 
@@ -194,7 +153,7 @@ function engagementShowsInEmailOutput(form) {
 }
 
 /** HTML block for Kahoot/Raffle engagement (matches KBYG spacing). */
-function buildEngagementSectionHtml(form) {
+function buildEngagementSectionHtml(form, strings) {
   if (!engagementShowsInEmailOutput(form)) return ''
   const t = trim(form.engagementType)
   const detailsRaw = trim(form.engagementDetails || '')
@@ -208,16 +167,16 @@ function buildEngagementSectionHtml(form) {
     detailLines.length > 0 ? '<br><br>' + detailLines.map((l) => `• ${escapeHtml(l)}`).join('<br>') : ''
 
   const prizeHtml =
-    prizeRaw.length > 0 ? `<br><br>Prize:<br>${escapeHtml(prizeRaw)}` : ''
+    prizeRaw.length > 0 ? `<br><br>${escapeHtml(strings.engagementPrize)}<br>${escapeHtml(prizeRaw)}` : ''
 
   if (t === 'kahoot') {
-    return `<strong>🎉 Engagement</strong><br><br><strong>Kahoot!</strong>${bulletsHtml}${prizeHtml}`
+    return `<strong>${escapeHtml(strings.engagement)}</strong><br><br><strong>${escapeHtml(strings.kahoot)}</strong>${bulletsHtml}${prizeHtml}`
   }
-  return `<strong>🎉 Raffle</strong>${bulletsHtml}${prizeHtml}`
+  return `<strong>${escapeHtml(strings.raffle)}</strong>${bulletsHtml}${prizeHtml}`
 }
 
 /** Plain-text engagement block. */
-function appendEngagementPlain(lines, form) {
+function appendEngagementPlain(lines, form, strings) {
   if (!engagementShowsInEmailOutput(form)) return
 
   const detailsRaw = trim(form.engagementDetails || '')
@@ -230,21 +189,21 @@ function appendEngagementPlain(lines, form) {
   const pushPrize = () => {
     if (!has(prizeRaw)) return
     lines.push('')
-    lines.push('Prize:')
+    lines.push(`${strings.prizeLabel}`)
     lines.push(prizeRaw)
   }
 
   if (trim(form.engagementType) === 'kahoot') {
-    lines.push('🎉 Engagement')
+    lines.push(strings.engagement)
     lines.push('')
-    lines.push('Kahoot!')
+    lines.push(strings.kahoot)
     detailLines.forEach((l) => lines.push(`- ${l}`))
     pushPrize()
     lines.push('')
     return
   }
 
-  lines.push('🎉 Raffle')
+  lines.push(strings.raffle)
   lines.push('')
   detailLines.forEach((l) => lines.push(`- ${l}`))
   pushPrize()
@@ -293,19 +252,6 @@ const TLDR_ITEM_ORDER = [
   'custom_note',
 ]
 
-const TLDR_INCLUDE_LABELS = {
-  arrival_time: 'Arrival time',
-  badge_pickup: 'Badge pickup',
-  booth_materials: 'Booth materials',
-  staffing_note: 'Staffing note',
-  lead_capture: 'Lead capture',
-  swag_materials: 'Swag/materials',
-  return_shipping: 'Return shipping',
-  key_contact: 'Key contact',
-  important_links: 'Important links',
-  custom_note: 'Custom note',
-}
-
 function getInitialTldrInclude() {
   return {
     arrival_time: true,
@@ -330,61 +276,62 @@ function truncateTldrLine(s, max = MAX_TLDR_LINE) {
   return `${t.slice(0, max - 1).trimEnd()}…`
 }
 
-function tldrBoothMaterialsSummary(form) {
+function tldrBoothMaterialsSummary(form, strings) {
   const key = normalizeBoothDeliveryMethodKey(form.boothMaterialsDeliveryMethod)
-  const scenario = BOOTH_MATERIALS_DELIVERY[key]
+  const scenario = strings.boothDelivery[key]
   if (!scenario) return null
   let s = scenario.label
   if (key === 'shipped_to_individual' && has(form.boothMaterialsShippedToName)) {
     s += ` — ${truncateTldrLine(form.boothMaterialsShippedToName, 48)}`
   }
-  return `Materials: ${s}`
+  return `${strings.tldr.materialsPrefix}: ${s}`
 }
 
 /** Plain-text bullet lines (with leading •). Respects generateTldr + tldrInclude + non-empty sources. */
-function getTldrBullets(form) {
+function getTldrBullets(form, strings) {
   if (form.generateTldr === false) return []
   const inc = { ...getInitialTldrInclude(), ...(form.tldrInclude || {}) }
   const out = []
+  const T = strings.tldr
 
   for (const id of TLDR_ITEM_ORDER) {
     if (!inc[id]) continue
     switch (id) {
       case 'arrival_time':
         if (has(form.eventDatesBoothSetup)) {
-          out.push(`• Arrive / build: ${truncateTldrLine(form.eventDatesBoothSetup)}`)
+          out.push(`• ${T.arriveBuild}: ${truncateTldrLine(form.eventDatesBoothSetup)}`)
         }
         break
       case 'badge_pickup':
         if (has(form.ticketsText)) {
-          out.push(`• Badges: ${truncateTldrLine(form.ticketsText)}`)
+          out.push(`• ${T.badges}: ${truncateTldrLine(form.ticketsText)}`)
         }
         break
       case 'booth_materials': {
-        const mat = tldrBoothMaterialsSummary(form)
+        const mat = tldrBoothMaterialsSummary(form, strings)
         if (mat) out.push(`• ${mat}`)
         break
       }
       case 'staffing_note':
         if (has(form.staffingScheduleNotes)) {
-          out.push(`• Staffing: ${truncateTldrLine(form.staffingScheduleNotes.split(/\n/)[0])}`)
+          out.push(`• ${T.staffing}: ${truncateTldrLine(form.staffingScheduleNotes.split(/\n/)[0])}`)
         } else if (has(form.staffingScheduleLink)) {
-          out.push(`• Staffing: ${truncateTldrLine(form.staffingScheduleLink, 100)}`)
+          out.push(`• ${T.staffing}: ${truncateTldrLine(form.staffingScheduleLink, 100)}`)
         }
         break
       case 'lead_capture':
         if (has(form.leadCaptureText)) {
-          out.push(`• Lead capture: ${truncateTldrLine(form.leadCaptureText)}`)
+          out.push(`• ${T.leadCapture}: ${truncateTldrLine(form.leadCaptureText)}`)
         }
         break
       case 'swag_materials':
         if (has(form.swagText)) {
-          out.push(`• Swag: ${truncateTldrLine(form.swagText)}`)
+          out.push(`• ${T.swag}: ${truncateTldrLine(form.swagText)}`)
         }
         break
       case 'return_shipping':
         if (has(form.eventDatesBoothCleanup)) {
-          out.push(`• Return / strike: ${truncateTldrLine(form.eventDatesBoothCleanup)}`)
+          out.push(`• ${T.returnStrike}: ${truncateTldrLine(form.eventDatesBoothCleanup)}`)
         }
         break
       case 'key_contact': {
@@ -393,19 +340,19 @@ function getTldrBullets(form) {
           const bits = [trim(c.name)]
           if (has(c.role)) bits.push(trim(c.role))
           if (has(c.email)) bits.push(trim(c.email))
-          out.push(`• Key contact: ${truncateTldrLine(bits.join(' · '))}`)
+          out.push(`• ${T.keyContact}: ${truncateTldrLine(bits.join(' · '))}`)
         }
         break
       }
       case 'important_links': {
         const parts = []
         if (has(form.knowBeforeYouGoDeckUrl)) {
-          parts.push(`Deck: ${truncateTldrLine(form.knowBeforeYouGoDeckUrl, 72)}`)
+          parts.push(`${T.deckShort}: ${truncateTldrLine(form.knowBeforeYouGoDeckUrl, 72)}`)
         }
         if (has(form.staffingScheduleLink)) {
-          parts.push(`Staffing: ${truncateTldrLine(form.staffingScheduleLink, 72)}`)
+          parts.push(`${T.staffingShort}: ${truncateTldrLine(form.staffingScheduleLink, 72)}`)
         }
-        if (parts.length) out.push(`• Links: ${parts.join(' · ')}`)
+        if (parts.length) out.push(`• ${T.links}: ${parts.join(' · ')}`)
         break
       }
       case 'custom_note':
@@ -427,24 +374,21 @@ function getTldrBullets(form) {
   return out
 }
 
-function hasConferenceTldrSection(form) {
-  return form.generateTldr !== false && getTldrBullets(form).length > 0
+function hasConferenceTldrSection(form, strings) {
+  return form.generateTldr !== false && getTldrBullets(form, strings).length > 0
 }
 
-const TLDR_HEADING_HTML =
-  '<strong>📝 <span style="background-color:#FEF08A;font-weight:bold;">TL;DR</span></strong>'
-
-function buildConferenceTldrBodyHtml(form) {
-  return getTldrBullets(form)
+function buildConferenceTldrBodyHtml(form, strings) {
+  return getTldrBullets(form, strings)
     .map((line) => escapeHtml(line))
     .join('<br>')
 }
 
-function appendConferenceTldrPlain(lines, form) {
-  if (!hasConferenceTldrSection(form)) return
+function appendConferenceTldrPlain(lines, form, strings) {
+  if (!hasConferenceTldrSection(form, strings)) return
 
-  lines.push('📝 TL;DR')
-  getTldrBullets(form).forEach((b) => lines.push(b))
+  lines.push(strings.tldrHeadingPlain)
+  getTldrBullets(form, strings).forEach((b) => lines.push(b))
   lines.push('')
 }
 
@@ -467,7 +411,7 @@ function formatContactBlockPlain(c) {
   return lines.join('\n')
 }
 
-function buildContactsSectionHtml(form) {
+function buildContactsSectionHtml(form, strings) {
   const withName = (form.contacts || []).filter((c) => has(c.name))
   if (withName.length === 0) return ''
 
@@ -480,11 +424,12 @@ function buildContactsSectionHtml(form) {
   }
 
   const chunks = []
+  const gl = strings.contactGroups
   for (const key of CONTACT_GROUP_ORDER) {
     const list = byGroup.get(key)
     if (!list?.length) continue
     chunks.push(
-      `<strong>${escapeHtml(CONTACT_GROUP_LABELS[key])}</strong><br><br>${list.map(formatContactBlockHtml).join('<br><br>')}`,
+      `<strong>${escapeHtml(gl[key])}</strong><br><br>${list.map(formatContactBlockHtml).join('<br><br>')}`,
     )
   }
 
@@ -492,16 +437,16 @@ function buildContactsSectionHtml(form) {
   if (other.length) {
     const block = other.map(formatContactBlockHtml).join('<br><br>')
     if (chunks.length) {
-      chunks.push(`<strong>Other contacts</strong><br><br>${block}`)
+      chunks.push(`<strong>${escapeHtml(strings.otherContacts)}</strong><br><br>${block}`)
     } else {
       chunks.push(block)
     }
   }
 
-  return `<strong>💬 Contacts</strong><br><br>${chunks.join('<br><br>')}`
+  return `<strong>${escapeHtml(strings.contactsHeading)}</strong><br><br>${chunks.join('<br><br>')}`
 }
 
-function buildContactsSectionPlain(form) {
+function buildContactsSectionPlain(form, strings) {
   const withName = (form.contacts || []).filter((c) => has(c.name))
   if (withName.length === 0) return ''
 
@@ -515,11 +460,12 @@ function buildContactsSectionPlain(form) {
 
   const hasGrouped = CONTACT_GROUP_ORDER.some((k) => (byGroup.get(k) || []).length > 0)
 
-  const parts = ['💬 Contacts', '']
+  const gl = strings.contactGroups
+  const parts = [strings.contactsHeading, '']
   for (const key of CONTACT_GROUP_ORDER) {
     const list = byGroup.get(key)
     if (!list?.length) continue
-    parts.push(CONTACT_GROUP_LABELS[key], '')
+    parts.push(gl[key], '')
     list.forEach((c) => {
       parts.push(formatContactBlockPlain(c))
       parts.push('')
@@ -529,7 +475,7 @@ function buildContactsSectionPlain(form) {
   const other = byGroup.get('_other') || []
   if (other.length) {
     if (hasGrouped) {
-      parts.push('Other contacts', '')
+      parts.push(strings.otherContacts, '')
     }
     other.forEach((c) => {
       parts.push(formatContactBlockPlain(c))
@@ -541,12 +487,13 @@ function buildContactsSectionPlain(form) {
 }
 
 /** Auto subject: "[Event Name] Know Before You Go + [booth info]" (venue, else first line of address). */
-function generateAutoSubjectLine(form) {
+function generateAutoSubjectLine(form, lang = 'en') {
+  const strings = getConferenceStrings(lang)
   const name = trim(form.conferenceName)
   const venue = trim(form.locationVenue)
   const addrFirst = trim(form.locationAddress).split('\n')[0]?.trim() || ''
   const boothInfo = venue || addrFirst
-  const base = name ? `${name} Know Before You Go` : 'Know Before You Go'
+  const base = name ? `${name} ${strings.subjectKbyg}` : strings.subjectKbyg
   return boothInfo ? `${base} + ${boothInfo}` : base
 }
 
@@ -565,17 +512,17 @@ function hasStaffingScheduleContent(form) {
   return has(form.staffingScheduleLink) || has(form.staffingScheduleNotes)
 }
 
-function buildStaffingScheduleSectionHtml(form) {
+function buildStaffingScheduleSectionHtml(form, strings) {
   if (!hasStaffingScheduleContent(form)) return ''
   const linkRaw = trim(form.staffingScheduleLink)
   const notesRaw = trim(form.staffingScheduleNotes)
 
-  let block = '<strong>Staffing Schedule</strong>'
+  let block = `<strong>${escapeHtml(strings.htmlStaffingStrong)}</strong>`
 
   if (has(linkRaw)) {
     const href = escapeHtmlAttr(linkRaw)
     const display = escapeHtml(linkRaw)
-    block += `<br><br>Please refer to the staffing schedule here:<br><a href="${href}" style="color:#1D4ED8;text-decoration:underline;">${display}</a>`
+    block += `<br><br>${escapeHtml(strings.htmlStaffingLink)}<br><a href="${href}" style="color:#1D4ED8;text-decoration:underline;">${display}</a>`
   }
 
   if (has(notesRaw)) {
@@ -591,13 +538,13 @@ function buildStaffingScheduleSectionHtml(form) {
   return block
 }
 
-function appendStaffingSchedulePlain(lines, form) {
+function appendStaffingSchedulePlain(lines, form, strings) {
   if (!hasStaffingScheduleContent(form)) return
-  lines.push('Staffing Schedule')
+  lines.push(strings.staffingSchedule)
   lines.push('')
   const linkRaw = trim(form.staffingScheduleLink)
   if (has(linkRaw)) {
-    lines.push('Please refer to the staffing schedule here:')
+    lines.push(strings.staffingLinkIntro)
     lines.push(linkRaw)
     lines.push('')
   }
@@ -611,58 +558,59 @@ function appendStaffingSchedulePlain(lines, form) {
   }
 }
 
-function buildEventDatesAndHoursSectionHtml(form) {
+function buildEventDatesAndHoursSectionHtml(form, strings) {
   if (!hasEventDatesAndHoursContent(form)) return ''
 
+  const L = strings.htmlEventDatesLabels
   const subs = []
   if (has(form.eventDatesBoothSetup)) {
-    subs.push(`Booth Setup: ${escapeHtml(trim(form.eventDatesBoothSetup))}`)
+    subs.push(`${escapeHtml(L.setup)} ${escapeHtml(trim(form.eventDatesBoothSetup))}`)
   }
   if (has(form.eventDatesBoothHours)) {
-    subs.push(`Booth Hours:<br>${linesToHtmlPreserve(form.eventDatesBoothHours)}`)
+    subs.push(`${escapeHtml(L.hours)}<br>${linesToHtmlPreserve(form.eventDatesBoothHours)}`)
   }
   if (has(form.eventDatesBoothCleanup)) {
-    subs.push(`Booth Cleanup: ${escapeHtml(trim(form.eventDatesBoothCleanup))}`)
+    subs.push(`${escapeHtml(L.cleanup)} ${escapeHtml(trim(form.eventDatesBoothCleanup))}`)
   }
   if (has(form.eventDatesNotes)) {
-    subs.push(`Notes:<br>${linesToHtmlPreserve(form.eventDatesNotes)}`)
+    subs.push(`${escapeHtml(L.notes)}<br>${linesToHtmlPreserve(form.eventDatesNotes)}`)
   }
 
-  let html = `<strong>🗓 Event Dates &amp; Hours</strong>`
+  let html = `<strong>${escapeHtml(strings.eventDatesTitle)}</strong>`
   if (subs.length > 0) {
     html += `<br><br>${subs.join('<br><br>')}`
   }
-  const staffingHtml = buildStaffingScheduleSectionHtml(form)
+  const staffingHtml = buildStaffingScheduleSectionHtml(form, strings)
   if (staffingHtml) {
     html += `<br><br>${staffingHtml}`
   }
   return html
 }
 
-function buildEventDatesAndHoursSectionPlain(form) {
+function buildEventDatesAndHoursSectionPlain(form, strings) {
   if (!hasEventDatesAndHoursContent(form)) return ''
 
   const lines = []
-  lines.push('🗓 Event Dates & Hours', '')
+  lines.push(strings.eventDatesTitle, '')
   if (has(form.eventDatesBoothSetup)) {
-    lines.push(`Booth Setup: ${trim(form.eventDatesBoothSetup)}`)
+    lines.push(`${strings.boothSetupLabel} ${trim(form.eventDatesBoothSetup)}`)
     lines.push('')
   }
   if (has(form.eventDatesBoothHours)) {
-    lines.push('Booth Hours:')
+    lines.push(strings.boothHoursLabel)
     lines.push(trim(form.eventDatesBoothHours))
     lines.push('')
   }
   if (has(form.eventDatesBoothCleanup)) {
-    lines.push(`Booth Cleanup: ${trim(form.eventDatesBoothCleanup)}`)
+    lines.push(`${strings.boothCleanupLabel} ${trim(form.eventDatesBoothCleanup)}`)
     lines.push('')
   }
   if (has(form.eventDatesNotes)) {
-    lines.push('Notes:')
+    lines.push(strings.notesLabel)
     lines.push(trim(form.eventDatesNotes))
     lines.push('')
   }
-  appendStaffingSchedulePlain(lines, form)
+  appendStaffingSchedulePlain(lines, form, strings)
   return lines.join('\n')
 }
 
@@ -671,38 +619,38 @@ function eventNameLabel(form) {
   return trim(form.conferenceName) || 'the event'
 }
 
-function buildConferenceIntroHtml(form) {
+function buildConferenceIntroHtml(form, strings) {
   const name = eventNameLabel(form)
   const enc = escapeHtml(name)
-  let html = `Hi Team,<br><br>`
-  html += `First and foremost, thank you for attending ${enc} and helping out at the DevRel booth! We appreciate your help very much!`
+  let html = strings.htmlIntroHi
+  html += strings.htmlThankYou(enc)
   if (has(form.knowBeforeYouGoDeckUrl)) {
     const href = escapeHtmlAttr(trim(form.knowBeforeYouGoDeckUrl))
-    html += `<br><br>For additional information, please take a look at the <a href="${href}" style="color:#1D4ED8;text-decoration:underline;">${enc} Know Before You Go slide deck</a>. If you have any questions, please don't hesitate to reach out.`
+    html += strings.htmlDeck(enc, href)
   }
   return html
 }
 
-function buildConferenceEmailHtml(form) {
-  const confName = eventNameLabel(form)
+function buildConferenceEmailHtml(form, opts = {}) {
+  const strings = getConferenceStrings(normalizeLanguage(opts.language))
   const parts = []
 
-  parts.push(buildConferenceIntroHtml(form))
+  parts.push(buildConferenceIntroHtml(form, strings))
   if (has(form.conferenceName)) {
     parts.push(`<strong>${escapeHtml(trim(form.conferenceName))}</strong>`)
   }
 
-  const tldrBodyHtml = buildConferenceTldrBodyHtml(form)
-  if (hasConferenceTldrSection(form) && tldrBodyHtml.length > 0) {
-    parts.push(`${TLDR_HEADING_HTML}<br><br>${tldrBodyHtml}`)
+  const tldrBodyHtml = buildConferenceTldrBodyHtml(form, strings)
+  if (hasConferenceTldrSection(form, strings) && tldrBodyHtml.length > 0) {
+    parts.push(`${strings.tldrHeadingHtml}<br><br>${tldrBodyHtml}`)
   }
 
-  const eventDatesBlock = buildEventDatesAndHoursSectionHtml(form)
+  const eventDatesBlock = buildEventDatesAndHoursSectionHtml(form, strings)
   if (eventDatesBlock) {
     parts.push(eventDatesBlock)
   }
   if (has(form.ticketsText)) {
-    parts.push(`<strong>🎟 Tickets</strong><br><br>${textToHtmlLines(form.ticketsText)}`)
+    parts.push(`<strong>${escapeHtml(strings.tickets)}</strong><br><br>${textToHtmlLines(form.ticketsText)}`)
   }
 
   if (has(form.locationVenue) || has(form.locationAddress)) {
@@ -711,34 +659,34 @@ function buildConferenceEmailHtml(form) {
     if (has(form.locationAddress)) {
       loc += (loc ? '<br>' : '') + escapeHtml(trim(form.locationAddress))
     }
-    parts.push(`<strong>🏢 Location</strong><br><br>${loc}`)
+    parts.push(`<strong>${escapeHtml(strings.location)}</strong><br><br>${loc}`)
   }
 
-  const contactsHtml = buildContactsSectionHtml(form)
+  const contactsHtml = buildContactsSectionHtml(form, strings)
   if (contactsHtml) {
     parts.push(contactsHtml)
   }
 
-  const boothLogisticsHtml = buildBoothSetupLogisticsSectionHtml(form)
+  const boothLogisticsHtml = buildBoothSetupLogisticsSectionHtml(form, strings)
   if (boothLogisticsHtml) {
     parts.push(boothLogisticsHtml)
   }
   if (has(form.avSetupRequirements)) {
     parts.push(
-      `<strong>🔌 AV / Setup Requirements</strong><br><br>${linesToHtmlPreserve(form.avSetupRequirements)}`,
+      `<strong>${escapeHtml(strings.avSetup)}</strong><br><br>${linesToHtmlPreserve(form.avSetupRequirements)}`,
     )
   }
   if (has(form.swagText)) {
-    parts.push(`<strong>🛍 Swag</strong><br><br>${textToHtmlLines(form.swagText)}`)
+    parts.push(`<strong>${escapeHtml(strings.swag)}</strong><br><br>${textToHtmlLines(form.swagText)}`)
   }
   if (has(form.parkingText)) {
-    parts.push(`<strong>🚙 Parking</strong><br><br>${textToHtmlLines(form.parkingText)}`)
+    parts.push(`<strong>${escapeHtml(strings.parking)}</strong><br><br>${textToHtmlLines(form.parkingText)}`)
   }
   if (has(form.foodBeverageText)) {
-    parts.push(`<strong>🍔 Food &amp; Beverage</strong><br><br>${textToHtmlLines(form.foodBeverageText)}`)
+    parts.push(`<strong>${escapeHtml(strings.foodBeverage)}</strong><br><br>${textToHtmlLines(form.foodBeverageText)}`)
   }
 
-  const engagementHtml = buildEngagementSectionHtml(form)
+  const engagementHtml = buildEngagementSectionHtml(form, strings)
   if (engagementHtml) {
     parts.push(engagementHtml)
   }
@@ -747,100 +695,95 @@ function buildConferenceEmailHtml(form) {
     const t = trim(sec.title)
     const c = trim(sec.content)
     if (!has(c)) return
-    const title = escapeHtml(t || 'Section')
+    const title = escapeHtml(t || strings.additionalSectionFallback)
     parts.push(`<strong>➕ ${title}</strong><br><br>${textToHtmlLines(sec.content)}`)
   })
 
   parts.push(
-    `<strong>💵 Travel &amp; Expenses</strong><br><br>${escapeHtml(STANDARD_TRAVEL_EXPENSES_TEXT)}`,
+    `<strong>${strings.htmlTravelStrong}</strong><br><br>${escapeHtml(strings.standardTravel)}`,
   )
-  parts.push(escapeHtml('Please reach out if anything changes on site or you need a hand.'))
+  parts.push(escapeHtml(strings.signoff))
 
   const inner = parts.filter((p) => String(p).trim().length > 0).join('<br><br>')
   return `<div style="font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.5;color:#202124;">${inner}</div>`
 }
 
-function generateConferenceEmailPlain(form) {
+function generateConferenceEmailPlain(form, opts = {}) {
+  const strings = getConferenceStrings(normalizeLanguage(opts.language))
   const confName = eventNameLabel(form)
   const lines = []
 
-  lines.push('Hi Team', '')
-  lines.push(
-    `First and foremost, thank you for attending ${confName} and helping out at the DevRel booth! We appreciate your help very much!`,
-    '',
-  )
+  lines.push(strings.hiTeam, '')
+  lines.push(strings.thankYou(confName), '')
   if (has(form.knowBeforeYouGoDeckUrl)) {
-    lines.push(
-      `For additional information, please take a look at the ${confName} Know Before You Go slide deck (${trim(form.knowBeforeYouGoDeckUrl)}). If you have any questions, please don't hesitate to reach out.`,
-      '',
-    )
+    lines.push(strings.deckParagraph(confName, trim(form.knowBeforeYouGoDeckUrl)), '')
   }
   if (has(form.conferenceName)) {
     lines.push(trim(form.conferenceName))
     lines.push('')
   }
 
-  appendConferenceTldrPlain(lines, form)
-  const eventDatesPlain = buildEventDatesAndHoursSectionPlain(form)
+  appendConferenceTldrPlain(lines, form, strings)
+  const eventDatesPlain = buildEventDatesAndHoursSectionPlain(form, strings)
   if (eventDatesPlain) {
     lines.push(eventDatesPlain)
     lines.push('')
   }
   if (has(form.ticketsText)) {
-    lines.push('🎟 Tickets')
+    lines.push(strings.tickets)
     lines.push(trim(form.ticketsText))
     lines.push('')
   }
   if (has(form.locationVenue) || has(form.locationAddress)) {
-    lines.push('🏢 Location')
+    lines.push(strings.location)
     if (has(form.locationVenue)) lines.push(trim(form.locationVenue))
     if (has(form.locationAddress)) lines.push(trim(form.locationAddress))
     lines.push('')
   }
 
-  const contactsPlain = buildContactsSectionPlain(form)
+  const contactsPlain = buildContactsSectionPlain(form, strings)
   if (contactsPlain) {
     lines.push(contactsPlain.trimEnd())
     lines.push('')
   }
 
-  appendBoothSetupLogisticsPlain(lines, form)
+  appendBoothSetupLogisticsPlain(lines, form, strings)
   if (has(form.avSetupRequirements)) {
-    lines.push('🔌 AV / Setup Requirements')
+    lines.push(strings.avSetup)
     lines.push(trim(form.avSetupRequirements))
     lines.push('')
   }
   if (has(form.swagText)) {
-    lines.push('🛍 Swag')
+    lines.push(strings.swag)
     lines.push(trim(form.swagText))
     lines.push('')
   }
   if (has(form.parkingText)) {
-    lines.push('🚙 Parking')
+    lines.push(strings.parking)
     lines.push(trim(form.parkingText))
     lines.push('')
   }
   if (has(form.foodBeverageText)) {
-    lines.push('🍔 Food & Beverage')
+    lines.push(strings.foodBeverage)
     lines.push(trim(form.foodBeverageText))
     lines.push('')
   }
 
-  appendEngagementPlain(lines, form)
+  appendEngagementPlain(lines, form, strings)
 
   ;(form.additionalSections || []).forEach((sec) => {
     const t = trim(sec.title)
     const c = trim(sec.content)
     if (!has(c)) return
-    lines.push(`➕ ${t || 'Section'}`)
+    lines.push(`➕ ${t || strings.additionalSectionFallback}`)
     lines.push(c)
     lines.push('')
   })
 
-  lines.push('💵 Travel & Expenses')
-  lines.push(STANDARD_TRAVEL_EXPENSES_TEXT)
+  lines.push(strings.travelExpenses)
+  lines.push(strings.standardTravel)
   lines.push('')
-  lines.push('Please reach out if anything changes on site or you need a hand.')
+  lines.push(strings.signoff)
 
   return lines.join('\n')
 }
@@ -848,7 +791,7 @@ function generateConferenceEmailPlain(form) {
 export default function ConferenceKnowBeforeYouGo() {
   const [form, setForm] = useState(() => getInitialForm())
   const subjectManuallyEditedRef = useRef(false)
-  const [subjectLine, setSubjectLine] = useState(() => generateAutoSubjectLine(getInitialForm()))
+  const [subjectLine, setSubjectLine] = useState(() => generateAutoSubjectLine(getInitialForm(), 'en'))
   const [plain, setPlain] = useState('')
   const [html, setHtml] = useState('')
   const [emailCopied, setEmailCopied] = useState(false)
@@ -862,11 +805,16 @@ export default function ConferenceKnowBeforeYouGo() {
   const [kbygEnhanceMode, setKbygEnhanceMode] = useState('email')
   const [kbygEnhanceOutput, setKbygEnhanceOutput] = useState('')
   const [kbygEnhanceCopied, setKbygEnhanceCopied] = useState(false)
+  const [conferenceLanguage, setConferenceLanguage] = useState('en')
+  const [translateMessage, setTranslateMessage] = useState(null)
+
+  const tldrIncludeLabels = getConferenceTldrIncludeLabels(conferenceLanguage)
+  const boothDeliveryOptionsEn = useMemo(() => getConferenceStrings('en').boothDelivery, [])
 
   useEffect(() => {
     if (subjectManuallyEditedRef.current) return
-    setSubjectLine(generateAutoSubjectLine(form))
-  }, [form.conferenceName, form.locationVenue, form.locationAddress])
+    setSubjectLine(generateAutoSubjectLine(form, conferenceLanguage))
+  }, [form.conferenceName, form.locationVenue, form.locationAddress, conferenceLanguage])
 
   const update = (key) => (e) => {
     const v = e.target.value
@@ -937,20 +885,50 @@ export default function ConferenceKnowBeforeYouGo() {
     }))
   }
 
+  const handleTranslateConference = async (targetLang) => {
+    const text = plain.trim()
+    if (!text) return
+    setTranslateMessage(null)
+    const data = await tryRemoteTranslate(text, targetLang)
+    const applied = applyRemoteKbygResult(data)
+    if (applied?.plain) {
+      setPlain(applied.plain)
+      if (applied.html) setHtml(applied.html)
+      return
+    }
+    setTranslateMessage(
+      'Translation needs your /api/generate backend (POST with action: translate). Plain text was not changed.',
+    )
+    setTimeout(() => setTranslateMessage(null), 6000)
+  }
+
   const handleGenerate = useCallback(
-    (e) => {
+    async (e) => {
       e.preventDefault()
-      setPlain(generateConferenceEmailPlain(form))
-      setHtml(buildConferenceEmailHtml(form))
+      const opts = { language: conferenceLanguage }
+      const remote = await tryRemoteGenerate({
+        generator: 'conferenceKbyg',
+        language: conferenceLanguage,
+        form,
+        options: opts,
+      })
+      const applied = applyRemoteKbygResult(remote)
+      if (applied?.plain) {
+        setPlain(applied.plain)
+        setHtml(applied.html || buildConferenceEmailHtml(form, opts))
+        return
+      }
+      setPlain(generateConferenceEmailPlain(form, opts))
+      setHtml(buildConferenceEmailHtml(form, opts))
     },
-    [form],
+    [form, conferenceLanguage],
   )
 
   const handleReset = () => {
     const next = getInitialForm()
     subjectManuallyEditedRef.current = false
     setForm(next)
-    setSubjectLine(generateAutoSubjectLine(next))
+    setSubjectLine(generateAutoSubjectLine(next, conferenceLanguage))
     setPlain('')
     setHtml('')
     setOrganizerImportText('')
@@ -1014,7 +992,8 @@ export default function ConferenceKnowBeforeYouGo() {
   /** Rich HTML + plain text for Gmail / clients (not raw HTML string paste). */
   const copyForEmail = async () => {
     if (!html) return
-    const plainBody = trim(plain) || generateConferenceEmailPlain(form).trim()
+    const plainBody =
+      trim(plain) || generateConferenceEmailPlain(form, { language: conferenceLanguage }).trim()
     try {
       const { html: clipHtml } = prepareConferenceEmailClipboardHtml(html)
       const payloadHtml = clipHtml || html
@@ -1220,7 +1199,7 @@ export default function ConferenceKnowBeforeYouGo() {
                 {TLDR_ITEM_ORDER.map((id) => (
                   <label key={id} className="checkbox-label tldr-include-option">
                     <input type="checkbox" checked={!!tldrIncludeMerged[id]} onChange={updateTldrInclude(id)} />
-                    {TLDR_INCLUDE_LABELS[id]}
+                    {tldrIncludeLabels[id]}
                   </label>
                 ))}
               </div>
@@ -1377,7 +1356,7 @@ export default function ConferenceKnowBeforeYouGo() {
               <select value={normalizeBoothDeliveryMethodKey(form.boothMaterialsDeliveryMethod)} onChange={updateBoothDeliveryMethod}>
                 {BOOTH_DELIVERY_METHOD_ORDER.map((value) => (
                   <option key={value} value={value}>
-                    {BOOTH_MATERIALS_DELIVERY[value].label}
+                    {boothDeliveryOptionsEn[value]?.label || value}
                   </option>
                 ))}
               </select>
@@ -1505,6 +1484,18 @@ export default function ConferenceKnowBeforeYouGo() {
             </button>
           </fieldset>
 
+          <div className="form-language-row" role="group" aria-label="Output language">
+            <label>
+              Language
+              <select value={conferenceLanguage} onChange={(e) => setConferenceLanguage(e.target.value)}>
+                {LANGUAGE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
           <button type="submit" className="btn-generate">
             Generate email
           </button>
@@ -1540,6 +1531,16 @@ export default function ConferenceKnowBeforeYouGo() {
           {plain ? (
             <>
               <h3 className="generated-email-heading">Email body</h3>
+              <div className="translate-output-bar" role="group" aria-label="Translate output via API">
+                <span className="form-hint translate-output-label">Translate output</span>
+                <button type="button" className="btn-section-action" onClick={() => handleTranslateConference('es')}>
+                  → Spanish
+                </button>
+                <button type="button" className="btn-section-action" onClick={() => handleTranslateConference('pt')}>
+                  → Portuguese (BR)
+                </button>
+              </div>
+              {translateMessage ? <p className="form-hint translate-api-hint">{translateMessage}</p> : null}
               {html ? (
                 <div className="meetup-page-preview output-text" dangerouslySetInnerHTML={{ __html: html }} />
               ) : (

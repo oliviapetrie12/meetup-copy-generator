@@ -8,6 +8,20 @@ import {
   rebuildKbygPlainFromSections,
   replaceKbygSectionBody,
 } from './outputHelpers.js'
+import {
+  LANGUAGE_OPTIONS,
+  normalizeLanguage,
+  getEventPageStrings,
+  getMeetupKbygStrings,
+  getMeetupKbygTldrLabels,
+  getMeetupKbygPhotoLines,
+} from './generationLanguage.js'
+import {
+  tryRemoteGenerate,
+  applyRemoteEventPageResult,
+  applyRemoteKbygResult,
+  tryRemoteTranslate,
+} from './generateApi.js'
 
 function SearchableSelect({ value, onChange, options, placeholder = 'Type to search…', id }) {
   const [open, setOpen] = useState(false)
@@ -474,17 +488,6 @@ const KBYG_TLDR_ITEM_ORDER = [
   'custom_note',
 ]
 
-const KBYG_TLDR_LABELS = {
-  arrival_time: 'Arrival time',
-  venue_location: 'Venue / location',
-  parking: 'Parking',
-  food_drinks: 'Food & drinks',
-  speaker_arrival: 'Speaker arrival note',
-  av_setup: 'AV / presentation setup',
-  host_contact: 'Host / point of contact',
-  custom_note: 'Custom note',
-}
-
 function getInitialKbygTldrInclude() {
   return {
     arrival_time: true,
@@ -509,13 +512,6 @@ const KBYG_AV_QUICK_FILL = [
   'A TV/screen will be available. It is recommended to bring a backup HDMI adapter.',
   'Please bring your laptop and any adapters you may need.',
   'HDMI connection will be available.',
-]
-
-const KBYG_TAKE_PHOTOS_DEFAULT_LINES = [
-  'Capture a few photos of the setup and space',
-  'Take photos during the talk (speaker + audience)',
-  'Get a few candid networking shots',
-  'Optional: short video clips for social',
 ]
 
 const KBYG_INITIAL_STATE = {
@@ -654,12 +650,13 @@ const QR_INITIAL_STATE = {
   qrEyeStyle: '',
 }
 
-function generateKnowBeforeYouGoSubject(form) {
+function generateKnowBeforeYouGoSubject(form, opts = {}) {
+  const S = getMeetupKbygStrings(normalizeLanguage(opts.language))
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const title = trim(form.eventTitle)
   const date = trim(form.eventDate)
-  if (!title) return 'Meetup Know Before You Go'
-  return `${title} | Meetup Know Before You Go${date ? ` | ${date}` : ''}`
+  if (!title) return S.subjectSuffix
+  return `${title} | ${S.subjectSuffix}${date ? ` | ${date}` : ''}`
 }
 
 const MAX_KBYG_TLDR_LEN = 115
@@ -672,6 +669,7 @@ function truncateKbygTldr(s, max = MAX_KBYG_TLDR_LEN) {
 }
 
 function buildKbygTldrBullets(form, opts = {}) {
+  const S = getMeetupKbygStrings(normalizeLanguage(opts.language))
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const has = (s) => trim(s).length > 0
   if (form.generateTldr === false) return []
@@ -684,29 +682,29 @@ function buildKbygTldrBullets(form, opts = {}) {
     switch (id) {
       case 'arrival_time': {
         if (has(form.arrivalTime)) {
-          out.push(`Arrive by ${trim(form.arrivalTime)}.`)
+          out.push(`${S.tldrArriveBy(trim(form.arrivalTime))}`)
         } else if (has(form.eventDate) || has(form.eventTime)) {
           const when = [trim(form.eventDate), trim(form.eventTime)].filter(Boolean).join(' at ')
-          if (when) out.push(`When: ${when}.`)
+          if (when) out.push(S.tldrWhen(when))
         }
         break
       }
       case 'venue_location': {
         if (has(form.venueName) || has(form.venueAddress)) {
           const parts = [trim(form.venueName), trim(form.venueAddress)].filter(Boolean)
-          out.push(`Venue: ${truncateKbygTldr(parts.join(' — '))}`)
+          out.push(S.tldrVenue(truncateKbygTldr(parts.join(' — '))))
         }
         break
       }
       case 'parking':
         if (has(form.parkingNotes)) {
-          out.push(`Parking: ${truncateKbygTldr(form.parkingNotes)}`)
+          out.push(S.tldrParking(truncateKbygTldr(form.parkingNotes)))
         }
         break
       case 'food_drinks': {
         if (has(form.foodDetails) || has(form.drinkDetails)) {
           const fd = [trim(form.foodDetails), trim(form.drinkDetails)].filter(Boolean).join('; ')
-          out.push(truncateKbygTldr(`Food & drinks: ${fd}${fd.endsWith('.') ? '' : '.'}`))
+          out.push(truncateKbygTldr(S.tldrFoodDrinks(fd)))
         }
         break
       }
@@ -721,7 +719,7 @@ function buildKbygTldrBullets(form, opts = {}) {
             .split(/\n+/)
             .map((s) => s.trim())
             .filter(Boolean)[0]
-          if (firstAv) out.push(`AV: ${truncateKbygTldr(firstAv, 100)}`)
+          if (firstAv) out.push(S.tldrAv(truncateKbygTldr(firstAv, 100)))
         }
         break
       }
@@ -731,7 +729,7 @@ function buildKbygTldrBullets(form, opts = {}) {
           const bits = [trim(c.name)]
           if (has(c.role)) bits.push(trim(c.role))
           if (has(c.contactInfo)) bits.push(trim(c.contactInfo))
-          out.push(`Contact: ${truncateKbygTldr(bits.join(' · '))}`)
+          out.push(S.tldrContact(truncateKbygTldr(bits.join(' · '))))
         }
         break
       }
@@ -767,6 +765,7 @@ function escapeHtmlAttr(s) {
 }
 
 function buildKnowBeforeYouGoEmailHtml(form, opts = {}) {
+  const S = getMeetupKbygStrings(normalizeLanguage(opts.language))
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const has = (s) => trim(s).length > 0
   const names = trim(form.greetingNames) || 'everyone'
@@ -779,27 +778,27 @@ function buildKnowBeforeYouGoEmailHtml(form, opts = {}) {
 
   chunks.push(`<p style="margin:0;line-height:1.5;">Hi ${escapeHtml(names)},</p>`)
 
-  let titleBody = eventTitle ? escapeHtml(eventTitle) : escapeHtml('Meetup')
+  let titleBody = eventTitle ? escapeHtml(eventTitle) : escapeHtml(S.meetupFallbackTitle)
   const whenLine = [eventDate, eventTime].filter(Boolean).join(' at ')
   if (whenLine) titleBody += `<br>${escapeHtml(whenLine)}`
-  if (arrivalTime) titleBody += `<br>${escapeHtml(`Arrive by ${arrivalTime}`)}`
-  chunks.push(`<p style="margin:0;line-height:1.5;"><strong>Title</strong><br><br>${titleBody}</p>`)
+  if (arrivalTime) titleBody += `<br>${escapeHtml(S.htmlArriveBy(arrivalTime))}`
+  chunks.push(`<p style="margin:0;line-height:1.5;"><strong>${escapeHtml(S.htmlTitleStrong)}</strong><br><br>${titleBody}</p>`)
 
   const tldrBullets = buildKbygTldrBullets(form, opts)
   if (tldrBullets.length > 0) {
-    const tldrInner = `<span style="background-color: #FEF08A; font-weight: bold;">TL;DR</span><br><br>${tldrBullets.map((i) => `• ${escapeHtml(i)}`).join('<br>')}`
+    const tldrInner = `<span style="background-color: #FEF08A; font-weight: bold;">${escapeHtml(S.tldrHeading)}</span><br><br>${tldrBullets.map((i) => `• ${escapeHtml(i)}`).join('<br>')}`
     chunks.push(`<p style="margin:0;line-height:1.5;">${tldrInner}</p>`)
   }
 
   let thanks = ''
   if (eventDate && eventTitle) {
-    thanks = `Thank you for being part of the ${eventTitle} meetup on ${eventDate}. Below are the logistics to help you prepare for the event.`
+    thanks = S.htmlThanksFull(eventTitle, eventDate)
   } else if (eventTitle) {
-    thanks = `Thank you for being part of the ${eventTitle} meetup. Below are the logistics to help you prepare for the event.`
+    thanks = S.htmlThanksTitle(eventTitle)
   } else if (eventDate) {
-    thanks = `Thank you for being part of this meetup on ${eventDate}. Below are the logistics to help you prepare for the event.`
+    thanks = S.htmlThanksDate(eventDate)
   } else {
-    thanks = 'Thank you for being part of this meetup. Below are the logistics to help you prepare for the event.'
+    thanks = S.htmlThanksGeneric
   }
   chunks.push(`<p style="margin:0;line-height:1.5;">${escapeHtml(thanks)}</p>`)
 
@@ -807,12 +806,12 @@ function buildKnowBeforeYouGoEmailHtml(form, opts = {}) {
     let loc = ''
     if (has(form.venueName)) loc += escapeHtml(trim(form.venueName))
     if (has(form.venueAddress)) loc += (loc ? '<br>' : '') + escapeHtml(trim(form.venueAddress))
-    chunks.push(`<p style="margin:0;line-height:1.5;"><strong>Location</strong><br><br>${loc}</p>`)
+    chunks.push(`<p style="margin:0;line-height:1.5;"><strong>${escapeHtml(S.htmlLocationStrong)}</strong><br><br>${loc}</p>`)
   }
 
   if (has(form.parkingNotes)) {
     chunks.push(
-      `<p style="margin:0;line-height:1.5;"><strong>Parking</strong><br><br>${escapeHtml(trim(form.parkingNotes)).replace(/\n/g, '<br>')}</p>`,
+      `<p style="margin:0;line-height:1.5;"><strong>${escapeHtml(S.htmlParkingStrong)}</strong><br><br>${escapeHtml(trim(form.parkingNotes)).replace(/\n/g, '<br>')}</p>`,
     )
   }
 
@@ -820,30 +819,30 @@ function buildKnowBeforeYouGoEmailHtml(form, opts = {}) {
     const agendaBullets = trim(form.internalAgenda).split(/\n+/).map((s) => s.trim()).filter(Boolean)
     if (agendaBullets.length > 0) {
       const agendaHtml = agendaBullets.map((b) => `• ${escapeHtml(b)}`).join('<br>')
-      chunks.push(`<p style="margin:0;line-height:1.5;"><strong>Agenda</strong><br><br>${agendaHtml}</p>`)
+      chunks.push(`<p style="margin:0;line-height:1.5;"><strong>${escapeHtml(S.htmlAgendaStrong)}</strong><br><br>${agendaHtml}</p>`)
     }
   }
 
   const speakerBits = []
   if (has(form.speaker1Name) || has(form.speaker1Title) || has(form.speaker1TalkTitle)) {
-    let t = trim(form.speaker1Name) || 'Speaker 1'
+    let t = trim(form.speaker1Name) || S.speaker1Default
     if (has(form.speaker1Title)) t += `, ${trim(form.speaker1Title)}`
     if (has(form.speaker1TalkTitle)) t += ` — ${trim(form.speaker1TalkTitle)}`
     speakerBits.push(`• ${escapeHtml(t)}`)
   }
   if (has(form.speaker2Name) || has(form.speaker2Title) || has(form.speaker2TalkTitle)) {
-    let t = trim(form.speaker2Name) || 'Speaker 2'
+    let t = trim(form.speaker2Name) || S.speaker2Default
     if (has(form.speaker2Title)) t += `, ${trim(form.speaker2Title)}`
     if (has(form.speaker2TalkTitle)) t += ` — ${trim(form.speaker2TalkTitle)}`
     speakerBits.push(`• ${escapeHtml(t)}`)
   }
   if (speakerBits.length) {
-    chunks.push(`<p style="margin:0;line-height:1.5;"><strong>Speaker</strong><br><br>${speakerBits.join('<br>')}</p>`)
+    chunks.push(`<p style="margin:0;line-height:1.5;"><strong>${escapeHtml(S.htmlSpeakerStrong)}</strong><br><br>${speakerBits.join('<br>')}</p>`)
   }
 
   if (has(form.speakerArrivalNote)) {
     chunks.push(
-      `<p style="margin:0;line-height:1.5;"><strong>Speaker arrival</strong><br><br>${escapeHtml(trim(form.speakerArrivalNote)).replace(/\n/g, '<br>')}</p>`,
+      `<p style="margin:0;line-height:1.5;"><strong>${escapeHtml(S.htmlSpeakerArrivalStrong)}</strong><br><br>${escapeHtml(trim(form.speakerArrivalNote)).replace(/\n/g, '<br>')}</p>`,
     )
   }
 
@@ -852,16 +851,16 @@ function buildKnowBeforeYouGoEmailHtml(form, opts = {}) {
     if (has(form.meetupLink)) {
       const u = trim(form.meetupLink)
       linkLines.push(
-        `• Meetup: <a href="${escapeHtmlAttr(u)}" style="color:#1D4ED8;text-decoration:underline;">${escapeHtml(u)}</a>`,
+        `• ${escapeHtml(S.htmlMeetupLink)}: <a href="${escapeHtmlAttr(u)}" style="color:#1D4ED8;text-decoration:underline;">${escapeHtml(u)}</a>`,
       )
     }
     if (has(form.lumaLink)) {
       const u = trim(form.lumaLink)
       linkLines.push(
-        `• Luma: <a href="${escapeHtmlAttr(u)}" style="color:#1D4ED8;text-decoration:underline;">${escapeHtml(u)}</a>`,
+        `• ${escapeHtml(S.htmlLumaLink)}: <a href="${escapeHtmlAttr(u)}" style="color:#1D4ED8;text-decoration:underline;">${escapeHtml(u)}</a>`,
       )
     }
-    chunks.push(`<p style="margin:0;line-height:1.5;"><strong>Event page</strong><br><br>${linkLines.join('<br>')}</p>`)
+    chunks.push(`<p style="margin:0;line-height:1.5;"><strong>${escapeHtml(S.htmlEventPageStrong)}</strong><br><br>${linkLines.join('<br>')}</p>`)
   }
 
   const contactEntries = (form.contacts || []).filter((c) => has(c.name) || has(c.role) || has(c.contactInfo))
@@ -880,7 +879,7 @@ function buildKnowBeforeYouGoEmailHtml(form, opts = {}) {
       else line = role
       return `• ${escapeHtml(line)}`
     })
-    chunks.push(`<p style="margin:0;line-height:1.5;"><strong>Helpful contacts</strong><br><br>${contactLines.join('<br>')}</p>`)
+    chunks.push(`<p style="margin:0;line-height:1.5;"><strong>${escapeHtml(S.htmlHelpfulContactsStrong)}</strong><br><br>${contactLines.join('<br>')}</p>`)
   }
 
   if (has(form.foodDetails) || has(form.drinkDetails)) {
@@ -888,7 +887,7 @@ function buildKnowBeforeYouGoEmailHtml(form, opts = {}) {
     if (has(form.foodDetails)) fd.push(`• ${escapeHtml(trim(form.foodDetails))}`)
     if (has(form.drinkDetails)) fd.push(`• ${escapeHtml(trim(form.drinkDetails))}`)
     if (fd.length > 0) {
-      chunks.push(`<p style="margin:0;line-height:1.5;"><strong>Food &amp; beverage</strong><br><br>${fd.join('<br>')}</p>`)
+      chunks.push(`<p style="margin:0;line-height:1.5;"><strong>${escapeHtml(S.htmlFoodStrong)}</strong><br><br>${fd.join('<br>')}</p>`)
     }
   }
 
@@ -896,7 +895,7 @@ function buildKnowBeforeYouGoEmailHtml(form, opts = {}) {
     const su = []
     if (has(form.setupNotes)) su.push(`• ${escapeHtml(trim(form.setupNotes))}`)
     if (has(form.swagNotes)) su.push(`• ${escapeHtml(trim(form.swagNotes))}`)
-    chunks.push(`<p style="margin:0;line-height:1.5;"><strong>Setup</strong><br><br>${su.join('<br>')}</p>`)
+    chunks.push(`<p style="margin:0;line-height:1.5;"><strong>${escapeHtml(S.htmlSetupStrong)}</strong><br><br>${su.join('<br>')}</p>`)
   }
 
   if (has(form.avNotes)) {
@@ -904,15 +903,16 @@ function buildKnowBeforeYouGoEmailHtml(form, opts = {}) {
     if (avBullets.length > 0) {
       const avHtml = avBullets.map((b) => `• ${escapeHtml(b)}`).join('<br>')
       chunks.push(
-        `<p style="margin:0;line-height:1.5;"><strong>AV / presentation setup</strong><br><br>${avHtml}</p>`,
+        `<p style="margin:0;line-height:1.5;"><strong>${escapeHtml(S.htmlAvStrong)}</strong><br><br>${avHtml}</p>`,
       )
     }
   }
 
   if (form.includePhotos !== false) {
-    const takePhotosHtml = KBYG_TAKE_PHOTOS_DEFAULT_LINES.map((line) => `• ${escapeHtml(line)}`).join('<br>')
+    const photoLines = getMeetupKbygPhotoLines(opts.language)
+    const takePhotosHtml = photoLines.map((line) => `• ${escapeHtml(line)}`).join('<br>')
     chunks.push(
-      `<p style="margin:0;line-height:1.5;"><strong>📸 Take Photos</strong><br><br>${takePhotosHtml}</p>`,
+      `<p style="margin:0;line-height:1.5;"><strong>${escapeHtml(S.htmlTakePhotosStrong)}</strong><br><br>${takePhotosHtml}</p>`,
     )
   }
 
@@ -920,17 +920,18 @@ function buildKnowBeforeYouGoEmailHtml(form, opts = {}) {
     const noteLines = trim(form.additionalNotes).split(/\n/).map((s) => s.trim()).filter(Boolean)
     if (noteLines.length > 0) {
       const notesHtml = noteLines.map((line) => escapeHtml(line)).join('<br>')
-      chunks.push(`<p style="margin:0;line-height:1.5;"><strong>Additional notes</strong><br><br>${notesHtml}</p>`)
+      chunks.push(`<p style="margin:0;line-height:1.5;"><strong>${escapeHtml(S.htmlAdditionalStrong)}</strong><br><br>${notesHtml}</p>`)
     }
   }
 
-  chunks.push(`<p style="margin:0;line-height:1.5;">${escapeHtml('Please let me know if you have any questions.')}</p>`)
+  chunks.push(`<p style="margin:0;line-height:1.5;">${escapeHtml(S.htmlClosing)}</p>`)
 
   const body = chunks.join('<br><br>')
   return `<div style="font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.5;color:#202124;">${body}</div>`
 }
 
 function generateKnowBeforeYouGoEmail(form, opts = {}) {
+  const S = getMeetupKbygStrings(normalizeLanguage(opts.language))
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const has = (s) => trim(s).length > 0
   const sectionTitle = (title) => `**${title}**`
@@ -945,40 +946,40 @@ function generateKnowBeforeYouGoEmail(form, opts = {}) {
   const eventTime = trim(form.eventTime)
   const arrivalTime = trim(form.arrivalTime)
 
-  lines.push(sectionTitle('Title'))
-  lines.push(eventTitle || 'Meetup')
+  lines.push(sectionTitle(S.titleHeading))
+  lines.push(eventTitle || S.meetupFallbackTitle)
   const whenLine = [eventDate, eventTime].filter(Boolean).join(' at ')
   if (whenLine) lines.push(whenLine)
-  if (arrivalTime) lines.push(`Arrive by ${arrivalTime}`)
+  if (arrivalTime) lines.push(S.htmlArriveBy(arrivalTime))
   lines.push('')
 
   const tldrBulletsPlain = buildKbygTldrBullets(form, opts)
   if (tldrBulletsPlain.length > 0) {
-    lines.push(sectionTitle('TL;DR'))
+    lines.push(sectionTitle(S.tldrHeading))
     tldrBulletsPlain.forEach((b) => lines.push(`- ${b}`))
     lines.push('')
   }
 
   if (eventDate && eventTitle) {
-    lines.push(`Thank you for being part of the ${eventTitle} meetup on ${eventDate}. Below are the logistics to help you prepare for the event.`)
+    lines.push(S.thanksFull(eventTitle, eventDate))
   } else if (eventTitle) {
-    lines.push(`Thank you for being part of the ${eventTitle} meetup. Below are the logistics to help you prepare for the event.`)
+    lines.push(S.thanksTitle(eventTitle))
   } else if (eventDate) {
-    lines.push(`Thank you for being part of this meetup on ${eventDate}. Below are the logistics to help you prepare for the event.`)
+    lines.push(S.thanksDate(eventDate))
   } else {
-    lines.push('Thank you for being part of this meetup. Below are the logistics to help you prepare for the event.')
+    lines.push(S.thanksGeneric)
   }
   lines.push('')
 
   if (has(form.venueName) || has(form.venueAddress)) {
-    lines.push(sectionTitle('Location'))
+    lines.push(sectionTitle(S.location))
     if (has(form.venueName)) lines.push(trim(form.venueName))
     if (has(form.venueAddress)) lines.push(trim(form.venueAddress))
     lines.push('')
   }
 
   if (has(form.parkingNotes)) {
-    lines.push(sectionTitle('Parking'))
+    lines.push(sectionTitle(S.parking))
     lines.push(trim(form.parkingNotes))
     lines.push('')
   }
@@ -986,7 +987,7 @@ function generateKnowBeforeYouGoEmail(form, opts = {}) {
   if (has(form.internalAgenda)) {
     const agendaBullets = trim(form.internalAgenda).split(/\n+/).map((s) => s.trim()).filter(Boolean)
     if (agendaBullets.length > 0) {
-      lines.push(sectionTitle('Agenda'))
+      lines.push(sectionTitle(S.agenda))
       agendaBullets.forEach((b) => lines.push(`- ${b}`))
       lines.push('')
     }
@@ -995,15 +996,15 @@ function generateKnowBeforeYouGoEmail(form, opts = {}) {
   const sp1 = has(form.speaker1Name) || has(form.speaker1Title) || has(form.speaker1TalkTitle)
   const sp2 = has(form.speaker2Name) || has(form.speaker2Title) || has(form.speaker2TalkTitle)
   if (sp1 || sp2) {
-    lines.push(sectionTitle('Speaker'))
+    lines.push(sectionTitle(S.speaker))
     if (sp1) {
-      let t = trim(form.speaker1Name) || 'Speaker 1'
+      let t = trim(form.speaker1Name) || S.speaker1Default
       if (has(form.speaker1Title)) t += `, ${trim(form.speaker1Title)}`
       if (has(form.speaker1TalkTitle)) t += ` — ${trim(form.speaker1TalkTitle)}`
       lines.push(`- ${t}`)
     }
     if (sp2) {
-      let t = trim(form.speaker2Name) || 'Speaker 2'
+      let t = trim(form.speaker2Name) || S.speaker2Default
       if (has(form.speaker2Title)) t += `, ${trim(form.speaker2Title)}`
       if (has(form.speaker2TalkTitle)) t += ` — ${trim(form.speaker2TalkTitle)}`
       lines.push(`- ${t}`)
@@ -1012,21 +1013,21 @@ function generateKnowBeforeYouGoEmail(form, opts = {}) {
   }
 
   if (has(form.speakerArrivalNote)) {
-    lines.push(sectionTitle('Speaker arrival'))
+    lines.push(sectionTitle(S.speakerArrival))
     lines.push(trim(form.speakerArrivalNote))
     lines.push('')
   }
 
   if (has(form.meetupLink) || has(form.lumaLink)) {
-    lines.push(sectionTitle('Event page'))
-    if (has(form.meetupLink)) lines.push(`- Meetup: ${trim(form.meetupLink)}`)
-    if (has(form.lumaLink)) lines.push(`- Luma: ${trim(form.lumaLink)}`)
+    lines.push(sectionTitle(S.eventPage))
+    if (has(form.meetupLink)) lines.push(`- ${S.meetupLabel}: ${trim(form.meetupLink)}`)
+    if (has(form.lumaLink)) lines.push(`- ${S.lumaLabel}: ${trim(form.lumaLink)}`)
     lines.push('')
   }
 
   const contactEntries = (form.contacts || []).filter((c) => has(c.name) || has(c.role) || has(c.contactInfo))
   if (contactEntries.length > 0) {
-    lines.push(sectionTitle('Helpful contacts'))
+    lines.push(sectionTitle(S.helpfulContacts))
     contactEntries.forEach((c) => {
       const name = trim(c.name)
       const role = trim(c.role)
@@ -1047,14 +1048,14 @@ function generateKnowBeforeYouGoEmail(form, opts = {}) {
     if (has(form.foodDetails)) foodLines.push(`- ${trim(form.foodDetails)}`)
     if (has(form.drinkDetails)) foodLines.push(`- ${trim(form.drinkDetails)}`)
     if (foodLines.length > 0) {
-      lines.push(sectionTitle('Food & beverage'))
+      lines.push(sectionTitle(S.foodBeverage))
       foodLines.forEach((l) => lines.push(l))
       lines.push('')
     }
   }
 
   if (has(form.setupNotes) || has(form.swagNotes)) {
-    lines.push(sectionTitle('Setup'))
+    lines.push(sectionTitle(S.setup))
     if (has(form.setupNotes)) lines.push(`- ${trim(form.setupNotes)}`)
     if (has(form.swagNotes)) lines.push(`- ${trim(form.swagNotes)}`)
     lines.push('')
@@ -1063,28 +1064,28 @@ function generateKnowBeforeYouGoEmail(form, opts = {}) {
   if (has(form.avNotes)) {
     const avBullets = trim(form.avNotes).split(/\n+/).map((s) => s.trim()).filter(Boolean)
     if (avBullets.length > 0) {
-      lines.push(sectionTitle('AV / presentation setup'))
+      lines.push(sectionTitle(S.avSetup))
       avBullets.forEach((b) => lines.push(`- ${b}`))
       lines.push('')
     }
   }
 
   if (form.includePhotos !== false) {
-    lines.push(sectionTitle('📸 Take Photos'))
-    KBYG_TAKE_PHOTOS_DEFAULT_LINES.forEach((line) => lines.push(`- ${line}`))
+    lines.push(sectionTitle(S.takePhotos))
+    getMeetupKbygPhotoLines(opts.language).forEach((line) => lines.push(`- ${line}`))
     lines.push('')
   }
 
   if (has(form.additionalNotes)) {
     const noteLines = trim(form.additionalNotes).split(/\n/).map((s) => s.trim()).filter(Boolean)
     if (noteLines.length > 0) {
-      lines.push(sectionTitle('Additional notes'))
+      lines.push(sectionTitle(S.additionalNotes))
       noteLines.forEach((line) => lines.push(line))
       lines.push('')
     }
   }
 
-  lines.push('Please let me know if you have any questions.')
+  lines.push(S.closingQuestion)
   return lines.join('\n')
 }
 
@@ -2061,7 +2062,8 @@ function buildQuickMeetupEventPageDraft(form) {
   return out
 }
 
-function buildIntro(form) {
+function buildIntro(form, lang = 'en') {
+  const S = getEventPageStrings(normalizeLanguage(lang))
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const dateRaw = trim(form.date)
   const date = dateRaw ? (formatDateWithOrdinal(dateRaw) || dateRaw) : ''
@@ -2073,22 +2075,22 @@ function buildIntro(form) {
 
   const baseGroup = getLinkedInGroupName(form)
   const groupName = baseGroup.startsWith('The ') ? baseGroup : `The ${baseGroup}`
-  const when = date ? ` on ${date}` : ''
-  let presentations
+  const when = date ? S.onDate(date) : ''
   if (s1 && hasSpeaker2 && s2 && hasSpeaker3 && s3) {
-    presentations = `presentations from ${s1}, ${s2}, and ${s3}`
-  } else if (s1 && hasSpeaker2 && s2) {
-    presentations = `presentations from ${s1} and ${s2}`
-  } else if (s1) {
-    presentations = `a presentation from ${s1}`
-  } else {
-    presentations = 'presentations'
+    return normalizeElastiFlow(S.intro3speakers(groupName, when, s1, s2, s3))
   }
-
-  return normalizeElastiFlow(`${groupName} is hosting a meetup${when}. We'll have ${presentations}, followed by food, refreshments, and networking.`)
+  if (s1 && hasSpeaker2 && s2) {
+    return normalizeElastiFlow(S.intro2speakers(groupName, when, s1, s2))
+  }
+  if (s1) {
+    return normalizeElastiFlow(S.intro1speaker(groupName, when, s1))
+  }
+  return normalizeElastiFlow(S.introNone(groupName, when))
 }
 
-function generateMeetupCopy(form) {
+function generateMeetupCopy(form, opts = {}) {
+  const lang = normalizeLanguage(opts.language)
+  const S = getEventPageStrings(lang)
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const has = (s) => trim(s).length > 0
   const hasSpeaker1 = [
@@ -2132,33 +2134,33 @@ function generateMeetupCopy(form) {
   }
 
   if (has(form.date) || has(form.eventStartTime)) {
-    sections.push({ title: 'When', body: normalizeElastiFlow(buildWhenBody()) })
+    sections.push({ title: S.when, body: normalizeElastiFlow(buildWhenBody()) })
   }
 
   if (has(form.venueName) || has(form.venueAddress)) {
     const where = [form.venueName, form.venueAddress].map(trim).filter(Boolean).map(normalizeElastiFlow).join('\n')
-    sections.push({ title: 'Where', body: where })
+    sections.push({ title: S.where, body: where })
   }
 
   if (has(form.rsvpInstructions)) {
-    sections.push({ title: 'RSVP', body: normalizeElastiFlow(trim(form.rsvpInstructions)) })
+    sections.push({ title: S.rsvp, body: normalizeElastiFlow(trim(form.rsvpInstructions)) })
   }
 
   if (has(form.arrivalInstructions)) {
-    sections.push({ title: 'Arrival', body: normalizeElastiFlow(trim(form.arrivalInstructions)) })
+    sections.push({ title: S.arrival, body: normalizeElastiFlow(trim(form.arrivalInstructions)) })
   }
 
   if (has(form.parkingNotes)) {
-    sections.push({ title: 'Parking', body: normalizeElastiFlow(trim(form.parkingNotes)) })
+    sections.push({ title: S.parking, body: normalizeElastiFlow(trim(form.parkingNotes)) })
   }
 
   if (form.eventPageIncludeWhyAttend !== false && has(form.meetupPageWhyAttend)) {
-    sections.push({ title: 'Why Attend', body: normalizeElastiFlow(trim(form.meetupPageWhyAttend)) })
+    sections.push({ title: S.whyAttend, body: normalizeElastiFlow(trim(form.meetupPageWhyAttend)) })
   }
 
   if (form.eventPageIncludeWhatToExpect !== false && has(form.meetupPageWhatToExpect)) {
     sections.push({
-      title: 'What to Expect',
+      title: S.whatToExpect,
       body: normalizeElastiFlow(trim(form.meetupPageWhatToExpect)),
     })
   }
@@ -2167,64 +2169,64 @@ function generateMeetupCopy(form) {
     ? normalizeElastiFlow(trim(form.meetupPageAgenda))
     : normalizeElastiFlow(buildAgenda(form))
   sections.push({
-    title: 'Agenda',
+    title: S.agenda,
     body: agendaBody,
   })
 
   const useEmojis = form.eventPageSectionEmojis !== false
   if (form.eventPageInviteSpeakers) {
-    const inviteTitle = (useEmojis ? '⚡ ' : '') + 'Are you interested in presenting your Elastic use case?'
+    const inviteTitle = (useEmojis ? '⚡ ' : '') + S.inviteTitle
     sections.push({
       title: inviteTitle,
-      body: "We welcome 5–10 minute lightning talks, 45-minute deep dives, and everything in between.\n\nIf you're interested, please send us an email at meetups@elastic.co.",
+      body: S.inviteBody,
     })
   }
 
   if (form.eventPageIncludeSpeakerSection !== false && (hasSpeaker1 || hasSpeaker2 || hasSpeaker3)) {
     sections.push({
-      title: 'Talk Abstracts',
+      title: S.talkAbstracts,
       body: buildTalkAbstracts(form),
     })
   }
 
   if (has(form.hostOrSponsor)) {
-    sections.push({ title: 'Host / Sponsor', body: normalizeElastiFlow(trim(form.hostOrSponsor)) })
+    sections.push({ title: S.hostSponsor, body: normalizeElastiFlow(trim(form.hostOrSponsor)) })
   }
 
   if (has(form.meetupPageClosing)) {
-    sections.push({ title: 'Closing', body: normalizeElastiFlow(trim(form.meetupPageClosing)) })
+    sections.push({ title: S.closing, body: normalizeElastiFlow(trim(form.meetupPageClosing)) })
   }
 
   const withEmoji = {
-    'When': '📅 Date and Time',
-    'Where': '📍 Location',
-    'Why Attend': '✨ Why Attend',
-    'What to Expect': '💡 What to Expect',
-    'Agenda': '📝 Agenda',
-    'Closing': '👋 Closing',
-    'Talk Abstracts': '💬 Talk Abstracts',
-    'Arrival': '🪧 Arrival Instructions',
-    'Parking': '🚗 Parking',
-    'RSVP': '📌 RSVP',
-    'Host / Sponsor': '🏢 Host / Sponsor',
+    [S.when]: S.emojiWhen,
+    [S.where]: S.emojiWhere,
+    [S.whyAttend]: S.emojiWhy,
+    [S.whatToExpect]: S.emojiWhat,
+    [S.agenda]: S.emojiAgenda,
+    [S.closing]: S.emojiClosing,
+    [S.talkAbstracts]: S.emojiTalks,
+    [S.arrival]: S.emojiArrival,
+    [S.parking]: S.emojiParking,
+    [S.rsvp]: S.emojiRsvp,
+    [S.hostSponsor]: S.emojiHost,
   }
   const plainHeader = {
-    'When': 'Date and Time',
-    'Where': 'Location',
-    'Why Attend': 'Why Attend',
-    'What to Expect': 'What to Expect',
-    'Agenda': 'Agenda',
-    'Closing': 'Closing',
-    'Talk Abstracts': 'Talk Abstracts',
-    'Arrival': 'Arrival Instructions',
-    'Parking': 'Parking',
-    'RSVP': 'RSVP',
-    'Host / Sponsor': 'Host / Sponsor',
+    [S.when]: S.plainWhen,
+    [S.where]: S.plainWhere,
+    [S.whyAttend]: S.plainWhy,
+    [S.whatToExpect]: S.plainWhat,
+    [S.agenda]: S.plainAgenda,
+    [S.closing]: S.plainClosing,
+    [S.talkAbstracts]: S.plainTalks,
+    [S.arrival]: S.plainArrival,
+    [S.parking]: S.plainParking,
+    [S.rsvp]: S.plainRsvp,
+    [S.hostSponsor]: S.plainHost,
   }
 
   const sectionLabel = (title) => (useEmojis ? (withEmoji[title] || title) : (plainHeader[title] || title))
 
-  const intro = buildIntro(form)
+  const intro = buildIntro(form, lang)
   const eventTitle = has(form.eventTitle) ? normalizeElastiFlow(trim(form.eventTitle)) : ''
 
   const plainLines = [intro, '']
@@ -2307,6 +2309,9 @@ export default function App() {
   const [intuitionWhyAttendCopied, setIntuitionWhyAttendCopied] = useState(false)
   const [intuitionBodyCopied, setIntuitionBodyCopied] = useState(false)
   const [kbygTldrRotation, setKbygTldrRotation] = useState(0)
+  const [eventPageLanguage, setEventPageLanguage] = useState('en')
+  const [meetupKbygLanguage, setMeetupKbygLanguage] = useState('en')
+  const [translateMessage, setTranslateMessage] = useState(null)
   const [kbygSectionCopiedId, setKbygSectionCopiedId] = useState(null)
   const [comboboxOpen, setComboboxOpen] = useState(false)
   const [comboboxHighlight, setComboboxHighlight] = useState(0)
@@ -2420,6 +2425,7 @@ export default function App() {
     setKbygForm((prev) => ({ ...prev, [key]: e.target.value }))
 
   const kbygTldrIncludeMerged = { ...getInitialKbygTldrInclude(), ...(kbygForm.kbygTldrInclude || {}) }
+  const kbygTldrLabels = getMeetupKbygTldrLabels(meetupKbygLanguage)
 
   const updateKbygCheckbox = (key) => (e) =>
     setKbygForm((prev) => ({ ...prev, [key]: e.target.checked }))
@@ -2479,11 +2485,46 @@ export default function App() {
     window.open('https://links.app.elstc.co', '_blank', 'noopener,noreferrer')
   }
 
-  const handleGenerate = () => {
+  const handleTranslateOutput = async (targetLang) => {
+    const text = generatedCopy.trim()
+    if (!text) return
+    setTranslateMessage(null)
+    const data = await tryRemoteTranslate(text, targetLang)
+    const applied = applyRemoteKbygResult(data)
+    if (applied?.plain) {
+      setGeneratedCopy(applied.plain)
+      if (applied.html) {
+        if (generatorType === 'knowBeforeYouGo') setKbygEmailHtml(applied.html)
+        if (generatorType === 'eventPromotion') setMeetupPageHtml(applied.html)
+      }
+      return
+    }
+    setTranslateMessage(
+      'Translation needs your /api/generate backend (POST with action: translate). Output was not changed.',
+    )
+    setTimeout(() => setTranslateMessage(null), 6000)
+  }
+
+  const handleGenerate = async () => {
     if (generatorType === 'knowBeforeYouGo') {
       setKbygTldrRotation(0)
-      const opts = { tldrRotation: 0 }
-      setGeneratedSubject(generateKnowBeforeYouGoSubject(kbygForm))
+      const opts = { tldrRotation: 0, language: meetupKbygLanguage }
+      const remote = await tryRemoteGenerate({
+        generator: 'meetupKbyg',
+        language: meetupKbygLanguage,
+        form: kbygForm,
+        options: opts,
+      })
+      const applied = applyRemoteKbygResult(remote)
+      if (applied?.plain) {
+        setGeneratedSubject(generateKnowBeforeYouGoSubject(kbygForm, opts))
+        setGeneratedCopy(applied.plain)
+        setKbygEmailHtml(applied.html || buildKnowBeforeYouGoEmailHtml(kbygForm, opts))
+        setMeetupPageHtml('')
+        setGeneratedOutreachLinkedIn('')
+        return
+      }
+      setGeneratedSubject(generateKnowBeforeYouGoSubject(kbygForm, opts))
       const emailText = generateKnowBeforeYouGoEmail(kbygForm, opts)
       setGeneratedCopy(emailText)
       setKbygEmailHtml(buildKnowBeforeYouGoEmailHtml(kbygForm, opts))
@@ -2515,7 +2556,21 @@ export default function App() {
       if (qrForm.qrLink) setGeneratedQr(true)
     } else {
       setGeneratedSubject('')
-      const page = generateMeetupCopy(form)
+      const remote = await tryRemoteGenerate({
+        generator: 'eventPage',
+        language: eventPageLanguage,
+        form,
+      })
+      const applied = applyRemoteEventPageResult(remote)
+      if (applied?.plain) {
+        setGeneratedCopy(applied.plain)
+        setMeetupPageHtml(applied.html || generateMeetupCopy(form, { language: eventPageLanguage }).html)
+        setKbygEmailHtml('')
+        setGeneratedOutreachLinkedIn('')
+        setLinkedInPost(buildLinkedInPost(form, linkedinVariant))
+        return
+      }
+      const page = generateMeetupCopy(form, { language: eventPageLanguage })
       setGeneratedCopy(page.plain)
       setMeetupPageHtml(page.html)
       setKbygEmailHtml('')
@@ -2547,8 +2602,8 @@ export default function App() {
   const handleRegenKbygTldr = () => {
     const next = kbygTldrRotation + 1
     setKbygTldrRotation(next)
-    const opts = { tldrRotation: next }
-    setGeneratedSubject(generateKnowBeforeYouGoSubject(kbygForm))
+    const opts = { tldrRotation: next, language: meetupKbygLanguage }
+    setGeneratedSubject(generateKnowBeforeYouGoSubject(kbygForm, opts))
     setGeneratedCopy(generateKnowBeforeYouGoEmail(kbygForm, opts))
     setKbygEmailHtml(buildKnowBeforeYouGoEmailHtml(kbygForm, opts))
   }
@@ -3247,6 +3302,21 @@ export default function App() {
               <label>Why attend / key value <input type="text" value={form.intuitionWhyAttend} onChange={update('intuitionWhyAttend')} placeholder="e.g. hands-on tips and peer learning" /></label>
               <label>Key takeaway or benefit (optional) <input type="text" value={form.intuitionKeyTakeaway} onChange={update('intuitionKeyTakeaway')} placeholder="e.g. leave with a working demo" /></label>
             </fieldset>
+            <div className="form-language-row" role="group" aria-label="Output language">
+              <label>
+                Language
+                <select
+                  value={eventPageLanguage}
+                  onChange={(e) => setEventPageLanguage(e.target.value)}
+                >
+                  {LANGUAGE_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
             <button type="submit" className="btn-generate">
               Generate Meetup Copy
             </button>
@@ -3400,7 +3470,7 @@ export default function App() {
                           checked={!!kbygTldrIncludeMerged[id]}
                           onChange={updateKbygTldrInclude(id)}
                         />
-                        {KBYG_TLDR_LABELS[id]}
+                        {kbygTldrLabels[id]}
                       </label>
                     ))}
                   </div>
@@ -3415,6 +3485,21 @@ export default function App() {
               <legend>Additional</legend>
               <label>Additional notes <textarea value={kbygForm.additionalNotes} onChange={updateKbyg('additionalNotes')} placeholder="Any other logistics..." rows={3} /></label>
             </fieldset>
+            <div className="form-language-row" role="group" aria-label="Output language">
+              <label>
+                Language
+                <select
+                  value={meetupKbygLanguage}
+                  onChange={(e) => setMeetupKbygLanguage(e.target.value)}
+                >
+                  {LANGUAGE_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
             <button type="submit" className="btn-generate">Generate Email</button>
             <button type="button" onClick={handleReset} className="btn-reset">🔄 Reset Form</button>
           </form>
@@ -3707,6 +3792,18 @@ export default function App() {
                       </div>
                     )}
                     <h3 className="generated-email-heading">Generated Email</h3>
+                    {generatedCopy ? (
+                      <div className="translate-output-bar" role="group" aria-label="Translate output via API">
+                        <span className="form-hint translate-output-label">Translate output</span>
+                        <button type="button" className="btn-section-action" onClick={() => handleTranslateOutput('es')}>
+                          → Spanish
+                        </button>
+                        <button type="button" className="btn-section-action" onClick={() => handleTranslateOutput('pt')}>
+                          → Portuguese (BR)
+                        </button>
+                      </div>
+                    ) : null}
+                    {translateMessage ? <p className="form-hint translate-api-hint">{translateMessage}</p> : null}
                     {kbygSections.length > 0 && (
                       <div className="kbyg-per-section-tools">
                         <span className="form-hint kbyg-per-section-hint">Sections</span>
@@ -3764,6 +3861,17 @@ export default function App() {
                 {generatorType === 'eventPromotion' && (
                   <>
                     <h3 className="generated-email-heading">Meetup Event Page Copy</h3>
+                    {generatedCopy ? (
+                      <div className="translate-output-bar" role="group" aria-label="Translate output via API">
+                        <span className="form-hint translate-output-label">Translate output</span>
+                        <button type="button" className="btn-section-action" onClick={() => handleTranslateOutput('es')}>
+                          → Spanish
+                        </button>
+                        <button type="button" className="btn-section-action" onClick={() => handleTranslateOutput('pt')}>
+                          → Portuguese (BR)
+                        </button>
+                      </div>
+                    ) : null}
                     <p className="form-hint" style={{ marginTop: 0 }}>Preview below. Copy pastes HTML with bold headings into editors that support rich paste (e.g. Meetup).</p>
                     {meetupPageHtml ? (
                       <div className="meetup-page-preview output-text" dangerouslySetInnerHTML={{ __html: meetupPageHtml }} />
