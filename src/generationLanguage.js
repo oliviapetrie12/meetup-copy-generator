@@ -117,16 +117,118 @@ export function getAgendaLineLabels(lang) {
   return M[n] || M.en
 }
 
+/** Generic timed agenda row when no speaker line applies (mirrors fallback middle line). */
+export function getAgendaMiddleSlotLabel(lang) {
+  const n = normalizeLanguage(lang)
+  if (n === 'es') return 'Charlas'
+  if (n === 'pt') return 'Palestras'
+  return 'Talks'
+}
+
+/**
+ * Clock times on generated agendas: 12h + AM/PM for English; 24h (HH:mm) for Spanish/Portuguese.
+ */
+export function formatAgendaClock(minutesFromMidnight, lang) {
+  const n = normalizeLanguage(lang)
+  let t = Math.floor(Number(minutesFromMidnight))
+  if (!Number.isFinite(t)) t = 0
+  t = ((t % (24 * 60)) + (24 * 60)) % (24 * 60)
+  const h = Math.floor(t / 60)
+  const m = t % 60
+  if (n === 'en') {
+    const ap = h >= 12 ? 'PM' : 'AM'
+    const h12 = h % 12 || 12
+    return `${h12}:${String(m).padStart(2, '0')} ${ap}`
+  }
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+function parseDateStringToLocaleDate(dateStr) {
+  const s = String(dateStr || '').trim()
+  if (!s) return null
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(s + 'T12:00:00')
+  const parsed = Date.parse(s)
+  if (!Number.isNaN(parsed)) return new Date(parsed)
+  return null
+}
+
+/** Long calendar date for event copy (locale weekday/month; no English when lang is es/pt). */
+export function formatLocalizedLongDate(dateStr, lang) {
+  const d = parseDateStringToLocaleDate(dateStr)
+  if (!d || Number.isNaN(d.getTime())) return String(dateStr || '').trim()
+  const n = normalizeLanguage(lang)
+  const locale = n === 'es' ? 'es' : n === 'pt' ? 'pt-BR' : 'en-US'
+  return new Intl.DateTimeFormat(locale, {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  }).format(d)
+}
+
+/** Date + start time phrase for “When” sections (localized connector, no English for es/pt). */
+export function formatWhenDateTimePhrase(dateStr, timeMinutesFromMidnight, lang) {
+  const n = normalizeLanguage(lang)
+  const datePart = formatLocalizedLongDate(dateStr, n)
+  const timePart = formatAgendaClock(timeMinutesFromMidnight, n)
+  if (n === 'es') return `${datePart} a las ${timePart}`
+  if (n === 'pt') return `${datePart} às ${timePart}`
+  return `${datePart} at ${timePart}`
+}
+
+/** Conference organizer-import structured sections (emoji headers). */
+export function getConferenceStructuredKbygSectionSpec(lang) {
+  const n = normalizeLanguage(lang)
+  const M = {
+    en: [
+      { cats: ['keyContacts'], emoji: '🔑', title: 'Key Contacts' },
+      { cats: ['eventVenue', 'foodBeverage'], emoji: '📍', title: 'Event & Venue' },
+      { cats: ['boothHours'], emoji: '🕒', title: 'Booth Hours' },
+      { cats: ['setupMoveIn'], emoji: '🛠️', title: 'Setup & Move-in' },
+      { cats: ['teardownMoveOut'], emoji: '📦', title: 'Teardown / Move-out' },
+      { cats: ['parkingTransportation'], emoji: '🚗', title: 'Parking & Transportation' },
+      { cats: ['logisticsBoothInfo'], emoji: '📋', title: 'Logistics / Booth Info' },
+      { cats: ['tickets'], emoji: '🎟️', title: 'Tickets' },
+      { cats: ['leadCapture'], emoji: '📱', title: 'Lead Capture' },
+      { cats: ['additionalNotes'], emoji: '📎', title: 'Additional Notes' },
+    ],
+    es: [
+      { cats: ['keyContacts'], emoji: '🔑', title: 'Contactos clave' },
+      { cats: ['eventVenue', 'foodBeverage'], emoji: '📍', title: 'Evento y lugar' },
+      { cats: ['boothHours'], emoji: '🕒', title: 'Horario del stand' },
+      { cats: ['setupMoveIn'], emoji: '🛠️', title: 'Montaje y entrada' },
+      { cats: ['teardownMoveOut'], emoji: '📦', title: 'Desmontaje / salida' },
+      { cats: ['parkingTransportation'], emoji: '🚗', title: 'Estacionamiento y transporte' },
+      { cats: ['logisticsBoothInfo'], emoji: '📋', title: 'Logística / información del stand' },
+      { cats: ['tickets'], emoji: '🎟️', title: 'Entradas' },
+      { cats: ['leadCapture'], emoji: '📱', title: 'Captación de leads' },
+      { cats: ['additionalNotes'], emoji: '📎', title: 'Notas adicionales' },
+    ],
+    pt: [
+      { cats: ['keyContacts'], emoji: '🔑', title: 'Contatos principais' },
+      { cats: ['eventVenue', 'foodBeverage'], emoji: '📍', title: 'Evento e local' },
+      { cats: ['boothHours'], emoji: '🕒', title: 'Horário do estande' },
+      { cats: ['setupMoveIn'], emoji: '🛠️', title: 'Montagem e entrada' },
+      { cats: ['teardownMoveOut'], emoji: '📦', title: 'Desmontagem / saída' },
+      { cats: ['parkingTransportation'], emoji: '🚗', title: 'Estacionamento e transporte' },
+      { cats: ['logisticsBoothInfo'], emoji: '📋', title: 'Logística / informações do estande' },
+      { cats: ['tickets'], emoji: '🎟️', title: 'Ingressos' },
+      { cats: ['leadCapture'], emoji: '📱', title: 'Captura de leads' },
+      { cats: ['additionalNotes'], emoji: '📎', title: 'Notas adicionais' },
+    ],
+  }
+  return M[n] || M.en
+}
+
 /** Fallback agenda when the timed builder returns nothing (edge case). */
 export function getEventPageAgendaFallbackLines(lang) {
   const n = normalizeLanguage(lang)
   const L = getAgendaLineLabels(n)
-  const M = {
-    en: `6:00 PM ${L.doors}\n6:30 PM Talks\n8:00 PM ${L.concludes}`,
-    es: `6:00 p. m. ${L.doors}\n6:30 p. m. Charlas\n8:00 p. m. ${L.concludes}`,
-    pt: `18:00 ${L.doors}\n18:30 Palestras\n20:00 ${L.concludes}`,
-  }
-  return M[n] || M.en
+  const mid = getAgendaMiddleSlotLabel(n)
+  const t1 = formatAgendaClock(18 * 60, n)
+  const t2 = formatAgendaClock(18 * 60 + 30, n)
+  const t3 = formatAgendaClock(20 * 60, n)
+  return `${t1} ${L.doors}\n${t2} ${mid}\n${t3} ${L.concludes}`
 }
 
 export function buildEventPageWhatToExpectQuickDraft({ city, theme1, lang }) {

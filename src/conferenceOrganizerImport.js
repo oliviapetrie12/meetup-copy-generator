@@ -5,6 +5,8 @@
  * Chunks are never reclassified after the classify step.
  */
 
+import { getConferenceStructuredKbygSectionSpec } from './generationLanguage.js'
+
 function trim(s) {
   return typeof s === 'string' ? s.trim() : ''
 }
@@ -737,20 +739,6 @@ function dedupeClassifiedRowsPreferComplete(rows) {
  * @typedef {{ chunk: string, category: OrganizerCategory, reason: string, weakMatch: boolean, ambiguous: boolean, validationMoved?: boolean, originalCategory?: OrganizerCategory }} ClassifiedRow
  */
 
-/** STEP 11: section order and emojis (📋 = Logistics — 10 sections, 9 emojis in brief; Logistics uses 📋). */
-const KBYG_SECTION_SPEC = [
-  { cats: ['keyContacts'], emoji: '🔑', title: 'Key Contacts' },
-  { cats: ['eventVenue', 'foodBeverage'], emoji: '📍', title: 'Event & Venue' },
-  { cats: ['boothHours'], emoji: '🕒', title: 'Booth Hours' },
-  { cats: ['setupMoveIn'], emoji: '🛠️', title: 'Setup & Move-in' },
-  { cats: ['teardownMoveOut'], emoji: '📦', title: 'Teardown / Move-out' },
-  { cats: ['parkingTransportation'], emoji: '🚗', title: 'Parking & Transportation' },
-  { cats: ['logisticsBoothInfo'], emoji: '📋', title: 'Logistics / Booth Info' },
-  { cats: ['tickets'], emoji: '🎟️', title: 'Tickets' },
-  { cats: ['leadCapture'], emoji: '📱', title: 'Lead Capture' },
-  { cats: ['additionalNotes'], emoji: '📎', title: 'Additional Notes' },
-]
-
 function chunkLinesToBullets(text) {
   const lines = text.split(/\n/).map((l) => trim(l)).filter(Boolean)
   if (lines.length === 0) return []
@@ -768,8 +756,9 @@ function formatChunkForStructuredKbyg(row) {
 /**
  * Structured Know Before You Go plain text (STEP 11).
  * @param {ClassifiedRow[]} rows
+ * @param {string} [language] en | es | pt — section titles follow UI language
  */
-export function buildStructuredKbygPlain(rows) {
+export function buildStructuredKbygPlain(rows, language = 'en') {
   const byCat = {}
   for (const row of rows) {
     const cat = row.category === 'foodBeverage' ? 'eventVenue' : row.category
@@ -781,7 +770,7 @@ export function buildStructuredKbygPlain(rows) {
   }
 
   const parts = []
-  for (const spec of KBYG_SECTION_SPEC) {
+  for (const spec of getConferenceStructuredKbygSectionSpec(language)) {
     const texts = spec.cats.flatMap((c) => byCat[c] || [])
     if (texts.length === 0) continue
     const block = [`${spec.emoji} ${spec.title}`, '']
@@ -817,13 +806,14 @@ function runPipelineClassifiedRows(raw) {
 
 /**
  * Form patch + structured KBYG (STEP 11).
+ * @param {string} [language] en | es | pt
  */
-export function processOrganizerImport(raw) {
+export function processOrganizerImport(raw, language = 'en') {
   const rows = runPipelineClassifiedRows(raw)
   const simple = rows.map((r) => ({ chunk: r.chunk, category: r.category }))
   const deduped = buildFormBucketsFromClassified(simple)
   const formPatch = bucketsToFormPatch(deduped)
-  const structuredKbygPlain = buildStructuredKbygPlain(rows)
+  const structuredKbygPlain = buildStructuredKbygPlain(rows, language)
   return { ...formPatch, structuredKbygPlain }
 }
 
@@ -831,7 +821,7 @@ export function processOrganizerImport(raw) {
  * Chunk → classify → validate → dedupe → form field patch (empty fields only via merge helper).
  */
 export function parseOrganizerDetails(raw) {
-  const r = processOrganizerImport(raw)
+  const r = processOrganizerImport(raw, 'en')
   const { structuredKbygPlain: _sk, ...formPatch } = r
   return formPatch
 }

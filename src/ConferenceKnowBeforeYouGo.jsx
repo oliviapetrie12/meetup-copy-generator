@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
-import { getGeneratorUiTranslations } from './formTranslations.js'
+import { getGeneratorUiTranslations, getDefaultConferenceSwagText } from './formTranslations.js'
 import { makeMoreConcise, prepareConferenceEmailClipboardHtml } from './outputHelpers.js'
 import { mergeOrganizerParsedIntoForm, processOrganizerImport } from './conferenceOrganizerImport.js'
 import { enhanceKbygOutput } from './kbygEnhanceOutput.js'
@@ -111,13 +111,7 @@ function appendBoothSetupLogisticsPlain(lines, form, strings) {
   lines.push('')
 }
 
-const DEFAULT_SWAG_TEXT = [
-  'Keep extra swag behind the table',
-  'Replenish throughout the day',
-  'Monitor distribution across event days',
-].join('\n')
-
-function getInitialForm() {
+function getInitialForm(lang = 'en') {
   return {
     conferenceName: '',
     knowBeforeYouGoDeckUrl: '',
@@ -138,7 +132,7 @@ function getInitialForm() {
     boothMaterialsDeliveryMethod: 'shipped_to_individual',
     boothMaterialsShippedToName: '',
     avSetupRequirements: '',
-    swagText: DEFAULT_SWAG_TEXT,
+    swagText: getDefaultConferenceSwagText(lang),
     parkingText: '',
     foodBeverageText: '',
     engagementType: 'none',
@@ -790,9 +784,10 @@ function generateConferenceEmailPlain(form, opts = {}) {
 }
 
 export default function ConferenceKnowBeforeYouGo() {
-  const [form, setForm] = useState(() => getInitialForm())
+  const [conferenceLanguage, setConferenceLanguage] = useState('en')
+  const [form, setForm] = useState(() => getInitialForm('en'))
   const subjectManuallyEditedRef = useRef(false)
-  const [subjectLine, setSubjectLine] = useState(() => generateAutoSubjectLine(getInitialForm(), 'en'))
+  const [subjectLine, setSubjectLine] = useState(() => generateAutoSubjectLine(getInitialForm('en'), 'en'))
   const [plain, setPlain] = useState('')
   const [html, setHtml] = useState('')
   const [emailCopied, setEmailCopied] = useState(false)
@@ -806,7 +801,6 @@ export default function ConferenceKnowBeforeYouGo() {
   const [kbygEnhanceMode, setKbygEnhanceMode] = useState('email')
   const [kbygEnhanceOutput, setKbygEnhanceOutput] = useState('')
   const [kbygEnhanceCopied, setKbygEnhanceCopied] = useState(false)
-  const [conferenceLanguage, setConferenceLanguage] = useState('en')
   const [translateMessage, setTranslateMessage] = useState(null)
 
   const t = useMemo(() => getGeneratorUiTranslations(conferenceLanguage), [conferenceLanguage])
@@ -934,7 +928,7 @@ export default function ConferenceKnowBeforeYouGo() {
   )
 
   const handleReset = () => {
-    const next = getInitialForm()
+    const next = getInitialForm(conferenceLanguage)
     subjectManuallyEditedRef.current = false
     setForm(next)
     setSubjectLine(generateAutoSubjectLine(next, conferenceLanguage))
@@ -949,7 +943,7 @@ export default function ConferenceKnowBeforeYouGo() {
   }
 
   const handleParseOrganizerDetails = () => {
-    const result = processOrganizerImport(organizerImportText)
+    const result = processOrganizerImport(organizerImportText, conferenceLanguage)
     const { structuredKbygPlain, ...formPatch } = result
     setForm((prev) => mergeOrganizerParsedIntoForm(prev, formPatch))
     setStructuredKbygPreview(structuredKbygPlain || '')
@@ -1090,7 +1084,7 @@ export default function ConferenceKnowBeforeYouGo() {
               <textarea
                 value={organizerImportText}
                 onChange={(e) => setOrganizerImportText(e.target.value)}
-                placeholder="Parking, booth hours, setup and teardown, shipping, Wi‑Fi, lead capture, venue, badge check-in, food…"
+                placeholder={t.conf_organizerImportPlaceholder}
                 rows={10}
                 autoComplete="off"
               />

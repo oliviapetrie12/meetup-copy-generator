@@ -18,6 +18,9 @@ import {
   getEventPageAgendaFallbackLines,
   getAgendaLineLabels,
   buildEventPageWhatToExpectQuickDraft,
+  formatAgendaClock,
+  formatLocalizedLongDate,
+  formatWhenDateTimePhrase,
 } from './generationLanguage.js'
 import {
   getEventPageFieldDefaults,
@@ -412,7 +415,6 @@ const INITIAL_STATE = {
   hostOrSponsor: '',
   rsvpInstructions: '',
   arrivalInstructions: '',
-  parkingNotes: '',
   intuitionAudience: '',
   intuitionWhyAttend: '',
   intuitionKeyTakeaway: '',
@@ -1227,18 +1229,6 @@ function parseTime(timeStr) {
   return null
 }
 
-function formatTime(minutesFromMidnight) {
-  let t = Math.floor(Number(minutesFromMidnight))
-  if (!Number.isFinite(t)) t = 0
-  t = ((t % (24 * 60)) + (24 * 60)) % (24 * 60)
-  const h = Math.floor(t / 60)
-  const m = t % 60
-  if (m < 0 || m > 59) return `${h % 12 || 12}:00 ${h >= 12 ? 'PM' : 'AM'}`
-  const ap = h >= 12 ? 'PM' : 'AM'
-  const h12 = h % 12 || 12
-  return `${h12}:${String(m).padStart(2, '0')} ${ap}`
-}
-
 function addMinutes(minutesFromMidnight, delta) {
   return (minutesFromMidnight + delta) % (24 * 60)
 }
@@ -1265,7 +1255,8 @@ function buildAgenda(form, lang = 'en') {
       .some((v) => trim(v).length > 0)
 
   const startMins = parseTime(form.eventStartTime)
-  const at = (offsetMins) => (startMins != null ? formatTime(addMinutes(startMins, offsetMins)) : null)
+  const at = (offsetMins) =>
+    startMins != null ? formatAgendaClock(addMinutes(startMins, offsetMins), lang) : null
 
   const lines = []
   const pushTimed = (offsetMins, text) => {
@@ -2056,7 +2047,7 @@ function buildIntro(form, lang = 'en') {
   const S = getEventPageStrings(normalizeLanguage(lang))
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const dateRaw = trim(form.date)
-  const date = dateRaw ? (formatDateWithOrdinal(dateRaw) || dateRaw) : ''
+  const date = dateRaw ? formatLocalizedLongDate(dateRaw, lang) || dateRaw : ''
   const s1 = formatSpeakerForEvent(form.speaker1Name, form.speaker1Title, form.speaker1Company)
   const s2 = formatSpeakerForEvent(form.speaker2Name, form.speaker2Title, form.speaker2Company)
   const s3 = formatSpeakerForEvent(form.speaker3Name, form.speaker3Title, form.speaker3Company)
@@ -2113,11 +2104,11 @@ function generateMeetupCopy(form, opts = {}) {
     const tzDisplay = getTimezoneDisplay(form.timezone)
     const parts = []
     if (dateRaw && startMins != null) {
-      parts.push(`${formatDateWithOrdinal(dateRaw) || dateRaw} at ${formatTime(startMins)}`)
+      parts.push(formatWhenDateTimePhrase(dateRaw, startMins, lang))
     } else if (dateRaw) {
-      parts.push(formatDateWithOrdinal(dateRaw) || dateRaw)
+      parts.push(formatLocalizedLongDate(dateRaw, lang) || dateRaw)
     } else if (startMins != null) {
-      parts.push(formatTime(startMins))
+      parts.push(formatAgendaClock(startMins, lang))
     }
     if (tzDisplay && parts.length) parts[0] = `${parts[0]} ${tzDisplay}`
     return parts.join('\n')
@@ -2336,6 +2327,7 @@ export default function App() {
       if (!String(prev.meetupPageWhyAttend || '').trim()) next.meetupPageWhyAttend = d.meetupPageWhyAttend
       if (!String(prev.meetupPageWhatToExpect || '').trim()) next.meetupPageWhatToExpect = d.meetupPageWhatToExpect
       if (!String(prev.meetupPageClosing || '').trim()) next.meetupPageClosing = d.meetupPageClosing
+      if (!String(prev.parkingNotes || '').trim()) next.parkingNotes = d.parkingNotes
       return next
     })
   }, [eventPageLanguage])

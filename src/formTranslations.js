@@ -132,6 +132,8 @@ const BASE_EN = {
   conf_eventName: 'Event name',
   conf_kbygDeckUrl: 'Know Before You Go Deck URL',
   conf_kbygDeckHint: 'If provided, the generated email links to this deck. Leave blank to omit that sentence.',
+  conf_organizerImportPlaceholder:
+    'Parking, booth hours, setup and teardown, shipping, Wi‑Fi, lead capture, venue, badge check-in, food…',
   conf_importLegend: 'Import organizer details',
   conf_importLead:
     'Optional. Paste organizer or sponsor text to pre-fill empty fields, and get a structured Know Before You Go (emoji sections, bullets) to copy.',
@@ -340,6 +342,8 @@ const BASE_ES = {
   conf_eventName: 'Nombre del evento',
   conf_kbygDeckUrl: 'URL del deck Know Before You Go',
   conf_kbygDeckHint: 'Si lo proporcionas, el correo enlaza este deck. Déjalo vacío para omitir esa frase.',
+  conf_organizerImportPlaceholder:
+    'Estacionamiento, horario del stand, montaje y desmontaje, envíos, Wi‑Fi, captación de leads, venue, credenciales, comida…',
   conf_importLegend: 'Importar detalles del organizador',
   conf_importLead:
     'Opcional. Pega texto del organizador o patrocinador para rellenar campos vacíos y obtener un Know Before You Go estructurado para copiar.',
@@ -548,6 +552,8 @@ const BASE_PT = {
   conf_eventName: 'Nome do evento',
   conf_kbygDeckUrl: 'URL do deck Know Before You Go',
   conf_kbygDeckHint: 'Se informado, o e-mail linka este deck. Deixe em branco para omitir a frase.',
+  conf_organizerImportPlaceholder:
+    'Estacionamento, horário do estande, montagem e desmontagem, envios, Wi‑Fi, captura de leads, local, credenciamento, comida…',
   conf_importLegend: 'Importar detalhes do organizador',
   conf_importLead:
     'Opcional. Cole texto do organizador ou patrocinador para preencher campos vazios e obter um Know Before You Go estruturado para copiar.',
@@ -647,6 +653,8 @@ export function getEventPageFieldDefaults(lang) {
     meetupPageWhyAttend: '',
     meetupPageWhatToExpect: t.expectDetails,
     meetupPageClosing: '',
+    /** Suggested default for the parking / venue field (editable). */
+    parkingNotes: t.parkingDetails,
   }
 }
 
@@ -697,4 +705,27 @@ export function getKbygSpeakerArrivalQuickFill(lang) {
 export function getKbygAvQuickFill(lang) {
   const n = normalizeLanguage(lang)
   return AV_QUICK[n] || AV_QUICK.en
+}
+
+const DEFAULT_CONFERENCE_SWAG = {
+  en: [
+    'Keep extra swag behind the table',
+    'Replenish throughout the day',
+    'Monitor distribution across event days',
+  ],
+  es: [
+    'Mantén swag extra detrás de la mesa',
+    'Repon a lo largo del día',
+    'Supervisa la distribución entre jornadas',
+  ],
+  pt: [
+    'Mantenha brindes extras atrás da mesa',
+    'Reponha ao longo do dia',
+    'Acompanhe a distribuição entre os dias do evento',
+  ],
+}
+
+export function getDefaultConferenceSwagText(lang) {
+  const n = normalizeLanguage(lang)
+  return (DEFAULT_CONFERENCE_SWAG[n] || DEFAULT_CONFERENCE_SWAG.en).join('\n')
 }
