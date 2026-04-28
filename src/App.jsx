@@ -2327,7 +2327,6 @@ export default function App() {
       if (!String(prev.meetupPageWhyAttend || '').trim()) next.meetupPageWhyAttend = d.meetupPageWhyAttend
       if (!String(prev.meetupPageWhatToExpect || '').trim()) next.meetupPageWhatToExpect = d.meetupPageWhatToExpect
       if (!String(prev.meetupPageClosing || '').trim()) next.meetupPageClosing = d.meetupPageClosing
-      if (!String(prev.parkingNotes || '').trim()) next.parkingNotes = d.parkingNotes
       return next
     })
   }, [eventPageLanguage])

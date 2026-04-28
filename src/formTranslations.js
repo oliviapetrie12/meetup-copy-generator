@@ -10,7 +10,6 @@ const BASE_EN = {
   arrival: 'Arrival Instructions',
   checkIn: 'Check in at the front desk',
   parking: 'Parking',
-  parkingDetails: 'Parking is free after 6pm',
   whyAttend: 'Why attend',
   whatToExpect: 'What to expect',
   expectDetails: 'Talks + networking\nFood and drinks will be provided',
@@ -221,7 +220,6 @@ const BASE_ES = {
   arrival: 'Instrucciones de llegada',
   checkIn: 'Regístrate en la recepción',
   parking: 'Estacionamiento',
-  parkingDetails: 'El estacionamiento es gratuito después de las 6pm',
   whyAttend: 'Por qué asistir',
   whatToExpect: 'Qué esperar',
   expectDetails: 'Charlas + networking\nSe proporcionarán comida y bebidas',
@@ -431,7 +429,6 @@ const BASE_PT = {
   arrival: 'Instruções de chegada',
   checkIn: 'Faça check-in na recepção',
   parking: 'Estacionamento',
-  parkingDetails: 'O estacionamento é gratuito após as 18h',
   whyAttend: 'Por que participar',
   whatToExpect: 'O que esperar',
   expectDetails: 'Palestras + networking\nComida e bebidas serão fornecidas',
@@ -653,8 +650,6 @@ export function getEventPageFieldDefaults(lang) {
     meetupPageWhyAttend: '',
     meetupPageWhatToExpect: t.expectDetails,
     meetupPageClosing: '',
-    /** Suggested default for the parking / venue field (editable). */
-    parkingNotes: t.parkingDetails,
   }
 }
 

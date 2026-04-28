@@ -68,18 +68,30 @@ export function eventPageRemotePrompt(lang) {
     'Explicitly include and localize when applicable: agenda; a short closing sentence inviting attendees; “Who this is for” / audience copy; “Why attend”; “What to expect”.',
     'Ensure section headers and bullet points match the selected language.',
     '',
+    'Arrival instructions and parking (critical): Write both sections entirely in the selected language.',
+    '- Do not copy English placeholder or example text from the form; treat empty arrival/parking fields as a signal to compose fresh logistics copy.',
+    '- If arrival instructions or parking notes are missing or blank in the form data, infer sensible content from venue name, venue address, date/time, timezone, RSVP instructions, and related fields—still fully in the selected language.',
+    '- If the form contains English for those fields, rewrite the substance in the selected language for the generated output (do not leave English when Spanish or Portuguese is selected).',
+    '',
     FORMAT_RULE,
   ].join('\n')
 }
 
 /** Meetup Know Before You Go email — remote API prompt. */
 export function meetupKbygRemotePrompt(lang) {
+  const n = normalizeLanguage(lang)
+  const arrivalParkingRule =
+    n === 'en'
+      ? 'Parking and arrival-related logistics (TL;DR lines, body sections): compose in English from the form and inferred venue/event context.'
+      : 'Parking and any arrival or check-in logistics must be written entirely in the target language. If parking or arrival fields are empty, infer practical copy from venue, address, time, and links—never leave English in the output.'
+
   return [
     baseGenerationPrompt(lang),
     '',
     'Generate the Meetup Know Before You Go organizer email from the form.',
     'Localize every section title, paragraph, and bullet. Use only information implied by the form fields.',
     'Do not paste English template logistics sentences—write natural copy in the selected language.',
+    arrivalParkingRule,
     '',
     FORMAT_RULE,
   ].join('\n')
@@ -93,6 +105,7 @@ export function conferenceKbygRemotePrompt(lang) {
     'Generate the Conference Know Before You Go email for onsite staff from the form.',
     'Localize all sections (TL;DR, dates, tickets, location, contacts, booth logistics, AV, swag, parking, food, engagement, travel, etc.).',
     'Do not leave English headers or bullets when the selected language is not English. Do not reuse canned English paragraphs—compose from the provided fields.',
+    'Parking and arrival / transportation content: generate fully in the selected language. Empty parking or transit fields should be filled with plausible, venue-aware copy inferred from the form—not English placeholders.',
     '',
     FORMAT_RULE,
   ].join('\n')
