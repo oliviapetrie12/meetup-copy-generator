@@ -8,8 +8,11 @@ export const LANGUAGE_OPTIONS = [
   { value: 'pt', label: 'Portuguese' },
 ]
 
-export const FORMAT_RULE =
-  'Preserve formatting, emojis, bullet points, and section headers exactly.'
+export const FORMAT_RULE = 'Preserve formatting, emojis, and structure.'
+
+/** Strict rule for event-page remote prompts (full localization). */
+export const STRICT_LOCALIZATION_RULE =
+  'Generate ALL content entirely in the selected language. Do not include any English unless the selected language is English.'
 
 /** Instruction fragment for prompts / API (English default = structure-only reminder). */
 export function languageInstruction(lang) {
@@ -22,6 +25,129 @@ export function languageInstruction(lang) {
 export function normalizeLanguage(lang) {
   if (lang === 'es' || lang === 'pt') return lang
   return 'en'
+}
+
+/** Full instruction for Meetup event page remote generation—no mixed-language output. */
+export function eventPageRemotePrompt(lang) {
+  const n = normalizeLanguage(lang)
+  const lines = [STRICT_LOCALIZATION_RULE, '']
+  if (n === 'es') {
+    lines.push('Generate the Meetup event page copy entirely in Spanish (neutral Latin American).')
+  } else if (n === 'pt') {
+    lines.push('Generate the Meetup event page copy entirely in Brazilian Portuguese.')
+  } else {
+    lines.push('Generate the Meetup event page copy in English.')
+  }
+  lines.push(
+    '',
+    'Explicitly include and localize when applicable:',
+    '- Agenda (every line, including times and activity labels, in the selected language).',
+    '- A short closing sentence inviting attendees to join (write fresh copy in the selected language—do not paste canned English phrases).',
+    '- "Who this is for" / audience-oriented framing when the input implies an audience, theme, or target attendee.',
+    '- "Why attend" (reasons and value).',
+    '- "What to expect" when relevant.',
+    'Do not hardcode English section titles, agenda lines, or sample closings—translate all labels and body copy to the selected language.',
+    'Include a short closing sentence inviting attendees to join, in the selected language.',
+    'Ensure section headers and bullet points are also translated.',
+    '',
+    FORMAT_RULE,
+  )
+  return lines.join('\n')
+}
+
+export function getAgendaLineLabels(lang) {
+  const n = normalizeLanguage(lang)
+  const M = {
+    en: {
+      doors: 'Doors open / mingle',
+      concludes: 'Event concludes',
+    },
+    es: {
+      doors: 'Apertura y convivencia',
+      concludes: 'Cierre del evento',
+    },
+    pt: {
+      doors: 'Abertura e confraternização',
+      concludes: 'Encerramento do evento',
+    },
+  }
+  return M[n] || M.en
+}
+
+/** Fallback agenda when the timed builder returns nothing (edge case). */
+export function getEventPageAgendaFallbackLines(lang) {
+  const n = normalizeLanguage(lang)
+  const L = getAgendaLineLabels(n)
+  const M = {
+    en: `6:00 PM ${L.doors}\n6:30 PM Talks\n8:00 PM ${L.concludes}`,
+    es: `6:00 p. m. ${L.doors}\n6:30 p. m. Charlas\n8:00 p. m. ${L.concludes}`,
+    pt: `18:00 ${L.doors}\n18:30 Palestras\n20:00 ${L.concludes}`,
+  }
+  return M[n] || M.en
+}
+
+/** Default copy for Meetup event page fields (UI initial state + quick draft for non-English). */
+export function getEventPageFieldDefaults(lang) {
+  const n = normalizeLanguage(lang)
+  const M = {
+    en: {
+      meetupPageWhyAttend:
+        '- Learn from community talks and real-world Elastic use cases\n- Network with other practitioners\n- All experience levels welcome',
+      meetupPageWhatToExpect: 'Talks + networking\nFood and drinks will be provided',
+      meetupPageClosing:
+        'Come hang out, learn something new, and connect with others in the Elastic community.',
+    },
+    es: {
+      meetupPageWhyAttend:
+        '- Aprende con charlas de la comunidad y casos reales con Elastic\n- Conecta con otras personas de la práctica\n- Todos los niveles de experiencia son bienvenidos',
+      meetupPageWhatToExpect: 'Charlas + networking\nHabrá comida y bebidas',
+      meetupPageClosing:
+        'Únete, aprende algo nuevo y conecta con la comunidad Elastic.',
+    },
+    pt: {
+      meetupPageWhyAttend:
+        '- Aprenda com palestras da comunidade e casos reais com Elastic\n- Faça networking com outras pessoas da área\n- Todos os níveis de experiência são bem-vindos',
+      meetupPageWhatToExpect: 'Palestras + networking\nComida e bebidas serão oferecidas',
+      meetupPageClosing:
+        'Venha, aprenda algo novo e conecte-se com a comunidade Elastic.',
+    },
+  }
+  return M[n] || M.en
+}
+
+export function buildEventPageWhatToExpectQuickDraft({ city, theme1, lang }) {
+  const n = normalizeLanguage(lang)
+  const T = {
+    en: {
+      withBoth: (c, t) =>
+        `Expect an evening of community talks focused on ${t}, time for questions, and networking with the ${c} Elastic community. Light refreshments will be available.`,
+      withCity: (c) =>
+        `Expect community talks, Q&A, and networking with the ${c} Elastic community. Light refreshments will be available.`,
+      generic: 'Expect community talks, Q&A, and networking. Light refreshments will be available.',
+    },
+    es: {
+      withBoth: (c, t) =>
+        `Cuenta con una velada de charlas comunitarias sobre ${t}, espacio para preguntas y networking con la comunidad Elastic de ${c}. Habrá refrigerios ligeros.`,
+      withCity: (c) =>
+        `Cuenta con charlas comunitarias, rondas de preguntas y networking con la comunidad Elastic de ${c}. Habrá refrigerios ligeros.`,
+      generic:
+        'Cuenta con charlas comunitarias, rondas de preguntas y networking. Habrá refrigerios ligeros.',
+    },
+    pt: {
+      withBoth: (c, t) =>
+        `Prepare-se para uma noite de palestras comunitárias focadas em ${t}, tempo para perguntas e networking com a comunidade Elastic de ${c}. Haverá refrescos leves.`,
+      withCity: (c) =>
+        `Prepare-se para palestras comunitárias, perguntas e respostas e networking com a comunidade Elastic de ${c}. Haverá refrescos leves.`,
+      generic:
+        'Prepare-se para palestras comunitárias, perguntas e respostas e networking. Haverá refrescos leves.',
+    },
+  }
+  const m = T[n] || T.en
+  const c = typeof city === 'string' ? city.trim() : ''
+  const t = typeof theme1 === 'string' ? theme1.trim() : ''
+  if (c && t) return m.withBoth(c, t)
+  if (c) return m.withCity(c)
+  return m.generic
 }
 
 export function getMeetupKbygTldrLabels(lang) {

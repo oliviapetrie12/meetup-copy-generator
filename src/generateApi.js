@@ -1,4 +1,4 @@
-import { languageInstruction, FORMAT_RULE } from './generationLanguage.js'
+import { languageInstruction, FORMAT_RULE, eventPageRemotePrompt } from './generationLanguage.js'
 
 /**
  * POST /api/generate — optional remote backend. Returns null if unavailable or invalid.
@@ -11,7 +11,10 @@ export async function tryRemoteGenerate(body) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...body,
-        instruction: languageInstruction(body.language),
+        instruction:
+          body.generator === 'eventPage'
+            ? eventPageRemotePrompt(body.language)
+            : languageInstruction(body.language),
         formatRule: FORMAT_RULE,
       }),
     })

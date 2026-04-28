@@ -15,6 +15,10 @@ import {
   getMeetupKbygStrings,
   getMeetupKbygTldrLabels,
   getMeetupKbygPhotoLines,
+  getEventPageFieldDefaults,
+  getEventPageAgendaFallbackLines,
+  getAgendaLineLabels,
+  buildEventPageWhatToExpectQuickDraft,
 } from './generationLanguage.js'
 import {
   tryRemoteGenerate,
@@ -371,12 +375,7 @@ function emailTextToHtml(text) {
 
 /** Reusable defaults for the Meetup Event Page generator (merged into INITIAL_STATE; all editable in the UI). */
 const EVENT_PAGE_FORM_DEFAULTS = {
-  meetupPageWhyAttend:
-    '- Learn from community talks and real-world Elastic use cases\n- Network with other practitioners\n- All experience levels welcome',
-  meetupPageWhatToExpect:
-    'Talks + networking\nFood and drinks will be provided',
-  meetupPageClosing:
-    'Come hang out, learn something new, and connect with others in the Elastic community.',
+  ...getEventPageFieldDefaults('en'),
   eventPageIncludeWhyAttend: true,
   eventPageIncludeWhatToExpect: true,
   eventPageIncludeSpeakerSection: true,
@@ -1263,7 +1262,8 @@ function agendaSpeakerLine(name, talkTitle) {
   return ''
 }
 
-function buildAgenda(form) {
+function buildAgenda(form, lang = 'en') {
+  const L = getAgendaLineLabels(lang)
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const hasSpeaker2 =
     [form.speaker2Name, form.speaker2Title, form.speaker2Company, form.speaker2TalkTitle, form.speaker2TalkAbstract]
@@ -1282,7 +1282,7 @@ function buildAgenda(form) {
     else lines.push(text)
   }
 
-  pushTimed(0, 'Doors open / mingle')
+  pushTimed(0, L.doors)
 
   const speaker1Line = agendaSpeakerLine(form.speaker1Name, form.speaker1TalkTitle)
   if (speaker1Line) pushTimed(30, speaker1Line)
@@ -1297,7 +1297,7 @@ function buildAgenda(form) {
     if (speaker3Line) pushTimed(90, speaker3Line)
   }
 
-  pushTimed(120, 'Event concludes')
+  pushTimed(120, L.concludes)
 
   return lines.join('\n')
 }
@@ -2026,37 +2026,36 @@ function meetupEventPageFieldIsEmpty(value) {
 }
 
 /** Draft text for Meetup Event Page optional sections; only includes keys that should be filled (caller merges when field is empty). */
-function buildQuickMeetupEventPageDraft(form) {
+function buildQuickMeetupEventPageDraft(form, language = 'en') {
+  const n = normalizeLanguage(language)
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const out = {}
+  const fieldDefaults = getEventPageFieldDefaults(n)
 
   if (meetupEventPageFieldIsEmpty(form.meetupPageWhyAttend)) {
-    const bullets = buildIntuitionWhyAttend(form, 0)
-    out.meetupPageWhyAttend = bullets.map((b) => `- ${trim(b).replace(/^[-•]\s*/, '')}`).join('\n')
-  }
-
-  if (meetupEventPageFieldIsEmpty(form.meetupPageWhatToExpect)) {
-    const city = getCityForIntuition(form)
-    const theme1 = getIntroTheme(form.speaker1TalkTitle, form.speaker1TalkAbstract)
-    if (city && theme1) {
-      out.meetupPageWhatToExpect = `Expect an evening of community talks focused on ${theme1}, time for questions, and networking with the ${city} Elastic community. Light refreshments will be available.`
-    } else if (city) {
-      out.meetupPageWhatToExpect = `Expect community talks, Q&A, and networking with the ${city} Elastic community. Light refreshments will be available.`
+    if (n === 'en') {
+      const bullets = buildIntuitionWhyAttend(form, 0)
+      out.meetupPageWhyAttend = bullets.map((b) => `- ${trim(b).replace(/^[-•]\s*/, '')}`).join('\n')
     } else {
-      out.meetupPageWhatToExpect =
-        'Expect community talks, Q&A, and networking. Light refreshments will be available.'
+      out.meetupPageWhyAttend = fieldDefaults.meetupPageWhyAttend
     }
   }
 
+  if (meetupEventPageFieldIsEmpty(form.meetupPageWhatToExpect)) {
+    out.meetupPageWhatToExpect = buildEventPageWhatToExpectQuickDraft({
+      city: getCityForIntuition(form),
+      theme1: getIntroTheme(form.speaker1TalkTitle, form.speaker1TalkAbstract),
+      lang: n,
+    })
+  }
+
   if (meetupEventPageFieldIsEmpty(form.meetupPageAgenda)) {
-    const built = trim(buildAgenda(form))
-    out.meetupPageAgenda =
-      built ||
-      `6:00 PM Doors open / mingle\n6:30 PM Talks\n8:00 PM Event concludes`
+    const built = trim(buildAgenda(form, n))
+    out.meetupPageAgenda = built || getEventPageAgendaFallbackLines(n)
   }
 
   if (meetupEventPageFieldIsEmpty(form.meetupPageClosing)) {
-    out.meetupPageClosing = EVENT_PAGE_FORM_DEFAULTS.meetupPageClosing
+    out.meetupPageClosing = fieldDefaults.meetupPageClosing
   }
 
   return out
@@ -2167,7 +2166,7 @@ function generateMeetupCopy(form, opts = {}) {
 
   const agendaBody = has(form.meetupPageAgenda)
     ? normalizeElastiFlow(trim(form.meetupPageAgenda))
-    : normalizeElastiFlow(buildAgenda(form))
+    : normalizeElastiFlow(buildAgenda(form, lang))
   sections.push({
     title: S.agenda,
     body: agendaBody,
@@ -2418,7 +2417,7 @@ export default function App() {
     setForm((prev) => ({ ...prev, [key]: e.target.value }))
 
   const handleQuickMeetupDraft = () => {
-    setForm((prev) => ({ ...prev, ...buildQuickMeetupEventPageDraft(prev) }))
+    setForm((prev) => ({ ...prev, ...buildQuickMeetupEventPageDraft(prev, eventPageLanguage) }))
   }
 
   const updateKbyg = (key) => (e) =>
