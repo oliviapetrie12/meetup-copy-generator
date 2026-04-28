@@ -59,6 +59,14 @@ export async function tryRemoteTranslate(text, targetLanguage) {
   })
 }
 
+/** Plain text from translate action response (`plain` or `output`). */
+export function extractTranslatedPlain(data) {
+  if (!data || typeof data !== 'object') return null
+  if (typeof data.plain === 'string' && data.plain.trim()) return data.plain.trim()
+  if (typeof data.output === 'string' && data.output.trim()) return data.output.trim()
+  return null
+}
+
 /**
  * Escape text for safe HTML body (minimal entity set).
  * @param {string} s

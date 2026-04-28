@@ -34,6 +34,7 @@ import {
   meetupPlainTextToHtml,
   applyRemoteKbygResult,
   tryRemoteTranslate,
+  extractTranslatedPlain,
 } from './generateApi.js'
 
 function SearchableSelect({ value, onChange, options, placeholder = 'Type to search…', id }) {
@@ -2368,6 +2369,11 @@ export default function App() {
   const [showSpeaker2, setShowSpeaker2] = useState(false)
   const [showSpeaker3, setShowSpeaker3] = useState(false)
 
+  const formRef = useRef(form)
+  formRef.current = form
+  /** Skip first Event Page mount; reset when leaving Event Page generator. */
+  const prevEventPageLangForTranslateRef = useRef(null)
+
   const kbygSections = useMemo(
     () =>
       generatorType === 'knowBeforeYouGo' && generatedCopy
@@ -2396,6 +2402,70 @@ export default function App() {
       return next
     })
   }, [eventPageLanguage])
+
+  /** On Event Page language change: translate arrival / parking / agenda via API and refresh preview. */
+  useEffect(() => {
+    if (generatorType !== 'eventPromotion') {
+      prevEventPageLangForTranslateRef.current = null
+      return
+    }
+
+    if (prevEventPageLangForTranslateRef.current === null) {
+      prevEventPageLangForTranslateRef.current = eventPageLanguage
+      return
+    }
+
+    if (prevEventPageLangForTranslateRef.current === eventPageLanguage) return
+    prevEventPageLangForTranslateRef.current = eventPageLanguage
+
+    let cancelled = false
+
+    ;(async () => {
+      const snapshot = formRef.current
+      const keys = ['arrivalInstructions', 'parkingNotes', 'meetupPageAgenda']
+      const updates = {}
+
+      await Promise.all(
+        keys.map(async (key) => {
+          const raw = String(snapshot[key] ?? '').trim()
+          if (!raw) return
+          const data = await tryRemoteTranslate(raw, eventPageLanguage)
+          const out = extractTranslatedPlain(data)
+          if (out) updates[key] = out
+        }),
+      )
+
+      if (cancelled) return
+
+      const mergedForm = { ...formRef.current }
+      for (const key of Object.keys(updates)) {
+        const atStart = String(snapshot[key] ?? '').trim()
+        const latest = String(formRef.current[key] ?? '').trim()
+        if (latest === atStart) mergedForm[key] = updates[key]
+      }
+
+      if (Object.keys(updates).length > 0) {
+        setForm((prev) => {
+          const next = { ...prev }
+          for (const key of Object.keys(updates)) {
+            const atStart = String(snapshot[key] ?? '').trim()
+            const cur = String(prev[key] ?? '').trim()
+            if (cur === atStart) next[key] = updates[key]
+          }
+          return next
+        })
+      }
+      setEventPageGeneratedContent(null)
+
+      const page = buildLocalizedEventPageContent(eventPageLanguage, mergedForm, {})
+      setGeneratedCopy(page.plain)
+      setMeetupPageHtml(page.html)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [eventPageLanguage, generatorType])
 
   useEffect(() => {
     function handleClickOutside(e) {
