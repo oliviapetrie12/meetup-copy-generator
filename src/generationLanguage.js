@@ -153,7 +153,8 @@ export function conferenceKbygRemotePrompt(lang) {
 
 export function getAgendaLineLabels(lang) {
   const n = normalizeLanguage(lang)
-  return agendaTranslationsByLanguage[n] || agendaTranslationsByLanguage.en
+  if (n === 'es' || n === 'pt') return agendaTranslationsByLanguage[n]
+  return agendaTranslationsByLanguage.en
 }
 
 /** Generic timed agenda row when no speaker line applies (mirrors fallback middle line). */
@@ -620,12 +621,12 @@ export function getEventPageStrings(lang) {
     es: {
       when: 'Cuándo',
       where: 'Dónde',
-      rsvp: 'RSVP',
+      rsvp: 'Inscripción',
       arrival: 'Llegada',
       parking: 'Estacionamiento',
       whyAttend: 'Por qué asistir',
       whatToExpect: 'Qué esperar',
-      agenda: 'Agenda',
+      agenda: 'Programa',
       talkAbstracts: 'Resúmenes de charlas',
       hostSponsor: 'Anfitrión / patrocinador',
       closing: 'Cierre',
@@ -636,23 +637,23 @@ export function getEventPageStrings(lang) {
       emojiWhere: '📍 Ubicación',
       emojiWhy: '✨ Por qué asistir',
       emojiWhat: '💡 Qué esperar',
-      emojiAgenda: '📝 Agenda',
+      emojiAgenda: '📝 Programa',
       emojiClosing: '👋 Cierre',
       emojiTalks: '💬 Resúmenes de charlas',
       emojiArrival: '🪧 Instrucciones de llegada',
       emojiParking: '🚗 Estacionamiento',
-      emojiRsvp: '📌 RSVP',
+      emojiRsvp: '📌 Inscripción',
       emojiHost: '🏢 Anfitrión / patrocinador',
       plainWhen: 'Fecha y hora',
       plainWhere: 'Ubicación',
       plainWhy: 'Por qué asistir',
       plainWhat: 'Qué esperar',
-      plainAgenda: 'Agenda',
+      plainAgenda: 'Programa',
       plainClosing: 'Cierre',
       plainTalks: 'Resúmenes de charlas',
       plainArrival: 'Instrucciones de llegada',
       plainParking: 'Estacionamiento',
-      plainRsvp: 'RSVP',
+      plainRsvp: 'Inscripción',
       plainHost: 'Anfitrión / patrocinador',
       intro3speakers: (groupName, when, s1, s2, s3) =>
         `${groupName} organiza un meetup${when}. Tendremos presentaciones de ${s1}, ${s2} y ${s3}, y después comida, refrescos y networking.`,
@@ -667,12 +668,12 @@ export function getEventPageStrings(lang) {
     pt: {
       when: 'Quando',
       where: 'Onde',
-      rsvp: 'RSVP',
+      rsvp: 'Inscrição',
       arrival: 'Chegada',
       parking: 'Estacionamento',
       whyAttend: 'Por que participar',
       whatToExpect: 'O que esperar',
-      agenda: 'Agenda',
+      agenda: 'Programação',
       talkAbstracts: 'Resumos das palestras',
       hostSponsor: 'Anfitrião / patrocinador',
       closing: 'Encerramento',
@@ -683,23 +684,23 @@ export function getEventPageStrings(lang) {
       emojiWhere: '📍 Local',
       emojiWhy: '✨ Por que participar',
       emojiWhat: '💡 O que esperar',
-      emojiAgenda: '📝 Agenda',
+      emojiAgenda: '📝 Programação',
       emojiClosing: '👋 Encerramento',
       emojiTalks: '💬 Resumos das palestras',
       emojiArrival: '🪧 Instruções de chegada',
       emojiParking: '🚗 Estacionamento',
-      emojiRsvp: '📌 RSVP',
+      emojiRsvp: '📌 Inscrição',
       emojiHost: '🏢 Anfitrião / patrocinador',
       plainWhen: 'Data e hora',
       plainWhere: 'Local',
       plainWhy: 'Por que participar',
       plainWhat: 'O que esperar',
-      plainAgenda: 'Agenda',
+      plainAgenda: 'Programação',
       plainClosing: 'Encerramento',
       plainTalks: 'Resumos das palestras',
       plainArrival: 'Instruções de chegada',
       plainParking: 'Estacionamento',
-      plainRsvp: 'RSVP',
+      plainRsvp: 'Inscrição',
       plainHost: 'Anfitrião / patrocinador',
       intro3speakers: (groupName, when, s1, s2, s3) =>
         `${groupName} está organizando um meetup${when}. Teremos apresentações de ${s1}, ${s2} e ${s3}, depois comida, refrescos e networking.`,
@@ -712,7 +713,8 @@ export function getEventPageStrings(lang) {
       onDate: (d) => ` em ${d}`,
     },
   }
-  return M[n] || M.en
+  if (n === 'es' || n === 'pt') return M[n]
+  return M.en
 }
 
 /** Conference KBYG: UI labels for TL;DR checkboxes (optional). */

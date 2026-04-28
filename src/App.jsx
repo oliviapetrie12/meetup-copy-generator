@@ -2046,18 +2046,24 @@ function buildQuickMeetupEventPageDraft(form, language = 'en') {
 }
 
 function buildIntro(form, lang = 'en') {
-  const S = getEventPageStrings(normalizeLanguage(lang))
+  const n = normalizeLanguage(lang)
+  const S = getEventPageStrings(n)
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const dateRaw = trim(form.date)
-  const date = dateRaw ? formatLocalizedLongDate(dateRaw, lang) || dateRaw : ''
+  const date = dateRaw ? formatLocalizedLongDate(dateRaw, n) || dateRaw : ''
   const s1 = formatSpeakerForEvent(form.speaker1Name, form.speaker1Title, form.speaker1Company)
   const s2 = formatSpeakerForEvent(form.speaker2Name, form.speaker2Title, form.speaker2Company)
   const s3 = formatSpeakerForEvent(form.speaker3Name, form.speaker3Title, form.speaker3Company)
   const hasSpeaker2 = [form.speaker2Name, form.speaker2Title, form.speaker2Company, form.speaker2TalkTitle, form.speaker2TalkAbstract].some((v) => trim(v).length > 0)
   const hasSpeaker3 = [form.speaker3Name, form.speaker3Title, form.speaker3Company, form.speaker3TalkTitle, form.speaker3TalkAbstract].some((v) => trim(v).length > 0)
 
-  const baseGroup = getLinkedInGroupName(form)
-  const groupName = baseGroup.startsWith('The ') ? baseGroup : `The ${baseGroup}`
+  const rawGroup = getLinkedInGroupName(form)
+  const groupName =
+    n === 'en'
+      ? rawGroup.startsWith('The ')
+        ? rawGroup
+        : `The ${rawGroup}`
+      : rawGroup.replace(/^The\s+/i, '').trim() || rawGroup
   const when = date ? S.onDate(date) : ''
   if (s1 && hasSpeaker2 && s2 && hasSpeaker3 && s3) {
     return normalizeElastiFlow(S.intro3speakers(groupName, when, s1, s2, s3))
@@ -2069,6 +2075,40 @@ function buildIntro(form, lang = 'en') {
     return normalizeElastiFlow(S.intro1speaker(groupName, when, s1))
   }
   return normalizeElastiFlow(S.introNone(groupName, when))
+}
+
+/**
+ * Single entry for localized Meetup event page plain + HTML from form + optional API structured fields.
+ * @param {string} language - generator locale (en | es | pt)
+ * @param {object} form - full event page form state
+ * @param {object} [generatedData] - `{ structured }` or `{ remoteSections }` from /api/generate
+ */
+function buildLocalizedEventPageContent(language, form, generatedData = {}) {
+  const lang = normalizeLanguage(language)
+  const remoteSections = generatedData?.structured ?? generatedData?.remoteSections
+  if (import.meta.env.DEV) {
+    console.log('[EventPage] buildLocalizedEventPageContent', {
+      language: lang,
+      hasStructuredRemote: !!(remoteSections && Object.keys(remoteSections).length),
+      fieldLengths: {
+        rsvp: String(form.rsvpInstructions || '').length,
+        arrival: String(form.arrivalInstructions || '').length,
+        parking: String(form.parkingNotes || '').length,
+        whatToExpect: String(form.meetupPageWhatToExpect || '').length,
+        agenda: String(form.meetupPageAgenda || '').length,
+        whyAttend: String(form.meetupPageWhyAttend || '').length,
+      },
+    })
+  }
+  const out = generateMeetupCopy(form, {
+    language: lang,
+    remoteSections: remoteSections || undefined,
+  })
+  if (import.meta.env.DEV) {
+    console.log('[EventPage] generated output (plain excerpt)', out.plain?.slice(0, 400))
+    console.log('[EventPage] generated HTML length', out.html?.length ?? 0)
+  }
+  return out
 }
 
 /** @param {Record<string, unknown> | null | undefined} rs */
@@ -2517,10 +2557,7 @@ export default function App() {
       if (applied) {
         const structured = applied.structured
         setEventPageGeneratedContent(structured)
-        const mergedPage = generateMeetupCopy(form, {
-          language: n,
-          remoteSections: structured || undefined,
-        })
+        const mergedPage = buildLocalizedEventPageContent(n, form, { structured })
         const finalPlain = applied.plain.trim() || mergedPage.plain
         let finalHtml = (applied.html && applied.html.trim()) || ''
         if (!finalHtml) {
@@ -2533,6 +2570,12 @@ export default function App() {
         setGeneratedCopy(finalPlain)
         setMeetupPageHtml(finalHtml)
         setEventPageLanguage(n)
+        if (import.meta.env.DEV) {
+          console.log('[EventPage] final rendered preview (translate)', {
+            selectedLanguage: n,
+            htmlSnippet: finalHtml?.slice(0, 280),
+          })
+        }
         return
       }
     } else {
@@ -2612,10 +2655,7 @@ export default function App() {
       if (applied) {
         const structured = applied.structured
         setEventPageGeneratedContent(structured)
-        const mergedPage = generateMeetupCopy(form, {
-          language: eventPageLanguage,
-          remoteSections: structured || undefined,
-        })
+        const mergedPage = buildLocalizedEventPageContent(eventPageLanguage, form, { structured })
         const finalPlain = applied.plain.trim() || mergedPage.plain
         let finalHtml = (applied.html && applied.html.trim()) || ''
         if (!finalHtml) {
@@ -2627,15 +2667,31 @@ export default function App() {
         }
         setGeneratedCopy(finalPlain)
         setMeetupPageHtml(finalHtml)
+        if (import.meta.env.DEV) {
+          console.log('[EventPage] final rendered preview (remote)', {
+            selectedLanguage: eventPageLanguage,
+            htmlSnippet: finalHtml?.slice(0, 280),
+            usedMergedHtml: Boolean(structured && Object.keys(structured).length && !String(applied.html || '').trim()),
+            usedPlainToHtml: Boolean(
+              !String(applied.html || '').trim() && !(structured && Object.keys(structured).length),
+            ),
+          })
+        }
         setKbygEmailHtml('')
         setGeneratedOutreachLinkedIn('')
         setLinkedInPost(buildLinkedInPost(form, linkedinVariant))
         return
       }
       setEventPageGeneratedContent(null)
-      const page = generateMeetupCopy(form, { language: eventPageLanguage })
+      const page = buildLocalizedEventPageContent(eventPageLanguage, form, {})
       setGeneratedCopy(page.plain)
       setMeetupPageHtml(page.html)
+      if (import.meta.env.DEV) {
+        console.log('[EventPage] final rendered preview (local generator)', {
+          selectedLanguage: eventPageLanguage,
+          htmlSnippet: page.html?.slice(0, 280),
+        })
+      }
       setKbygEmailHtml('')
       setGeneratedOutreachLinkedIn('')
       setLinkedInPost(buildLinkedInPost(form, linkedinVariant))
