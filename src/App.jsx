@@ -1265,7 +1265,8 @@ function buildAgenda(form, lang = 'en') {
     else lines.push(text)
   }
 
-  pushTimed(0, L.doors)
+  pushTimed(0, L.doorsOpen)
+  pushTimed(15, L.welcome)
 
   const speaker1Line = agendaSpeakerLine(form.speaker1Name, form.speaker1TalkTitle)
   if (speaker1Line) pushTimed(30, speaker1Line)

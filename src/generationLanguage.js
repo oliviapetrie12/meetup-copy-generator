@@ -11,6 +11,38 @@ export const LANGUAGE_OPTIONS = [
 export const FORMAT_RULE =
   'Preserve formatting, emojis, bullet points, and section headers.'
 
+/**
+ * Localized stock agenda lines (timed builder + fallback). Keys: en / es / pt.
+ */
+export const agendaTranslationsByLanguage = {
+  en: {
+    doorsOpen: 'Doors open, grab a seat, and enjoy some pizza!',
+    welcome: 'Welcome & introduction',
+    concludes: 'Event concludes',
+  },
+  es: {
+    doorsOpen: 'Apertura de puertas, toma asiento y disfruta de pizza',
+    welcome: 'Bienvenida e introducción',
+    concludes: 'Cierre del evento',
+  },
+  pt: {
+    doorsOpen: 'Abertura das portas, sente-se e aproveite a pizza',
+    welcome: 'Boas-vindas e introdução',
+    concludes: 'Encerramento do evento',
+  },
+}
+
+/** Bullet list appended to remote prompts so agenda / arrival / parking stay localized. */
+export function translateAllSectionsPromptBlock() {
+  return [
+    'Translate ALL sections including:',
+    '- Agenda (every agenda line and label)',
+    '- Arrival instructions',
+    '- Parking',
+    '- Bullet points',
+  ].join('\n')
+}
+
 /** Display / prompt target name for the selected locale. */
 export function getPromptLanguageName(lang) {
   const n = normalizeLanguage(lang)
@@ -26,11 +58,14 @@ export function baseGenerationPrompt(lang) {
   const name = getPromptLanguageName(lang)
   return [
     `Generate ALL content entirely in ${name}.`,
+    'Do NOT include any English unless the selected language is English.',
     '',
     'CRITICAL:',
     '- Do NOT include any English unless the selected language is English',
     '- Translate ALL sections, headers, and bullet points',
     '- Do NOT reuse or copy English examples',
+    '',
+    translateAllSectionsPromptBlock(),
   ].join('\n')
 }
 
@@ -68,6 +103,7 @@ export function eventPageRemotePrompt(lang) {
     'Explicitly include and localize when applicable: agenda; a short closing sentence inviting attendees; “Who this is for” / audience copy; “Why attend”; “What to expect”.',
     'Ensure section headers and bullet points match the selected language.',
     '',
+    'Agenda (critical): Every agenda label and line must be in the selected language—use localized wording for openings, welcome, talks, and closing; never emit English stock phrases for Spanish or Portuguese.',
     'Arrival instructions and parking (critical): Write both sections entirely in the selected language.',
     '- Do not copy English placeholder or example text from the form; treat empty arrival/parking fields as a signal to compose fresh logistics copy.',
     '- If arrival instructions or parking notes are missing or blank in the form data, infer sensible content from venue name, venue address, date/time, timezone, RSVP instructions, and related fields—still fully in the selected language.',
@@ -91,6 +127,7 @@ export function meetupKbygRemotePrompt(lang) {
     'Generate the Meetup Know Before You Go organizer email from the form.',
     'Localize every section title, paragraph, and bullet. Use only information implied by the form fields.',
     'Do not paste English template logistics sentences—write natural copy in the selected language.',
+    'Agenda section: translate every agenda bullet from the form; if bullets are in English, rewrite them fully in the selected language.',
     arrivalParkingRule,
     '',
     FORMAT_RULE,
@@ -105,6 +142,7 @@ export function conferenceKbygRemotePrompt(lang) {
     'Generate the Conference Know Before You Go email for onsite staff from the form.',
     'Localize all sections (TL;DR, dates, tickets, location, contacts, booth logistics, AV, swag, parking, food, engagement, travel, etc.).',
     'Do not leave English headers or bullets when the selected language is not English. Do not reuse canned English paragraphs—compose from the provided fields.',
+    'Agenda and schedule bullets: translate fully; never leave English agenda labels or lines when Spanish or Portuguese is selected.',
     'Parking and arrival / transportation content: generate fully in the selected language. Empty parking or transit fields should be filled with plausible, venue-aware copy inferred from the form—not English placeholders.',
     '',
     FORMAT_RULE,
@@ -113,21 +151,7 @@ export function conferenceKbygRemotePrompt(lang) {
 
 export function getAgendaLineLabels(lang) {
   const n = normalizeLanguage(lang)
-  const M = {
-    en: {
-      doors: 'Doors open / mingle',
-      concludes: 'Event concludes',
-    },
-    es: {
-      doors: 'Apertura y convivencia',
-      concludes: 'Cierre del evento',
-    },
-    pt: {
-      doors: 'Abertura e confraternização',
-      concludes: 'Encerramento do evento',
-    },
-  }
-  return M[n] || M.en
+  return agendaTranslationsByLanguage[n] || agendaTranslationsByLanguage.en
 }
 
 /** Generic timed agenda row when no speaker line applies (mirrors fallback middle line). */
@@ -239,9 +263,10 @@ export function getEventPageAgendaFallbackLines(lang) {
   const L = getAgendaLineLabels(n)
   const mid = getAgendaMiddleSlotLabel(n)
   const t1 = formatAgendaClock(18 * 60, n)
+  const tWelcome = formatAgendaClock(18 * 60 + 15, n)
   const t2 = formatAgendaClock(18 * 60 + 30, n)
   const t3 = formatAgendaClock(20 * 60, n)
-  return `${t1} ${L.doors}\n${t2} ${mid}\n${t3} ${L.concludes}`
+  return `${t1} ${L.doorsOpen}\n${tWelcome} ${L.welcome}\n${t2} ${mid}\n${t3} ${L.concludes}`
 }
 
 export function buildEventPageWhatToExpectQuickDraft({ city, theme1, lang }) {
