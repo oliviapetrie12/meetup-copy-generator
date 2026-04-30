@@ -496,6 +496,9 @@ const KBYG_TLDR_ITEM_ORDER = [
   'custom_note',
 ]
 
+/** TL;DR for email: arrival, venue, food, AV only — max 4 bullets (Gmail-friendly). */
+const KBYG_TLDR_LEAN_ORDER = ['arrival_time', 'venue_location', 'food_drinks', 'av_setup']
+
 function getInitialKbygTldrInclude() {
   return {
     arrival_time: true,
@@ -754,6 +757,170 @@ function buildKbygTldrBullets(form, opts = {}) {
   return out
 }
 
+function buildKbygTldrBulletsLean(form, opts = {}) {
+  const S = getMeetupKbygStrings(normalizeLanguage(opts.language))
+  const trim = (s) => (typeof s === 'string' ? s.trim() : '')
+  const has = (s) => trim(s).length > 0
+  if (form.generateTldr === false) return []
+
+  const inc = { ...getInitialKbygTldrInclude(), ...(form.kbygTldrInclude || {}) }
+  let out = []
+
+  for (const id of KBYG_TLDR_LEAN_ORDER) {
+    if (!inc[id]) continue
+    switch (id) {
+      case 'arrival_time': {
+        if (has(form.arrivalTime)) {
+          out.push(`${S.tldrArriveBy(trim(form.arrivalTime))}`)
+        } else if (has(form.eventDate) || has(form.eventTime)) {
+          const when = [trim(form.eventDate), trim(form.eventTime)].filter(Boolean).join(' at ')
+          if (when) out.push(S.tldrWhen(when))
+        }
+        break
+      }
+      case 'venue_location': {
+        if (has(form.venueName) || has(form.venueAddress)) {
+          const parts = [trim(form.venueName), trim(form.venueAddress)].filter(Boolean)
+          out.push(S.tldrVenue(truncateKbygTldr(parts.join(' — '))))
+        }
+        break
+      }
+      case 'food_drinks': {
+        if (has(form.foodDetails) || has(form.drinkDetails)) {
+          const fd = [trim(form.foodDetails), trim(form.drinkDetails)].filter(Boolean).join('; ')
+          out.push(truncateKbygTldr(S.tldrFoodDrinks(fd)))
+        }
+        break
+      }
+      case 'av_setup': {
+        if (has(form.avNotes)) {
+          const firstAv = trim(form.avNotes)
+            .split(/\n+/)
+            .map((s) => s.trim())
+            .filter(Boolean)[0]
+          if (firstAv) out.push(S.tldrAv(truncateKbygTldr(firstAv, 100)))
+        }
+        break
+      }
+      default:
+        break
+    }
+  }
+
+  out = out.slice(0, 4)
+  const rot = Math.max(0, Number(opts.tldrRotation) || 0)
+  if (out.length > 1 && rot > 0) {
+    const r = rot % out.length
+    out = [...out.slice(r), ...out.slice(0, r)]
+  }
+  return out
+}
+
+function parseKbygAgendaBlocks(raw) {
+  const lines = String(raw || '')
+    .split(/\n+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const blocks = []
+  let i = 0
+  while (i < lines.length) {
+    const line = lines[i]
+    const m = line.match(/^(\d{1,2}:\d{2}\s*(?:AM|PM))\s*[-–—]\s*(\d{1,2}:\d{2}\s*(?:AM|PM))\s*(.*)$/i)
+    if (m) {
+      const timeRange = `${m[1].replace(/\s+/g, ' ')} – ${m[2].replace(/\s+/g, ' ')}`
+      const title = (m[3] || '').trim()
+      let speaker = ''
+      if (i + 1 < lines.length && !/^\d{1,2}:\d{2}/.test(lines[i + 1])) {
+        speaker = lines[i + 1]
+        i += 2
+      } else {
+        i += 1
+      }
+      blocks.push({ type: 'slot', timeRange, title, speaker })
+    } else {
+      blocks.push({ type: 'raw', text: line })
+      i += 1
+    }
+  }
+  return blocks
+}
+
+function buildKbygAgendaHtmlFromBlocks(blocks) {
+  if (!blocks.length) return ''
+  const lis = blocks
+    .map((b) => {
+      if (b.type === 'raw') {
+        return `<li style="margin:0 0 10px;"><p style="margin:0;line-height:1.45;">${escapeHtml(b.text)}</p></li>`
+      }
+      let inner = `<p style="margin:0 0 6px;line-height:1.45;"><strong>${escapeHtml(b.timeRange)}</strong>`
+      if (b.title) inner += ` ${escapeHtml(b.title)}`
+      inner += '</p>'
+      if (b.speaker) {
+        inner += `<p style="margin:0;line-height:1.45;font-style:italic;color:#374151;">${escapeHtml(b.speaker)}</p>`
+      }
+      return `<li style="margin:0 0 14px;">${inner}</li>`
+    })
+    .join('')
+  return `<ul style="margin:8px 0 0;padding-left:24px;list-style-type:disc;">${lis}</ul>`
+}
+
+/** Single opening paragraph: event context + optional arrival (no separate “title” block). */
+function buildKbygIntroParagraphText(S, eventTitle, eventDate, eventTime, arrivalTime, trim) {
+  const whenLine = [trim(eventDate), trim(eventTime)].filter(Boolean).join(' at ')
+  const t = trim(eventTitle)
+  if (!t && !whenLine) {
+    let s = S.thanksLeanGeneric
+    const arr = trim(arrivalTime)
+    if (arr) s = `${s} ${S.htmlArriveBy(arr)}.`
+    return s
+  }
+  let s = S.kbygIntroLead(t, whenLine, S.meetupFallbackTitle)
+  const arr = trim(arrivalTime)
+  if (arr) s = `${s} ${S.htmlArriveBy(arr)}.`
+  return s
+}
+
+function buildKbygLogisticsHtmlItems(form, S, trim, has) {
+  const items = []
+  if (has(form.venueName) || has(form.venueAddress)) {
+    const parts = [trim(form.venueName), trim(form.venueAddress)].filter(Boolean)
+    items.push(`<strong>${escapeHtml(S.location)}:</strong> ${escapeHtml(parts.join(' · '))}`)
+  }
+  if (has(form.parkingNotes)) {
+    items.push(
+      `<strong>${escapeHtml(S.parking)}:</strong> ${escapeHtml(trim(form.parkingNotes)).replace(/\n/g, '<br>')}`,
+    )
+  }
+  if (has(form.foodDetails) || has(form.drinkDetails)) {
+    const fd = [has(form.foodDetails) ? trim(form.foodDetails) : '', has(form.drinkDetails) ? trim(form.drinkDetails) : '']
+      .filter(Boolean)
+      .join(' · ')
+    items.push(`<strong>${escapeHtml(S.foodBeverage)}:</strong> ${escapeHtml(fd)}`)
+  }
+  if (has(form.avNotes)) {
+    items.push(
+      `<strong>${escapeHtml(S.avSetup)}:</strong> ${escapeHtml(trim(form.avNotes)).replace(/\n/g, '<br>')}`,
+    )
+  }
+  return items
+}
+
+function buildKbygLogisticsPlainLines(form, S, trim, has) {
+  const lines = []
+  if (has(form.venueName) || has(form.venueAddress)) {
+    lines.push(`${S.location}: ${[trim(form.venueName), trim(form.venueAddress)].filter(Boolean).join(' · ')}`)
+  }
+  if (has(form.parkingNotes)) lines.push(`${S.parking}: ${trim(form.parkingNotes)}`)
+  if (has(form.foodDetails) || has(form.drinkDetails)) {
+    const fd = [has(form.foodDetails) ? trim(form.foodDetails) : '', has(form.drinkDetails) ? trim(form.drinkDetails) : '']
+      .filter(Boolean)
+      .join(' · ')
+    lines.push(`${S.foodBeverage}: ${fd}`)
+  }
+  if (has(form.avNotes)) lines.push(`${S.avSetup}: ${trim(form.avNotes)}`)
+  return lines
+}
+
 function escapeHtmlAttr(s) {
   if (s == null) return ''
   return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;')
@@ -782,55 +949,31 @@ function buildKnowBeforeYouGoEmailHtml(form, opts = {}) {
 
   chunks.push(`<p style="margin:0 0 16px;line-height:1.5;">Hi ${escapeHtml(names)},</p>`)
 
-  const introLines = []
-  if (eventTitle) introLines.push(`<strong>${escapeHtml(eventTitle)}</strong>`)
-  else introLines.push(`<strong>${escapeHtml(S.meetupFallbackTitle)}</strong>`)
-  const whenLine = [eventDate, eventTime].filter(Boolean).join(' at ')
-  if (whenLine) introLines.push(escapeHtml(whenLine))
-  if (arrivalTime) introLines.push(escapeHtml(S.htmlArriveBy(arrivalTime)))
-  chunks.push(`<p style="margin:0 0 16px;line-height:1.5;">${introLines.join('<br>')}</p>`)
+  chunks.push(
+    `<p style="margin:0 0 16px;line-height:1.5;">${escapeHtml(buildKbygIntroParagraphText(S, eventTitle, eventDate, eventTime, arrivalTime, trim))}</p>`,
+  )
 
-  const tldrBullets = buildKbygTldrBullets(form, opts)
+  const tldrBullets = buildKbygTldrBulletsLean(form, opts)
   if (tldrBullets.length > 0) {
     const tldrItems = tldrBullets.map((i) => escapeHtml(i))
     chunks.push(
-      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong style="background-color:#FEF08A;padding:2px 6px;display:inline-block;">${escapeHtml(S.tldrHeading)}</strong></p>${kbygHtmlUl(tldrItems)}</div>`,
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.tldrHeading)}</strong></p>${kbygHtmlUl(tldrItems)}</div>`,
     )
   }
 
-  let thanks = ''
-  if (eventDate && eventTitle) {
-    thanks = S.htmlThanksFull(eventTitle, eventDate)
-  } else if (eventTitle) {
-    thanks = S.htmlThanksTitle(eventTitle)
-  } else if (eventDate) {
-    thanks = S.htmlThanksDate(eventDate)
-  } else {
-    thanks = S.htmlThanksGeneric
-  }
-  chunks.push(`<p style="margin:0 0 16px;line-height:1.5;">${escapeHtml(thanks)}</p>`)
-
-  if (has(form.venueName) || has(form.venueAddress)) {
-    let loc = ''
-    if (has(form.venueName)) loc += escapeHtml(trim(form.venueName))
-    if (has(form.venueAddress)) loc += (loc ? '<br>' : '') + escapeHtml(trim(form.venueAddress))
+  const logisticsItems = buildKbygLogisticsHtmlItems(form, S, trim, has)
+  if (logisticsItems.length > 0) {
     chunks.push(
-      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlLocationStrong)}</strong></p><p style="margin:0;line-height:1.5;">${loc}</p></div>`,
-    )
-  }
-
-  if (has(form.parkingNotes)) {
-    chunks.push(
-      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlParkingStrong)}</strong></p><p style="margin:0;line-height:1.5;">${escapeHtml(trim(form.parkingNotes)).replace(/\n/g, '<br>')}</p></div>`,
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.logisticsHeading)}</strong></p>${kbygHtmlUl(logisticsItems)}</div>`,
     )
   }
 
   if (has(form.internalAgenda)) {
-    const agendaBullets = trim(form.internalAgenda).split(/\n+/).map((s) => s.trim()).filter(Boolean)
-    if (agendaBullets.length > 0) {
-      const agendaItems = agendaBullets.map((b) => escapeHtml(b))
+    const blocks = parseKbygAgendaBlocks(trim(form.internalAgenda))
+    const agendaHtml = buildKbygAgendaHtmlFromBlocks(blocks)
+    if (agendaHtml) {
       chunks.push(
-        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlAgendaStrong)}</strong></p>${kbygHtmlUl(agendaItems)}</div>`,
+        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlAgendaStrong)}</strong></p>${agendaHtml}</div>`,
       )
     }
   }
@@ -900,17 +1043,6 @@ function buildKnowBeforeYouGoEmailHtml(form, opts = {}) {
     )
   }
 
-  if (has(form.foodDetails) || has(form.drinkDetails)) {
-    const fd = []
-    if (has(form.foodDetails)) fd.push(escapeHtml(trim(form.foodDetails)))
-    if (has(form.drinkDetails)) fd.push(escapeHtml(trim(form.drinkDetails)))
-    if (fd.length > 0) {
-      chunks.push(
-        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlFoodStrong)}</strong></p>${kbygHtmlUl(fd)}</div>`,
-      )
-    }
-  }
-
   if (has(form.setupNotes) || has(form.swagNotes)) {
     const su = []
     if (has(form.setupNotes)) su.push(escapeHtml(trim(form.setupNotes)))
@@ -918,16 +1050,6 @@ function buildKnowBeforeYouGoEmailHtml(form, opts = {}) {
     chunks.push(
       `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlSetupStrong)}</strong></p>${kbygHtmlUl(su)}</div>`,
     )
-  }
-
-  if (has(form.avNotes)) {
-    const avBullets = trim(form.avNotes).split(/\n+/).map((s) => s.trim()).filter(Boolean)
-    if (avBullets.length > 0) {
-      const avItems = avBullets.map((b) => escapeHtml(b))
-      chunks.push(
-        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlAvStrong)}</strong></p>${kbygHtmlUl(avItems)}</div>`,
-      )
-    }
   }
 
   if (form.includePhotos !== false) {
@@ -948,7 +1070,9 @@ function buildKnowBeforeYouGoEmailHtml(form, opts = {}) {
     }
   }
 
-  chunks.push(`<p style="margin:0;line-height:1.5;">${escapeHtml(S.htmlClosing)}</p>`)
+  chunks.push(`<p style="margin:0 0 12px;line-height:1.5;">${escapeHtml(S.closingQuestion)}</p>`)
+  chunks.push(`<p style="margin:0 0 12px;line-height:1.5;">${escapeHtml(S.kbygLookingForward)}</p>`)
+  chunks.push(`<p style="margin:0;line-height:1.5;">${escapeHtml(S.kbygSignature)}</p>`)
 
   const body = chunks.join('')
   return `<div style="font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.5;color:#202124;">${body}</div>`
@@ -970,48 +1094,35 @@ function generateKnowBeforeYouGoEmail(form, opts = {}) {
   const eventTime = trim(form.eventTime)
   const arrivalTime = trim(form.arrivalTime)
 
-  lines.push(eventTitle || S.meetupFallbackTitle)
-  const whenLine = [eventDate, eventTime].filter(Boolean).join(' at ')
-  if (whenLine) lines.push(whenLine)
-  if (arrivalTime) lines.push(S.htmlArriveBy(arrivalTime))
+  lines.push(buildKbygIntroParagraphText(S, eventTitle, eventDate, eventTime, arrivalTime, trim))
   lines.push('')
 
-  const tldrBulletsPlain = buildKbygTldrBullets(form, opts)
+  const tldrBulletsPlain = buildKbygTldrBulletsLean(form, opts)
   if (tldrBulletsPlain.length > 0) {
     lines.push(sectionTitle(S.tldrHeading))
     tldrBulletsPlain.forEach((b) => lines.push(`- ${b}`))
     lines.push('')
   }
 
-  if (eventDate && eventTitle) {
-    lines.push(S.thanksFull(eventTitle, eventDate))
-  } else if (eventTitle) {
-    lines.push(S.thanksTitle(eventTitle))
-  } else if (eventDate) {
-    lines.push(S.thanksDate(eventDate))
-  } else {
-    lines.push(S.thanksGeneric)
-  }
-  lines.push('')
-
-  if (has(form.venueName) || has(form.venueAddress)) {
-    lines.push(sectionTitle(S.location))
-    if (has(form.venueName)) lines.push(trim(form.venueName))
-    if (has(form.venueAddress)) lines.push(trim(form.venueAddress))
-    lines.push('')
-  }
-
-  if (has(form.parkingNotes)) {
-    lines.push(sectionTitle(S.parking))
-    lines.push(trim(form.parkingNotes))
+  const logisticsPlain = buildKbygLogisticsPlainLines(form, S, trim, has)
+  if (logisticsPlain.length > 0) {
+    lines.push(sectionTitle(S.logisticsHeading))
+    logisticsPlain.forEach((l) => lines.push(`- ${l}`))
     lines.push('')
   }
 
   if (has(form.internalAgenda)) {
-    const agendaBullets = trim(form.internalAgenda).split(/\n+/).map((s) => s.trim()).filter(Boolean)
-    if (agendaBullets.length > 0) {
+    const agendaBlocks = parseKbygAgendaBlocks(trim(form.internalAgenda))
+    if (agendaBlocks.length > 0) {
       lines.push(sectionTitle(S.agenda))
-      agendaBullets.forEach((b) => lines.push(`- ${b}`))
+      for (const b of agendaBlocks) {
+        if (b.type === 'raw') {
+          lines.push(`- ${b.text}`)
+        } else {
+          lines.push(`- **${b.timeRange}**${b.title ? ` ${b.title}` : ''}`)
+          if (b.speaker) lines.push(`  ${b.speaker}`)
+        }
+      }
       lines.push('')
     }
   }
@@ -1066,31 +1177,11 @@ function generateKnowBeforeYouGoEmail(form, opts = {}) {
     lines.push('')
   }
 
-  if (has(form.foodDetails) || has(form.drinkDetails)) {
-    const foodLines = []
-    if (has(form.foodDetails)) foodLines.push(`- ${trim(form.foodDetails)}`)
-    if (has(form.drinkDetails)) foodLines.push(`- ${trim(form.drinkDetails)}`)
-    if (foodLines.length > 0) {
-      lines.push(sectionTitle(S.foodBeverage))
-      foodLines.forEach((l) => lines.push(l))
-      lines.push('')
-    }
-  }
-
   if (has(form.setupNotes) || has(form.swagNotes)) {
     lines.push(sectionTitle(S.setup))
     if (has(form.setupNotes)) lines.push(`- ${trim(form.setupNotes)}`)
     if (has(form.swagNotes)) lines.push(`- ${trim(form.swagNotes)}`)
     lines.push('')
-  }
-
-  if (has(form.avNotes)) {
-    const avBullets = trim(form.avNotes).split(/\n+/).map((s) => s.trim()).filter(Boolean)
-    if (avBullets.length > 0) {
-      lines.push(sectionTitle(S.avSetup))
-      avBullets.forEach((b) => lines.push(`- ${b}`))
-      lines.push('')
-    }
   }
 
   if (form.includePhotos !== false) {
@@ -1109,6 +1200,10 @@ function generateKnowBeforeYouGoEmail(form, opts = {}) {
   }
 
   lines.push(S.closingQuestion)
+  lines.push('')
+  lines.push(S.kbygLookingForward)
+  lines.push('')
+  lines.push(S.kbygSignature)
   return lines.join('\n')
 }
 

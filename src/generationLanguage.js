@@ -392,6 +392,19 @@ export function getMeetupKbygStrings(lang) {
       htmlAvStrong: 'AV / presentation setup',
       htmlTakePhotosStrong: '📸 Take Photos',
       htmlAdditionalStrong: 'Additional notes',
+      logisticsHeading: 'Logistics',
+      kbygLookingForward: 'Looking forward to seeing you there!',
+      kbygSignature: 'Olivia',
+      thanksLeanFull: (eventTitle, eventDate) => `Thanks for joining ${eventTitle} on ${eventDate}.`,
+      thanksLeanTitle: (eventTitle) => `Thanks for joining ${eventTitle}.`,
+      thanksLeanDate: (eventDate) => `Thanks for joining us on ${eventDate}.`,
+      thanksLeanGeneric: 'Thanks for being part of this event.',
+      kbygIntroLead: (eventTitle, whenLine, fallbackTitle) => {
+        const t = (eventTitle && String(eventTitle).trim()) || fallbackTitle
+        const w = (whenLine && String(whenLine).trim()) || ''
+        if (w) return `Thanks for joining us for ${t} on ${w}.`
+        return `Thanks for joining us for ${t}.`
+      },
       htmlClosing: 'Please let me know if you have any questions.',
       htmlThanksFull: (eventTitle, eventDate) =>
         `Thank you for being part of the ${eventTitle} meetup on ${eventDate}. Below are the logistics to help you prepare for the event.`,
@@ -456,6 +469,20 @@ export function getMeetupKbygStrings(lang) {
       htmlAvStrong: 'AV / configuración de presentación',
       htmlTakePhotosStrong: '📸 Fotos',
       htmlAdditionalStrong: 'Notas adicionales',
+      logisticsHeading: 'Logística',
+      kbygLookingForward: '¡Nos vemos allí!',
+      kbygSignature: 'Olivia',
+      thanksLeanFull: (eventTitle, eventDate) =>
+        `Gracias por unirte a ${eventTitle} el ${eventDate}.`,
+      thanksLeanTitle: (eventTitle) => `Gracias por unirte a ${eventTitle}.`,
+      thanksLeanDate: (eventDate) => `Gracias por acompañarnos el ${eventDate}.`,
+      thanksLeanGeneric: 'Gracias por ser parte de este evento.',
+      kbygIntroLead: (eventTitle, whenLine, fallbackTitle) => {
+        const t = (eventTitle && String(eventTitle).trim()) || fallbackTitle
+        const w = (whenLine && String(whenLine).trim()) || ''
+        if (w) return `Gracias por acompañarnos en ${t} el ${w}.`
+        return `Gracias por acompañarnos en ${t}.`
+      },
       htmlClosing: 'Avísame si tienes alguna pregunta.',
       htmlThanksFull: (eventTitle, eventDate) =>
         `Gracias por ser parte del meetup ${eventTitle} el ${eventDate}. Abajo tienes la logística para prepararte.`,
@@ -520,6 +547,20 @@ export function getMeetupKbygStrings(lang) {
       htmlAvStrong: 'AV / configuração de apresentação',
       htmlTakePhotosStrong: '📸 Fotos',
       htmlAdditionalStrong: 'Notas adicionais',
+      logisticsHeading: 'Logística',
+      kbygLookingForward: 'Te vejo lá!',
+      kbygSignature: 'Olivia',
+      thanksLeanFull: (eventTitle, eventDate) =>
+        `Obrigado por participar do ${eventTitle} em ${eventDate}.`,
+      thanksLeanTitle: (eventTitle) => `Obrigado por participar do ${eventTitle}.`,
+      thanksLeanDate: (eventDate) => `Obrigado por vir em ${eventDate}.`,
+      thanksLeanGeneric: 'Obrigado por fazer parte deste evento.',
+      kbygIntroLead: (eventTitle, whenLine, fallbackTitle) => {
+        const t = (eventTitle && String(eventTitle).trim()) || fallbackTitle
+        const w = (whenLine && String(whenLine).trim()) || ''
+        if (w) return `Obrigado por participar do ${t} em ${w}.`
+        return `Obrigado por participar do ${t}.`
+      },
       htmlClosing: 'Me avise se tiver alguma dúvida.',
       htmlThanksFull: (eventTitle, eventDate) =>
         `Obrigado por fazer parte do meetup ${eventTitle} em ${eventDate}. Abaixo estão os detalhes logísticos para você se preparar.`,
