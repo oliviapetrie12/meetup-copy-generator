@@ -957,7 +957,7 @@ function buildKnowBeforeYouGoEmailHtml(form, opts = {}) {
   if (tldrBullets.length > 0) {
     const tldrItems = tldrBullets.map((i) => escapeHtml(i))
     chunks.push(
-      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.tldrHeading)}</strong></p>${kbygHtmlUl(tldrItems)}</div>`,
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 12px;line-height:1.5;"><span style="background-color:#fff3cd;padding:2px 6px;font-weight:bold;border-radius:3px;">${escapeHtml(S.tldrHeading)}</span></p>${kbygHtmlUl(tldrItems)}</div>`,
     )
   }
 
