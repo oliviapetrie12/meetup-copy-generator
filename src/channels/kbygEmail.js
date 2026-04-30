@@ -1,0 +1,361 @@
+/**
+ * KBYG email channel: HTML (Gmail) and plain text from SharedEventData + KBYG form chrome.
+ */
+
+import { escapeHtml, escapeHtmlAttr } from '../htmlEscape.js'
+import { getMeetupKbygStrings, normalizeLanguage } from '../generationLanguage.js'
+import { getMeetupKbygPhotoLines } from '../generationLanguage.js'
+import { buildKbygTldrBulletsLean } from '../kbygTldr.js'
+
+/** @param {import('../shared/eventData.js').SharedEventData} eventData */
+function buildKbygIntroParagraphText(S, eventData, trim) {
+  const whenLine = trim(eventData.date)
+  const t = trim(eventData.title)
+  if (!t && !whenLine) {
+    let s = S.thanksLeanGeneric
+    const arr = trim(eventData.arrivalTime)
+    if (arr) s = `${s} ${S.htmlArriveBy(arr)}.`
+    return s
+  }
+  let s = S.kbygIntroLead(t, whenLine, S.meetupFallbackTitle)
+  const arr = trim(eventData.arrivalTime)
+  if (arr) s = `${s} ${S.htmlArriveBy(arr)}.`
+  return s
+}
+
+function kbygHtmlUl(items) {
+  if (!items.length) return ''
+  const lis = items
+    .map((t) => `<li style="margin:0 0 6px;line-height:1.5;">${t}</li>`)
+    .join('')
+  return `<ul style="margin:8px 0 0;padding-left:24px;list-style-type:disc;">${lis}</ul>`
+}
+
+/** @param {import('../shared/agendaItems.js').AgendaItem[]} items */
+function buildKbygAgendaHtmlFromItems(items) {
+  if (!items.length) return ''
+  const lis = items
+    .map((it) => {
+      const hasSlot = it.time && (it.title || it.speaker)
+      if (hasSlot) {
+        let inner = `<p style="margin:0 0 6px;line-height:1.45;"><strong>${escapeHtml(it.time)}</strong>`
+        if (it.title) inner += ` ${escapeHtml(it.title)}`
+        inner += '</p>'
+        if (it.speaker) {
+          inner += `<p style="margin:0;line-height:1.45;font-style:italic;color:#374151;">${escapeHtml(it.speaker)}</p>`
+        }
+        return `<li style="margin:0 0 14px;">${inner}</li>`
+      }
+      const text = [it.title, it.speaker].filter(Boolean).join(' — ')
+      if (!text) return ''
+      return `<li style="margin:0 0 10px;"><p style="margin:0;line-height:1.45;">${escapeHtml(text)}</p></li>`
+    })
+    .filter(Boolean)
+    .join('')
+  if (!lis) return ''
+  return `<ul style="margin:8px 0 0;padding-left:24px;list-style-type:disc;">${lis}</ul>`
+}
+
+/** @param {import('../shared/eventData.js').SharedEventData} data */
+function logisticsHtmlItemsFromEventData(data, S) {
+  const items = []
+  if (data.venue) {
+    items.push(`<strong>${escapeHtml(S.location)}:</strong> ${escapeHtml(data.venue).replace(/\n/g, '<br>')}`)
+  }
+  if (data.parking) {
+    items.push(`<strong>${escapeHtml(S.parking)}:</strong> ${escapeHtml(data.parking).replace(/\n/g, '<br>')}`)
+  }
+  if (data.food) {
+    items.push(`<strong>${escapeHtml(S.foodBeverage)}:</strong> ${escapeHtml(data.food)}`)
+  }
+  if (data.av) {
+    items.push(`<strong>${escapeHtml(S.avSetup)}:</strong> ${escapeHtml(data.av).replace(/\n/g, '<br>')}`)
+  }
+  return items
+}
+
+/** @param {import('../shared/eventData.js').SharedEventData} data */
+function logisticsPlainLinesFromEventData(data, S) {
+  const lines = []
+  if (data.venue) lines.push(`${S.location}: ${data.venue.replace(/\n/g, ' ')}`)
+  if (data.parking) lines.push(`${S.parking}: ${data.parking}`)
+  if (data.food) lines.push(`${S.foodBeverage}: ${data.food}`)
+  if (data.av) lines.push(`${S.avSetup}: ${data.av}`)
+  return lines
+}
+
+/**
+ * @param {import('../shared/eventData.js').SharedEventData} eventData
+ * @param {object} form - full KBYG form (greeting, speakers, links, TL;DR toggles)
+ * @param {object} [opts]
+ */
+export function renderKbygEmailHtml(eventData, form, opts = {}) {
+  const S = getMeetupKbygStrings(normalizeLanguage(opts.language))
+  const trim = (s) => (typeof s === 'string' ? s.trim() : '')
+  const has = (s) => trim(s).length > 0
+  const names = trim(form.greetingNames) || 'everyone'
+
+  const chunks = []
+
+  chunks.push(`<p style="margin:0 0 16px;line-height:1.5;">Hi ${escapeHtml(names)},</p>`)
+
+  chunks.push(
+    `<p style="margin:0 0 16px;line-height:1.5;">${escapeHtml(buildKbygIntroParagraphText(S, eventData, trim))}</p>`,
+  )
+
+  const tldrBullets = buildKbygTldrBulletsLean(form, opts)
+  if (tldrBullets.length > 0) {
+    const tldrItems = tldrBullets.map((i) => escapeHtml(i))
+    chunks.push(
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 12px;line-height:1.5;"><span style="background-color:#fff3cd;padding:2px 6px;font-weight:bold;border-radius:3px;">${escapeHtml(S.tldrHeading)}</span></p>${kbygHtmlUl(tldrItems)}</div>`,
+    )
+  }
+
+  const logisticsItems = logisticsHtmlItemsFromEventData(eventData, S)
+  if (logisticsItems.length > 0) {
+    chunks.push(
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.logisticsHeading)}</strong></p>${kbygHtmlUl(logisticsItems)}</div>`,
+    )
+  }
+
+  if (eventData.agenda.length > 0) {
+    const agendaHtml = buildKbygAgendaHtmlFromItems(eventData.agenda)
+    if (agendaHtml) {
+      chunks.push(
+        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlAgendaStrong)}</strong></p>${agendaHtml}</div>`,
+      )
+    }
+  }
+
+  const speakerItems = []
+  if (has(form.speaker1Name) || has(form.speaker1Title) || has(form.speaker1TalkTitle)) {
+    let t = trim(form.speaker1Name) || S.speaker1Default
+    if (has(form.speaker1Title)) t += `, ${trim(form.speaker1Title)}`
+    if (has(form.speaker1TalkTitle)) t += ` — ${trim(form.speaker1TalkTitle)}`
+    speakerItems.push(escapeHtml(t))
+  }
+  if (has(form.speaker2Name) || has(form.speaker2Title) || has(form.speaker2TalkTitle)) {
+    let t = trim(form.speaker2Name) || S.speaker2Default
+    if (has(form.speaker2Title)) t += `, ${trim(form.speaker2Title)}`
+    if (has(form.speaker2TalkTitle)) t += ` — ${trim(form.speaker2TalkTitle)}`
+    speakerItems.push(escapeHtml(t))
+  }
+  if (speakerItems.length) {
+    chunks.push(
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlSpeakerStrong)}</strong></p>${kbygHtmlUl(speakerItems)}</div>`,
+    )
+  }
+
+  if (has(form.speakerArrivalNote)) {
+    chunks.push(
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlSpeakerArrivalStrong)}</strong></p><p style="margin:0;line-height:1.5;">${escapeHtml(trim(form.speakerArrivalNote)).replace(/\n/g, '<br>')}</p></div>`,
+    )
+  }
+
+  if (has(form.meetupLink) || has(form.lumaLink)) {
+    const linkItems = []
+    if (has(form.meetupLink)) {
+      const u = trim(form.meetupLink)
+      linkItems.push(
+        `${escapeHtml(S.htmlMeetupLink)}: <a href="${escapeHtmlAttr(u)}" style="color:#1D4ED8;text-decoration:underline;">${escapeHtml(u)}</a>`,
+      )
+    }
+    if (has(form.lumaLink)) {
+      const u = trim(form.lumaLink)
+      linkItems.push(
+        `${escapeHtml(S.htmlLumaLink)}: <a href="${escapeHtmlAttr(u)}" style="color:#1D4ED8;text-decoration:underline;">${escapeHtml(u)}</a>`,
+      )
+    }
+    chunks.push(
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlEventPageStrong)}</strong></p>${kbygHtmlUl(linkItems)}</div>`,
+    )
+  }
+
+  const contactEntries = (form.contacts || []).filter((c) => has(c.name) || has(c.role) || has(c.contactInfo))
+  if (contactEntries.length > 0) {
+    const contactItems = contactEntries.map((c) => {
+      const name = trim(c.name)
+      const role = trim(c.role)
+      const info = trim(c.contactInfo)
+      let main = ''
+      if (name && info) main = `${name} (${info})`
+      else if (name) main = name
+      else if (info) main = info
+      let line = ''
+      if (main && role) line = `${main} – ${role}`
+      else if (main) line = main
+      else line = role
+      return escapeHtml(line)
+    })
+    chunks.push(
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlHelpfulContactsStrong)}</strong></p>${kbygHtmlUl(contactItems)}</div>`,
+    )
+  }
+
+  if (has(form.setupNotes) || has(form.swagNotes)) {
+    const su = []
+    if (has(form.setupNotes)) su.push(escapeHtml(trim(form.setupNotes)))
+    if (has(form.swagNotes)) su.push(escapeHtml(trim(form.swagNotes)))
+    chunks.push(
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlSetupStrong)}</strong></p>${kbygHtmlUl(su)}</div>`,
+    )
+  }
+
+  if (form.includePhotos !== false) {
+    const photoLines = getMeetupKbygPhotoLines(opts.language)
+    const photoItems = photoLines.map((line) => escapeHtml(line))
+    chunks.push(
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlTakePhotosStrong)}</strong></p>${kbygHtmlUl(photoItems)}</div>`,
+    )
+  }
+
+  if (has(form.additionalNotes)) {
+    const noteLines = trim(form.additionalNotes).split(/\n/).map((s) => s.trim()).filter(Boolean)
+    if (noteLines.length > 0) {
+      const notesBlocks = noteLines
+        .map((line) => `<p style="margin:0 0 8px;line-height:1.5;">${escapeHtml(line)}</p>`)
+        .join('')
+      chunks.push(
+        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlAdditionalStrong)}</strong></p>${notesBlocks}</div>`,
+      )
+    }
+  }
+
+  chunks.push(`<p style="margin:0 0 12px;line-height:1.5;">${escapeHtml(S.closingQuestion)}</p>`)
+  chunks.push(`<p style="margin:0 0 12px;line-height:1.5;">${escapeHtml(S.kbygLookingForward)}</p>`)
+  chunks.push(`<p style="margin:0;line-height:1.5;">${escapeHtml(S.kbygSignature)}</p>`)
+
+  const body = chunks.join('')
+  return `<div style="font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.5;color:#202124;">${body}</div>`
+}
+
+/** @param {import('../shared/agendaItems.js').AgendaItem[]} items */
+function agendaPlainLinesFromItems(items) {
+  const lines = []
+  for (const it of items) {
+    if (it.time && (it.title || it.speaker)) {
+      lines.push(`- **${it.time}**${it.title ? ` ${it.title}` : ''}`)
+      if (it.speaker) lines.push(`  ${it.speaker}`)
+    } else if (it.title || it.speaker) {
+      lines.push(`- ${[it.title, it.speaker].filter(Boolean).join(' — ')}`)
+    }
+  }
+  return lines
+}
+
+/**
+ * @param {import('../shared/eventData.js').SharedEventData} eventData
+ */
+export function renderKbygEmailPlain(eventData, form, opts = {}) {
+  const S = getMeetupKbygStrings(normalizeLanguage(opts.language))
+  const trim = (s) => (typeof s === 'string' ? s.trim() : '')
+  const has = (s) => trim(s).length > 0
+  const sectionTitle = (title) => `**${title}**`
+
+  const lines = []
+  const names = trim(form.greetingNames) || 'everyone'
+  lines.push(`Hi ${names},`)
+  lines.push('')
+
+  lines.push(buildKbygIntroParagraphText(S, eventData, trim))
+  lines.push('')
+
+  const tldrBulletsPlain = buildKbygTldrBulletsLean(form, opts)
+  if (tldrBulletsPlain.length > 0) {
+    lines.push(sectionTitle(S.tldrHeading))
+    tldrBulletsPlain.forEach((b) => lines.push(`- ${b}`))
+    lines.push('')
+  }
+
+  const logisticsPlain = logisticsPlainLinesFromEventData(eventData, S)
+  if (logisticsPlain.length > 0) {
+    lines.push(sectionTitle(S.logisticsHeading))
+    logisticsPlain.forEach((l) => lines.push(`- ${l}`))
+    lines.push('')
+  }
+
+  if (eventData.agenda.length > 0) {
+    lines.push(sectionTitle(S.agenda))
+    agendaPlainLinesFromItems(eventData.agenda).forEach((l) => lines.push(l))
+    lines.push('')
+  }
+
+  const sp1 = has(form.speaker1Name) || has(form.speaker1Title) || has(form.speaker1TalkTitle)
+  const sp2 = has(form.speaker2Name) || has(form.speaker2Title) || has(form.speaker2TalkTitle)
+  if (sp1 || sp2) {
+    lines.push(sectionTitle(S.speaker))
+    if (sp1) {
+      let t = trim(form.speaker1Name) || S.speaker1Default
+      if (has(form.speaker1Title)) t += `, ${trim(form.speaker1Title)}`
+      if (has(form.speaker1TalkTitle)) t += ` — ${trim(form.speaker1TalkTitle)}`
+      lines.push(`- ${t}`)
+    }
+    if (sp2) {
+      let t = trim(form.speaker2Name) || S.speaker2Default
+      if (has(form.speaker2Title)) t += `, ${trim(form.speaker2Title)}`
+      if (has(form.speaker2TalkTitle)) t += ` — ${trim(form.speaker2TalkTitle)}`
+      lines.push(`- ${t}`)
+    }
+    lines.push('')
+  }
+
+  if (has(form.speakerArrivalNote)) {
+    lines.push(sectionTitle(S.speakerArrival))
+    lines.push(trim(form.speakerArrivalNote))
+    lines.push('')
+  }
+
+  if (has(form.meetupLink) || has(form.lumaLink)) {
+    lines.push(sectionTitle(S.eventPage))
+    if (has(form.meetupLink)) lines.push(`- ${S.meetupLabel}: ${trim(form.meetupLink)}`)
+    if (has(form.lumaLink)) lines.push(`- ${S.lumaLabel}: ${trim(form.lumaLink)}`)
+    lines.push('')
+  }
+
+  const contactEntries = (form.contacts || []).filter((c) => has(c.name) || has(c.role) || has(c.contactInfo))
+  if (contactEntries.length > 0) {
+    lines.push(sectionTitle(S.helpfulContacts))
+    contactEntries.forEach((c) => {
+      const name = trim(c.name)
+      const role = trim(c.role)
+      const info = trim(c.contactInfo)
+      let main = ''
+      if (name && info) main = `${name} (${info})`
+      else if (name) main = name
+      else if (info) main = info
+      if (main && role) lines.push(`- ${main} – ${role}`)
+      else if (main) lines.push(`- ${main}`)
+      else if (role) lines.push(`- ${role}`)
+    })
+    lines.push('')
+  }
+
+  if (has(form.setupNotes) || has(form.swagNotes)) {
+    lines.push(sectionTitle(S.setup))
+    if (has(form.setupNotes)) lines.push(`- ${trim(form.setupNotes)}`)
+    if (has(form.swagNotes)) lines.push(`- ${trim(form.swagNotes)}`)
+    lines.push('')
+  }
+
+  if (form.includePhotos !== false) {
+    lines.push(sectionTitle(S.takePhotos))
+    getMeetupKbygPhotoLines(opts.language).forEach((line) => lines.push(`- ${line}`))
+    lines.push('')
+  }
+
+  if (has(form.additionalNotes)) {
+    const noteLines = trim(form.additionalNotes).split(/\n/).map((s) => s.trim()).filter(Boolean)
+    if (noteLines.length > 0) {
+      lines.push(sectionTitle(S.additionalNotes))
+      noteLines.forEach((line) => lines.push(line))
+      lines.push('')
+    }
+  }
+
+  lines.push(S.closingQuestion)
+  lines.push('')
+  lines.push(S.kbygLookingForward)
+  lines.push('')
+  lines.push(S.kbygSignature)
+  return lines.join('\n')
+}
