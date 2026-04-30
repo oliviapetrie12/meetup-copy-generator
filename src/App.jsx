@@ -759,6 +759,15 @@ function escapeHtmlAttr(s) {
   return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;')
 }
 
+/** Gmail-friendly unordered list (no • characters). */
+function kbygHtmlUl(items) {
+  if (!items.length) return ''
+  const lis = items
+    .map((t) => `<li style="margin:0 0 6px;line-height:1.5;">${t}</li>`)
+    .join('')
+  return `<ul style="margin:8px 0 0;padding-left:24px;list-style-type:disc;">${lis}</ul>`
+}
+
 function buildKnowBeforeYouGoEmailHtml(form, opts = {}) {
   const S = getMeetupKbygStrings(normalizeLanguage(opts.language))
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
@@ -771,18 +780,22 @@ function buildKnowBeforeYouGoEmailHtml(form, opts = {}) {
 
   const chunks = []
 
-  chunks.push(`<p style="margin:0;line-height:1.5;">Hi ${escapeHtml(names)},</p>`)
+  chunks.push(`<p style="margin:0 0 16px;line-height:1.5;">Hi ${escapeHtml(names)},</p>`)
 
-  let titleBody = eventTitle ? escapeHtml(eventTitle) : escapeHtml(S.meetupFallbackTitle)
+  const introLines = []
+  if (eventTitle) introLines.push(`<strong>${escapeHtml(eventTitle)}</strong>`)
+  else introLines.push(`<strong>${escapeHtml(S.meetupFallbackTitle)}</strong>`)
   const whenLine = [eventDate, eventTime].filter(Boolean).join(' at ')
-  if (whenLine) titleBody += `<br>${escapeHtml(whenLine)}`
-  if (arrivalTime) titleBody += `<br>${escapeHtml(S.htmlArriveBy(arrivalTime))}`
-  chunks.push(`<p style="margin:0;line-height:1.5;"><strong>${escapeHtml(S.htmlTitleStrong)}</strong><br><br>${titleBody}</p>`)
+  if (whenLine) introLines.push(escapeHtml(whenLine))
+  if (arrivalTime) introLines.push(escapeHtml(S.htmlArriveBy(arrivalTime)))
+  chunks.push(`<p style="margin:0 0 16px;line-height:1.5;">${introLines.join('<br>')}</p>`)
 
   const tldrBullets = buildKbygTldrBullets(form, opts)
   if (tldrBullets.length > 0) {
-    const tldrInner = `<span style="background-color: #FEF08A; font-weight: bold;">${escapeHtml(S.tldrHeading)}</span><br><br>${tldrBullets.map((i) => `• ${escapeHtml(i)}`).join('<br>')}`
-    chunks.push(`<p style="margin:0;line-height:1.5;">${tldrInner}</p>`)
+    const tldrItems = tldrBullets.map((i) => escapeHtml(i))
+    chunks.push(
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong style="background-color:#FEF08A;padding:2px 6px;display:inline-block;">${escapeHtml(S.tldrHeading)}</strong></p>${kbygHtmlUl(tldrItems)}</div>`,
+    )
   }
 
   let thanks = ''
@@ -795,72 +808,80 @@ function buildKnowBeforeYouGoEmailHtml(form, opts = {}) {
   } else {
     thanks = S.htmlThanksGeneric
   }
-  chunks.push(`<p style="margin:0;line-height:1.5;">${escapeHtml(thanks)}</p>`)
+  chunks.push(`<p style="margin:0 0 16px;line-height:1.5;">${escapeHtml(thanks)}</p>`)
 
   if (has(form.venueName) || has(form.venueAddress)) {
     let loc = ''
     if (has(form.venueName)) loc += escapeHtml(trim(form.venueName))
     if (has(form.venueAddress)) loc += (loc ? '<br>' : '') + escapeHtml(trim(form.venueAddress))
-    chunks.push(`<p style="margin:0;line-height:1.5;"><strong>${escapeHtml(S.htmlLocationStrong)}</strong><br><br>${loc}</p>`)
+    chunks.push(
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlLocationStrong)}</strong></p><p style="margin:0;line-height:1.5;">${loc}</p></div>`,
+    )
   }
 
   if (has(form.parkingNotes)) {
     chunks.push(
-      `<p style="margin:0;line-height:1.5;"><strong>${escapeHtml(S.htmlParkingStrong)}</strong><br><br>${escapeHtml(trim(form.parkingNotes)).replace(/\n/g, '<br>')}</p>`,
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlParkingStrong)}</strong></p><p style="margin:0;line-height:1.5;">${escapeHtml(trim(form.parkingNotes)).replace(/\n/g, '<br>')}</p></div>`,
     )
   }
 
   if (has(form.internalAgenda)) {
     const agendaBullets = trim(form.internalAgenda).split(/\n+/).map((s) => s.trim()).filter(Boolean)
     if (agendaBullets.length > 0) {
-      const agendaHtml = agendaBullets.map((b) => `• ${escapeHtml(b)}`).join('<br>')
-      chunks.push(`<p style="margin:0;line-height:1.5;"><strong>${escapeHtml(S.htmlAgendaStrong)}</strong><br><br>${agendaHtml}</p>`)
+      const agendaItems = agendaBullets.map((b) => escapeHtml(b))
+      chunks.push(
+        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlAgendaStrong)}</strong></p>${kbygHtmlUl(agendaItems)}</div>`,
+      )
     }
   }
 
-  const speakerBits = []
+  const speakerItems = []
   if (has(form.speaker1Name) || has(form.speaker1Title) || has(form.speaker1TalkTitle)) {
     let t = trim(form.speaker1Name) || S.speaker1Default
     if (has(form.speaker1Title)) t += `, ${trim(form.speaker1Title)}`
     if (has(form.speaker1TalkTitle)) t += ` — ${trim(form.speaker1TalkTitle)}`
-    speakerBits.push(`• ${escapeHtml(t)}`)
+    speakerItems.push(escapeHtml(t))
   }
   if (has(form.speaker2Name) || has(form.speaker2Title) || has(form.speaker2TalkTitle)) {
     let t = trim(form.speaker2Name) || S.speaker2Default
     if (has(form.speaker2Title)) t += `, ${trim(form.speaker2Title)}`
     if (has(form.speaker2TalkTitle)) t += ` — ${trim(form.speaker2TalkTitle)}`
-    speakerBits.push(`• ${escapeHtml(t)}`)
+    speakerItems.push(escapeHtml(t))
   }
-  if (speakerBits.length) {
-    chunks.push(`<p style="margin:0;line-height:1.5;"><strong>${escapeHtml(S.htmlSpeakerStrong)}</strong><br><br>${speakerBits.join('<br>')}</p>`)
+  if (speakerItems.length) {
+    chunks.push(
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlSpeakerStrong)}</strong></p>${kbygHtmlUl(speakerItems)}</div>`,
+    )
   }
 
   if (has(form.speakerArrivalNote)) {
     chunks.push(
-      `<p style="margin:0;line-height:1.5;"><strong>${escapeHtml(S.htmlSpeakerArrivalStrong)}</strong><br><br>${escapeHtml(trim(form.speakerArrivalNote)).replace(/\n/g, '<br>')}</p>`,
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlSpeakerArrivalStrong)}</strong></p><p style="margin:0;line-height:1.5;">${escapeHtml(trim(form.speakerArrivalNote)).replace(/\n/g, '<br>')}</p></div>`,
     )
   }
 
   if (has(form.meetupLink) || has(form.lumaLink)) {
-    const linkLines = []
+    const linkItems = []
     if (has(form.meetupLink)) {
       const u = trim(form.meetupLink)
-      linkLines.push(
-        `• ${escapeHtml(S.htmlMeetupLink)}: <a href="${escapeHtmlAttr(u)}" style="color:#1D4ED8;text-decoration:underline;">${escapeHtml(u)}</a>`,
+      linkItems.push(
+        `${escapeHtml(S.htmlMeetupLink)}: <a href="${escapeHtmlAttr(u)}" style="color:#1D4ED8;text-decoration:underline;">${escapeHtml(u)}</a>`,
       )
     }
     if (has(form.lumaLink)) {
       const u = trim(form.lumaLink)
-      linkLines.push(
-        `• ${escapeHtml(S.htmlLumaLink)}: <a href="${escapeHtmlAttr(u)}" style="color:#1D4ED8;text-decoration:underline;">${escapeHtml(u)}</a>`,
+      linkItems.push(
+        `${escapeHtml(S.htmlLumaLink)}: <a href="${escapeHtmlAttr(u)}" style="color:#1D4ED8;text-decoration:underline;">${escapeHtml(u)}</a>`,
       )
     }
-    chunks.push(`<p style="margin:0;line-height:1.5;"><strong>${escapeHtml(S.htmlEventPageStrong)}</strong><br><br>${linkLines.join('<br>')}</p>`)
+    chunks.push(
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlEventPageStrong)}</strong></p>${kbygHtmlUl(linkItems)}</div>`,
+    )
   }
 
   const contactEntries = (form.contacts || []).filter((c) => has(c.name) || has(c.role) || has(c.contactInfo))
   if (contactEntries.length > 0) {
-    const contactLines = contactEntries.map((c) => {
+    const contactItems = contactEntries.map((c) => {
       const name = trim(c.name)
       const role = trim(c.role)
       const info = trim(c.contactInfo)
@@ -872,56 +893,64 @@ function buildKnowBeforeYouGoEmailHtml(form, opts = {}) {
       if (main && role) line = `${main} – ${role}`
       else if (main) line = main
       else line = role
-      return `• ${escapeHtml(line)}`
+      return escapeHtml(line)
     })
-    chunks.push(`<p style="margin:0;line-height:1.5;"><strong>${escapeHtml(S.htmlHelpfulContactsStrong)}</strong><br><br>${contactLines.join('<br>')}</p>`)
+    chunks.push(
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlHelpfulContactsStrong)}</strong></p>${kbygHtmlUl(contactItems)}</div>`,
+    )
   }
 
   if (has(form.foodDetails) || has(form.drinkDetails)) {
     const fd = []
-    if (has(form.foodDetails)) fd.push(`• ${escapeHtml(trim(form.foodDetails))}`)
-    if (has(form.drinkDetails)) fd.push(`• ${escapeHtml(trim(form.drinkDetails))}`)
+    if (has(form.foodDetails)) fd.push(escapeHtml(trim(form.foodDetails)))
+    if (has(form.drinkDetails)) fd.push(escapeHtml(trim(form.drinkDetails)))
     if (fd.length > 0) {
-      chunks.push(`<p style="margin:0;line-height:1.5;"><strong>${escapeHtml(S.htmlFoodStrong)}</strong><br><br>${fd.join('<br>')}</p>`)
+      chunks.push(
+        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlFoodStrong)}</strong></p>${kbygHtmlUl(fd)}</div>`,
+      )
     }
   }
 
   if (has(form.setupNotes) || has(form.swagNotes)) {
     const su = []
-    if (has(form.setupNotes)) su.push(`• ${escapeHtml(trim(form.setupNotes))}`)
-    if (has(form.swagNotes)) su.push(`• ${escapeHtml(trim(form.swagNotes))}`)
-    chunks.push(`<p style="margin:0;line-height:1.5;"><strong>${escapeHtml(S.htmlSetupStrong)}</strong><br><br>${su.join('<br>')}</p>`)
+    if (has(form.setupNotes)) su.push(escapeHtml(trim(form.setupNotes)))
+    if (has(form.swagNotes)) su.push(escapeHtml(trim(form.swagNotes)))
+    chunks.push(
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlSetupStrong)}</strong></p>${kbygHtmlUl(su)}</div>`,
+    )
   }
 
   if (has(form.avNotes)) {
     const avBullets = trim(form.avNotes).split(/\n+/).map((s) => s.trim()).filter(Boolean)
     if (avBullets.length > 0) {
-      const avHtml = avBullets.map((b) => `• ${escapeHtml(b)}`).join('<br>')
+      const avItems = avBullets.map((b) => escapeHtml(b))
       chunks.push(
-        `<p style="margin:0;line-height:1.5;"><strong>${escapeHtml(S.htmlAvStrong)}</strong><br><br>${avHtml}</p>`,
+        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlAvStrong)}</strong></p>${kbygHtmlUl(avItems)}</div>`,
       )
     }
   }
 
   if (form.includePhotos !== false) {
     const photoLines = getMeetupKbygPhotoLines(opts.language)
-    const takePhotosHtml = photoLines.map((line) => `• ${escapeHtml(line)}`).join('<br>')
+    const photoItems = photoLines.map((line) => escapeHtml(line))
     chunks.push(
-      `<p style="margin:0;line-height:1.5;"><strong>${escapeHtml(S.htmlTakePhotosStrong)}</strong><br><br>${takePhotosHtml}</p>`,
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlTakePhotosStrong)}</strong></p>${kbygHtmlUl(photoItems)}</div>`,
     )
   }
 
   if (has(form.additionalNotes)) {
     const noteLines = trim(form.additionalNotes).split(/\n/).map((s) => s.trim()).filter(Boolean)
     if (noteLines.length > 0) {
-      const notesHtml = noteLines.map((line) => escapeHtml(line)).join('<br>')
-      chunks.push(`<p style="margin:0;line-height:1.5;"><strong>${escapeHtml(S.htmlAdditionalStrong)}</strong><br><br>${notesHtml}</p>`)
+      const notesBlocks = noteLines.map((line) => `<p style="margin:0 0 8px;line-height:1.5;">${escapeHtml(line)}</p>`).join('')
+      chunks.push(
+        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlAdditionalStrong)}</strong></p>${notesBlocks}</div>`,
+      )
     }
   }
 
   chunks.push(`<p style="margin:0;line-height:1.5;">${escapeHtml(S.htmlClosing)}</p>`)
 
-  const body = chunks.join('<br><br>')
+  const body = chunks.join('')
   return `<div style="font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.5;color:#202124;">${body}</div>`
 }
 
@@ -941,7 +970,6 @@ function generateKnowBeforeYouGoEmail(form, opts = {}) {
   const eventTime = trim(form.eventTime)
   const arrivalTime = trim(form.arrivalTime)
 
-  lines.push(sectionTitle(S.titleHeading))
   lines.push(eventTitle || S.meetupFallbackTitle)
   const whenLine = [eventDate, eventTime].filter(Boolean).join(' at ')
   if (whenLine) lines.push(whenLine)
@@ -2350,6 +2378,7 @@ export default function App() {
   const [emailBodyVariant, setEmailBodyVariant] = useState(0)
   const [subjectCopied, setSubjectCopied] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [kbygEmailHtmlCopied, setKbygEmailHtmlCopied] = useState(false)
   const [linkedInCopied, setLinkedInCopied] = useState(false)
   const [outreachLinkedInCopied, setOutreachLinkedInCopied] = useState(false)
   const [intuitionSubjectCopiedIndex, setIntuitionSubjectCopiedIndex] = useState(null)
@@ -2864,17 +2893,6 @@ export default function App() {
         } catch {
           await navigator.clipboard.writeText(generatedCopy)
         }
-      } else if (generatorType === 'knowBeforeYouGo' && kbygEmailHtml && typeof ClipboardItem !== 'undefined') {
-        try {
-          await navigator.clipboard.write([
-            new ClipboardItem({
-              'text/html': new Blob([kbygEmailHtml], { type: 'text/html' }),
-              'text/plain': new Blob([generatedCopy], { type: 'text/plain' }),
-            }),
-          ])
-        } catch {
-          await navigator.clipboard.writeText(generatedCopy)
-        }
       } else {
         await navigator.clipboard.writeText(generatedCopy)
       }
@@ -2908,6 +2926,31 @@ export default function App() {
     setGeneratedSubject('')
     setGeneratedOutreachLinkedIn('')
     setLinkedInPost('')
+  }
+
+  const handleCopyKbygEmailHtml = async () => {
+    if (!kbygEmailHtml || !generatedCopy) return
+    try {
+      if (typeof ClipboardItem !== 'undefined') {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'text/html': new Blob([kbygEmailHtml], { type: 'text/html' }),
+            'text/plain': new Blob([generatedCopy], { type: 'text/plain' }),
+          }),
+        ])
+      } else {
+        await navigator.clipboard.writeText(generatedCopy)
+      }
+      setKbygEmailHtmlCopied(true)
+      setTimeout(() => setKbygEmailHtmlCopied(false), 2000)
+    } catch (err) {
+      console.error('Copy failed', err)
+      try {
+        await navigator.clipboard.writeText(generatedCopy)
+      } catch (e2) {
+        console.error(e2)
+      }
+    }
   }
 
   const handleCopySubject = async () => {
@@ -4042,9 +4085,12 @@ export default function App() {
                     ) : (
                       <pre className="output-text">{generatedCopy}</pre>
                     )}
-                    <div className="output-actions output-actions-inline">
+                    <div className="output-actions output-actions-inline kbyg-copy-actions">
+                      <button type="button" onClick={handleCopyKbygEmailHtml} className="btn-copy" disabled={!kbygEmailHtml}>
+                        {kbygEmailHtmlCopied ? 'Copied!' : 'Copy for Email (HTML)'}
+                      </button>
                       <button type="button" onClick={handleCopy} className="btn-copy" aria-pressed={copied}>
-                        {copied ? 'Copied!' : 'Copy to clipboard'}
+                        {copied ? 'Copied!' : 'Copy plain text (Slack / Docs)'}
                       </button>
                     </div>
                   </>
