@@ -1,3 +1,8 @@
+/**
+ * Used when URL ingestion is re-enabled from the Quick Import UI.
+ * @see ./DISABLED.md
+ */
+
 import { extractImportedContent } from './extractImportedContent.js'
 import { fetchEventPageHtml } from './fetchEventPage.js'
 import {

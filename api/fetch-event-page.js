@@ -1,6 +1,8 @@
 /**
  * Vercel / Node serverless: proxy-fetch allowed event pages (Meetup, Luma).
- * Same JSON contract as Vite dev middleware (`POST /api/fetch-event-page`).
+ *
+ * STATUS: Deployable but unused — KBYG Quick Import no longer calls this endpoint.
+ * See `src/eventUrlImport/DISABLED.md` to re-enable with the SPA + `vite.config.js`.
  */
 
 import { fetchEventHtmlSafe } from '../lib/eventFetchCore.mjs'

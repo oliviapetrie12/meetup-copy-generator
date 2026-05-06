@@ -1,6 +1,6 @@
 /**
- * Quick Import URL pipeline — extend with new platforms in `platformRegistry.js`
- * and (for server fetch) `lib/eventFetchCore.mjs` allowlist.
+ * Meetup/Luma URL → HTML → text pipeline (not used by the KBYG UI while paste-only).
+ * @see ./DISABLED.md
  */
 
 export { extractImportedContent } from './extractImportedContent.js'

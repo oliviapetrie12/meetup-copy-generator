@@ -1,5 +1,6 @@
 /**
- * Client: POST to same-origin fetch API (Vite dev middleware or deployed serverless).
+ * Client: POST to same-origin fetch API (unused while Quick Import is paste-only).
+ * @see ./DISABLED.md
  */
 
 /**

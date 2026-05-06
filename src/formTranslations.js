@@ -77,19 +77,19 @@ const BASE_EN = {
   kbyg_addContact: '+ Add Contact',
   kbyg_quickFill: 'Quick fill',
   kbyg_quickImport: 'Quick Import',
-  kbyg_quickImportPasteLabel: 'Paste event details or a Meetup / Luma event URL',
+  kbyg_quickImportPasteLabel: 'Paste copied Meetup, Luma, or event details',
   kbyg_quickImportPlaceholder:
-    'Event notes or agenda… or paste https://www.meetup.com/... / https://lu.ma/…',
+    'Paste Meetup/Luma page copy, Slack notes, or an agenda…',
   kbyg_parseEventDetails: 'Parse Event Details',
   kbyg_importEventDetails: 'Import Event Details',
   kbyg_quickImportHint:
-    'Paste full event text or a Meetup/Luma URL (dev server or deployed /api/fetch-event-page). Same confidence-based parser; event title stays manual.',
+    'Paste event page text (Meetup, Luma, Slack, etc.). Section-aware, confidence-based fill; event title stays manual.',
   kbyg_quickImportFetching: 'Fetching event page…',
   kbyg_quickImportParsing: 'Parsing event details…',
   kbyg_quickImportFromUrlNote: 'Imported from URL',
   kbyg_quickImportPartialImport:
     'Partial event details imported — review fields and add anything missing.',
-  kbyg_quickImportErr_EMPTY: 'Paste event text or a Meetup/Luma URL first.',
+  kbyg_quickImportErr_EMPTY: 'Paste event details first, then parse.',
   kbyg_quickImportErr_NETWORK:
     'Could not reach the import service. Use plain-text paste, run `npm run dev` for URL import, or deploy with the `/api/fetch-event-page` endpoint.',
   kbyg_quickImportErr_FETCH_FAILED: 'Unable to fetch that page. Try pasting the event text instead.',
@@ -341,19 +341,19 @@ const BASE_ES = {
   kbyg_addContact: '+ Añadir contacto',
   kbyg_quickFill: 'Relleno rápido',
   kbyg_quickImport: 'Importación rápida',
-  kbyg_quickImportPasteLabel: 'Pega el texto del evento o un enlace Meetup / Luma',
+  kbyg_quickImportPasteLabel: 'Pega el contenido copiado de Meetup, Luma o del evento',
   kbyg_quickImportPlaceholder:
-    'Notas o agenda… o pega https://www.meetup.com/… / https://lu.ma/…',
+    'Pega texto de la página Meetup/Luma, notas de Slack o una agenda…',
   kbyg_parseEventDetails: 'Analizar detalles del evento',
   kbyg_importEventDetails: 'Importar detalles del evento',
   kbyg_quickImportHint:
-    'Pega el texto completo o un enlace Meetup/Luma (servidor de desarrollo o `/api/fetch-event-page`). Mismo analizador por confianza; el título sigue manual.',
+    'Pega el texto del evento (Meetup, Luma, Slack, etc.). Importación por secciones y por confianza; el título sigue manual.',
   kbyg_quickImportFetching: 'Descargando la página del evento…',
   kbyg_quickImportParsing: 'Analizando detalles…',
   kbyg_quickImportFromUrlNote: 'Importado desde URL',
   kbyg_quickImportPartialImport:
     'Importación parcial — revisa los campos y completa lo que falte.',
-  kbyg_quickImportErr_EMPTY: 'Pega texto del evento o un enlace Meetup/Luma.',
+  kbyg_quickImportErr_EMPTY: 'Pega primero los detalles del evento y luego analiza.',
   kbyg_quickImportErr_NETWORK:
     'No se pudo contactar el servicio de importación. Usa texto plano, ejecuta `npm run dev` para URLs o despliega el endpoint `/api/fetch-event-page`.',
   kbyg_quickImportErr_FETCH_FAILED:
@@ -606,19 +606,19 @@ const BASE_PT = {
   kbyg_addContact: '+ Adicionar contato',
   kbyg_quickFill: 'Preenchimento rápido',
   kbyg_quickImport: 'Importação rápida',
-  kbyg_quickImportPasteLabel: 'Cole os detalhes do evento ou um link Meetup / Luma',
+  kbyg_quickImportPasteLabel: 'Cole conteúdo copiado do Meetup, Luma ou do evento',
   kbyg_quickImportPlaceholder:
-    'Notas ou agenda… ou cole https://www.meetup.com/… / https://lu.ma/…',
+    'Cole texto da página Meetup/Luma, notas no Slack ou uma agenda…',
   kbyg_parseEventDetails: 'Analisar detalhes do evento',
   kbyg_importEventDetails: 'Importar detalhes do evento',
   kbyg_quickImportHint:
-    'Cole o texto completo ou um link Meetup/Luma (servidor dev ou `/api/fetch-event-page`). Mesmo analisador por confiança; título permanece manual.',
+    'Cole o texto do evento (Meetup, Luma, Slack etc.). Importação por seções e confiança; título permanece manual.',
   kbyg_quickImportFetching: 'Baixando a página do evento…',
   kbyg_quickImportParsing: 'Analisando detalhes…',
   kbyg_quickImportFromUrlNote: 'Importado da URL',
   kbyg_quickImportPartialImport:
     'Importação parcial — revise os campos e complete o que faltar.',
-  kbyg_quickImportErr_EMPTY: 'Cole texto do evento ou um link Meetup/Luma.',
+  kbyg_quickImportErr_EMPTY: 'Cole os detalhes do evento primeiro e depois analise.',
   kbyg_quickImportErr_NETWORK:
     'Não foi possível contatar o serviço de importação. Use texto simples, rode `npm run dev` para URLs ou publique o endpoint `/api/fetch-event-page`.',
   kbyg_quickImportErr_FETCH_FAILED:
