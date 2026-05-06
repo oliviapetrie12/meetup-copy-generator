@@ -426,6 +426,15 @@ body {
   color: #8b9099;
 }
 
+/* Primary editing surface for pasted Meetup/Luma agendas — tall default, user-resizable */
+.form textarea.kbyg-internal-agenda-textarea {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-height: clamp(12rem, 32vh, 22rem);
+  line-height: 1.45;
+}
+
 /* Update / format KBYG: lead description + subtle merge hint */
 .form-fieldset-kbyg-enhance .form-hint-kbyg-enhance-lead {
   margin-top: 0;

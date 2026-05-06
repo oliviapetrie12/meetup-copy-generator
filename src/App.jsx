@@ -2944,11 +2944,12 @@ export default function App() {
                 </p>
                 <textarea
                   id="kbyg-internal-agenda"
+                  className="kbyg-internal-agenda-textarea"
                   aria-describedby="kbyg-internal-agenda-desc"
                   value={kbygForm.internalAgenda}
                   onChange={updateKbyg('internalAgenda')}
                   placeholder={tKbyg.kbyg_ph_internalAgenda}
-                  rows={4}
+                  rows={14}
                 />
               </div>
             </fieldset>
