@@ -50,6 +50,9 @@ import {
   mergeKbygQuickImportPatch,
   parseKbygQuickImport,
 } from './kbygQuickImportParse.js'
+import { looksLikeHttpUrl } from './eventUrlImport/platformRegistry.js'
+import { formatQuickImportFetchError } from './eventUrlImport/quickImportErrors.js'
+import { resolveQuickImportInput } from './eventUrlImport/resolveQuickImportInput.js'
 
 function SearchableSelect({ value, onChange, options, placeholder = 'Type to search…', id }) {
   const [open, setOpen] = useState(false)
@@ -1606,6 +1609,9 @@ export default function App() {
   const tKbyg = useMemo(() => getGeneratorUiTranslations(meetupKbygLanguage), [meetupKbygLanguage])
   const [kbygQuickImportPaste, setKbygQuickImportPaste] = useState('')
   const [kbygQuickImportFeedback, setKbygQuickImportFeedback] = useState('')
+  const [kbygQuickImportPhase, setKbygQuickImportPhase] = useState(
+    /** @type {'idle' | 'fetching' | 'parsing'} */ ('idle'),
+  )
   useEffect(() => {
     if (!kbygQuickImportFeedback) return
     const t = window.setTimeout(() => setKbygQuickImportFeedback(''), 8000)
@@ -1844,9 +1850,31 @@ export default function App() {
     setKbygForm((prev) => ({ ...prev, [fieldKey]: value }))
   }
 
-  const handleKbygQuickImportParse = () => {
+  const handleKbygQuickImportParse = async () => {
+    if (kbygQuickImportPhase !== 'idle') return
+    const rawInput = kbygQuickImportPaste
+    if (!String(rawInput || '').trim()) {
+      setKbygQuickImportFeedback(formatQuickImportFetchError(tKbyg, 'EMPTY'))
+      return
+    }
+
+    if (looksLikeHttpUrl(rawInput)) setKbygQuickImportPhase('fetching')
+    else setKbygQuickImportPhase('parsing')
+
+    const resolved = await resolveQuickImportInput(rawInput)
+
+    if (resolved.kind === 'error') {
+      setKbygQuickImportPhase('idle')
+      setKbygQuickImportFeedback(formatQuickImportFetchError(tKbyg, resolved.code))
+      return
+    }
+
+    setKbygQuickImportPhase('parsing')
+
+    const textToParse = resolved.text
+
     setKbygForm((prev) => {
-      const { patch, meta } = parseKbygQuickImport(kbygQuickImportPaste)
+      const { patch, meta } = parseKbygQuickImport(textToParse)
       const { next, appliedKeys } = mergeKbygQuickImportPatch(prev, patch)
       const eventTimeResolved = (next.eventTime || '').trim() || (prev.eventTime || '').trim()
       const arrivalResolved = (next.arrivalTime || '').trim() || (prev.arrivalTime || '').trim()
@@ -1856,8 +1884,20 @@ export default function App() {
         const s = computeArrivalTimeSuggestion(eventTimeResolved)
         if (s) suggestions.arrivalTimeSuggestion = s
       }
+
+      let feedback = formatQuickImportFeedback(appliedKeys, tKbyg, meta, suggestions)
+      if (resolved.kind === 'url') {
+        const lines = [feedback]
+        lines.unshift(`${tKbyg.kbyg_quickImportFromUrlNote}: ${resolved.urlMeta.pageUrl}`)
+        if (resolved.urlMeta.partial) {
+          lines.push(tKbyg.kbyg_quickImportPartialImport)
+        }
+        feedback = lines.filter(Boolean).join('\n\n')
+      }
+
       queueMicrotask(() => {
-        setKbygQuickImportFeedback(formatQuickImportFeedback(appliedKeys, tKbyg, meta, suggestions))
+        setKbygQuickImportFeedback(feedback)
+        setKbygQuickImportPhase('idle')
       })
       return next
     })
@@ -2172,6 +2212,7 @@ export default function App() {
       setKbygForm(KBYG_INITIAL_STATE)
       setKbygQuickImportPaste('')
       setKbygQuickImportFeedback('')
+      setKbygQuickImportPhase('idle')
     } else if (generatorType === 'speakerOutreach') {
       setOutreachForm(SPEAKER_OUTREACH_INITIAL_STATE)
     } else if (generatorType === 'urlQrGenerator') {
@@ -2876,6 +2917,7 @@ export default function App() {
                   placeholder={tKbyg.kbyg_quickImportPlaceholder}
                   rows={6}
                   autoComplete="off"
+                  disabled={kbygQuickImportPhase !== 'idle'}
                 />
               </label>
               <div className="quick-draft-stack">
@@ -2883,10 +2925,21 @@ export default function App() {
                   type="button"
                   className="btn-quick-draft"
                   onClick={handleKbygQuickImportParse}
+                  disabled={kbygQuickImportPhase !== 'idle'}
                 >
-                  {tKbyg.kbyg_parseEventDetails}
+                  {tKbyg.kbyg_importEventDetails}
                 </button>
               </div>
+              {kbygQuickImportPhase === 'fetching' ? (
+                <p className="form-hint" role="status" aria-live="polite">
+                  {tKbyg.kbyg_quickImportFetching}
+                </p>
+              ) : null}
+              {kbygQuickImportPhase === 'parsing' ? (
+                <p className="form-hint" role="status" aria-live="polite">
+                  {tKbyg.kbyg_quickImportParsing}
+                </p>
+              ) : null}
               {kbygQuickImportFeedback ? (
                 <p className="form-hint" role="status" aria-live="polite" style={{ whiteSpace: 'pre-line' }}>
                   {kbygQuickImportFeedback}
