@@ -677,6 +677,16 @@ body {
   gap: 0.4rem;
 }
 
+/** Meetup KBYG: top reset control (mirrors bottom btn-reset styling). */
+.form-kbyg-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem;
+}
+
 .translate-output-bar {
   display: flex;
   flex-wrap: wrap;

@@ -2787,6 +2787,11 @@ export default function App() {
             onSubmit={(e) => { e.preventDefault(); handleGenerate() }}
             className="form"
           >
+            <div className="form-kbyg-toolbar" role="toolbar" aria-label="Form quick actions">
+              <button type="button" onClick={handleReset} className="btn-reset">
+                🔄 {tKbyg.kbyg_btnReset}
+              </button>
+            </div>
             <fieldset className="form-fieldset">
               <legend>{tKbyg.kbyg_emailDetails}</legend>
               <label>{tKbyg.kbyg_recipients} <input type="text" value={kbygForm.recipients} onChange={updateKbyg('recipients')} placeholder={tKbyg.kbyg_ph_recipients} /></label>
