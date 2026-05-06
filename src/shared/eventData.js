@@ -9,6 +9,8 @@
  *   arrivalTime: string
  *   venue: string
  *   parking: string
+ *   parkingBookingUrl: string
+ *   parkingBookingLabel: string
  *   food: string
  *   foodLines: string[]
  *   av: string
@@ -36,6 +38,8 @@ export function createEmptySharedEventData() {
     arrivalTime: '',
     venue: '',
     parking: '',
+    parkingBookingUrl: '',
+    parkingBookingLabel: '',
     food: '',
     foodLines: [],
     av: '',
@@ -134,6 +138,8 @@ export function buildSharedEventDataFromEventPageForm(form, language, options = 
     arrivalTime: has(arrivalField) ? normalizeElastiFlow(trim(arrivalField)) : '',
     venue: venue ? normalizeElastiFlow(venue) : '',
     parking: has(parkingField) ? normalizeElastiFlow(trim(parkingField)) : '',
+    parkingBookingUrl: '',
+    parkingBookingLabel: '',
     food: '',
     foodLines: [],
     av: '',
@@ -174,6 +180,8 @@ export function buildSharedEventDataFromKbygForm(form, language) {
     arrivalTime: trim(form.arrivalTime),
     venue,
     parking: has(form.parkingNotes) ? trim(form.parkingNotes) : '',
+    parkingBookingUrl: has(form.parkingBookingUrl) ? trim(form.parkingBookingUrl) : '',
+    parkingBookingLabel: trim(form.parkingBookingLabel || ''),
     food: fd,
     foodLines,
     av: has(form.avNotes) ? trim(form.avNotes) : '',

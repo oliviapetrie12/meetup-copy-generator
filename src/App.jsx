@@ -471,6 +471,8 @@ const KBYG_INITIAL_STATE = {
   venueName: '',
   venueAddress: '',
   parkingNotes: '',
+  parkingBookingUrl: '',
+  parkingBookingLabel: '',
   meetupLink: '',
   lumaLink: '',
   contacts: [
@@ -2811,6 +2813,28 @@ export default function App() {
               <label>
                 {tKbyg.kbyg_parkingLabel} <span className="form-hint">({tKbyg.kbyg_optional})</span>
                 <input type="text" value={kbygForm.parkingNotes} onChange={updateKbyg('parkingNotes')} />
+              </label>
+              <label>
+                {tKbyg.kbyg_parkingBookingUrl}{' '}
+                <span className="form-hint">({tKbyg.kbyg_optional})</span>
+                <input
+                  type="url"
+                  inputMode="url"
+                  autoComplete="off"
+                  value={kbygForm.parkingBookingUrl}
+                  onChange={updateKbyg('parkingBookingUrl')}
+                  placeholder={tKbyg.kbyg_ph_parkingBookingUrl}
+                />
+              </label>
+              <label>
+                {tKbyg.kbyg_parkingBookingLabel}{' '}
+                <span className="form-hint">({tKbyg.kbyg_optional})</span>
+                <input
+                  type="text"
+                  value={kbygForm.parkingBookingLabel}
+                  onChange={updateKbyg('parkingBookingLabel')}
+                  placeholder={tKbyg.kbyg_ph_parkingBookingLabel}
+                />
               </label>
             </fieldset>
             <fieldset className="form-fieldset">

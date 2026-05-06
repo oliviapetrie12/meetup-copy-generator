@@ -20,6 +20,14 @@ function kbygExternalLinkHtml(url, labelText) {
   return `<a href="${escapeHtmlAttr(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(labelText)}</a>`
 }
 
+/** Ensures pasted/bookmarked links resolve (SpotHero, venue pages, etc.). */
+function normalizeKbygHttpUrl(url) {
+  const t = typeof url === 'string' ? url.trim() : ''
+  if (!t) return ''
+  if (/^https?:\/\//i.test(t)) return t
+  return `https://${t}`
+}
+
 /**
  * Meetup + Luma rows for Event page section (HTML list cells are anchors only).
  * @returns {string[]} inner HTML fragments for each &lt;li&gt;
@@ -92,10 +100,10 @@ function buildKbygAgendaHtmlFromItems(items) {
  * Order: venue → parking → food & beverage → AV.
  * @param {import('../shared/eventData.js').SharedEventData} data
  * @param {(s: string) => string} trim
- * @returns {ReadonlyArray<{ sectionKey: string, title: string, body: string, bulletLines?: string[] }>}
+ * @returns {ReadonlyArray<{ sectionKey: string, title: string, body: string, bulletLines?: string[], parkingBooking?: { url: string, label: string } }>}
  */
 function kbygLogisticsStandaloneBlocks(data, trim, S) {
-  /** @type {{ sectionKey: string, title: string, body: string, bulletLines?: string[] }[]} */
+  /** @type {{ sectionKey: string, title: string, body: string, bulletLines?: string[], parkingBooking?: { url: string, label: string } }[]} */
   const blocks = []
   const pushPara = (sectionKey, title, raw) => {
     const body = trim(raw)
@@ -109,7 +117,20 @@ function kbygLogisticsStandaloneBlocks(data, trim, S) {
   }
 
   pushPara('location', S.location, data.venue)
-  pushPara('parking', S.parking, data.parking)
+  {
+    const parkingBody = trim(data.parking)
+    const bookingRaw = trim(data.parkingBookingUrl || '')
+    const bookingUrl = bookingRaw ? normalizeKbygHttpUrl(bookingRaw) : ''
+    const bookingLabel = trim(data.parkingBookingLabel || '') || S.parkingBookLinkDefaultLabel
+    if (parkingBody || bookingUrl) {
+      blocks.push({
+        sectionKey: 'parking',
+        title: S.parking,
+        body: parkingBody,
+        parkingBooking: bookingUrl ? { url: bookingUrl, label: bookingLabel } : undefined,
+      })
+    }
+  }
   if (Array.isArray(data.foodLines) && data.foodLines.length > 0) {
     pushBullets('foodDrinks', S.foodBeverage, data.foodLines)
   } else {
@@ -128,10 +149,20 @@ function kbygStandaloneSectionHtml(sectionKey, titlePlain, bodyText, emojisEnabl
 
 /**
  * Logistics block: paragraph body, or bullet list (e.g. food vs drink lines from KBYG form).
- * @param {{ sectionKey: string, title: string, body: string, bulletLines?: string[] }} block
+ * @param {{ sectionKey: string, title: string, body: string, bulletLines?: string[], parkingBooking?: { url: string, label: string } }} block
  */
-function kbygStandaloneBlockHtml(block, emojisEnabled) {
+function kbygStandaloneBlockHtml(block, emojisEnabled, S) {
   const title = formatSectionHeader(block.sectionKey, block.title, emojisEnabled)
+  if (block.sectionKey === 'parking' && block.parkingBooking?.url) {
+    const linkHtml = kbygExternalLinkHtml(block.parkingBooking.url, block.parkingBooking.label)
+    let html = `<p><strong>${escapeHtml(title)}</strong></p>`
+    html += `<p>${escapeHtml(S.parkingBookingIntro)}<br>${linkHtml}</p>`
+    const bodyText = typeof block.body === 'string' ? block.body.trim() : ''
+    if (bodyText) {
+      html += `<p>${escapeHtml(bodyText).replace(/\n/g, '<br>')}</p>`
+    }
+    return html
+  }
   if (block.bulletLines && block.bulletLines.length) {
     const items = block.bulletLines.map((line) => escapeHtml(line))
     return `<p><strong>${escapeHtml(title)}</strong></p>${kbygHtmlUl(items)}`
@@ -140,13 +171,20 @@ function kbygStandaloneBlockHtml(block, emojisEnabled) {
 }
 
 /** Append plain lines for one logistics block (heading, optional bullets, trailing blank line). */
-function appendKbygStandaloneBlockPlain(lines, headingFn, block) {
+function appendKbygStandaloneBlockPlain(lines, headingFn, block, S) {
   lines.push(headingFn(block.sectionKey, block.title))
+  if (block.sectionKey === 'parking' && block.parkingBooking?.url) {
+    lines.push(S.parkingBookingIntro)
+    const label = block.parkingBooking.label || S.parkingBookLinkDefaultLabel
+    lines.push(`[${label}](${block.parkingBooking.url})`)
+  }
   if (block.bulletLines && block.bulletLines.length) {
     block.bulletLines.forEach((ln) => lines.push(`- ${ln.trimEnd()}`))
   } else {
     const raw = typeof block.body === 'string' ? block.body : ''
-    raw.split('\n').forEach((ln) => lines.push(ln.trimEnd()))
+    if (raw.trim()) {
+      raw.split('\n').forEach((ln) => lines.push(ln.trimEnd()))
+    }
   }
   lines.push('')
 }
@@ -202,7 +240,7 @@ function appendKbygEmailHtmlBody(chunks, ctx) {
     },
     () => {
       for (const block of kbygLogisticsStandaloneBlocks(eventData, trim, S)) {
-        chunks.push(kbygStandaloneBlockHtml(block, emojisEnabled))
+        chunks.push(kbygStandaloneBlockHtml(block, emojisEnabled, S))
       }
     },
     () => {
@@ -303,7 +341,7 @@ function appendKbygEmailPlainBody(lines, ctx) {
     },
     () => {
       for (const block of kbygLogisticsStandaloneBlocks(eventData, trim, S)) {
-        appendKbygStandaloneBlockPlain(lines, heading, block)
+        appendKbygStandaloneBlockPlain(lines, heading, block, S)
       }
     },
     () => {

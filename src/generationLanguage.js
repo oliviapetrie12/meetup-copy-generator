@@ -429,6 +429,8 @@ export function getMeetupKbygStrings(lang) {
       tldrAv: (line) => `AV: ${line}`,
       tldrContact: (line) => `Contact: ${line}`,
       tldrArriveBy: (t) => `Arrive by ${t}.`,
+      parkingBookingIntro: 'Reserve parking in advance:',
+      parkingBookLinkDefaultLabel: 'Book Parking',
     },
     es: {
       subjectSuffix: 'Meetup — Información previa',
@@ -509,6 +511,8 @@ export function getMeetupKbygStrings(lang) {
       tldrAv: (line) => `AV: ${line}`,
       tldrContact: (line) => `Contacto: ${line}`,
       tldrArriveBy: (t) => `Llega antes de las ${t}.`,
+      parkingBookingIntro: 'Reserva estacionamiento con anticipación:',
+      parkingBookLinkDefaultLabel: 'Reservar estacionamiento',
     },
     pt: {
       subjectSuffix: 'Meetup — Saiba antes de ir',
@@ -589,6 +593,8 @@ export function getMeetupKbygStrings(lang) {
       tldrAv: (line) => `AV: ${line}`,
       tldrContact: (line) => `Contato: ${line}`,
       tldrArriveBy: (t) => `Chegue até ${t}.`,
+      parkingBookingIntro: 'Reserve estacionamento com antecedência:',
+      parkingBookLinkDefaultLabel: 'Reservar estacionamento',
     },
   }
   return M[n] || M.en
