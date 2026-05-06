@@ -44,6 +44,11 @@ import {
 import { renderEventPagePlainMarkdown } from './channels/eventPagePlain.js'
 import { renderKbygEmailHtml, renderKbygEmailPlain } from './channels/kbygEmail.js'
 import { KBYG_TLDR_ITEM_ORDER, getInitialKbygTldrInclude } from './kbygTldr.js'
+import {
+  KBYG_QUICK_IMPORT_I18N_KEYS,
+  mergeKbygQuickImportPatch,
+  parseKbygQuickImport,
+} from './kbygQuickImportParse.js'
 
 function SearchableSelect({ value, onChange, options, placeholder = 'Type to search…', id }) {
   const [open, setOpen] = useState(false)
@@ -1563,6 +1568,7 @@ export default function App() {
       // ignore quota / private mode
     }
   }, [kbygForm])
+
   const [outreachForm, setOutreachForm] = useState(SPEAKER_OUTREACH_INITIAL_STATE)
   const [urlQrForm, setUrlQrForm] = useState(URL_QR_INITIAL_STATE)
   const [qrForm, setQrForm] = useState(QR_INITIAL_STATE)
@@ -1597,6 +1603,13 @@ export default function App() {
   const [meetupKbygLanguage, setMeetupKbygLanguage] = useState('en')
   const tEvent = useMemo(() => getGeneratorUiTranslations(eventPageLanguage), [eventPageLanguage])
   const tKbyg = useMemo(() => getGeneratorUiTranslations(meetupKbygLanguage), [meetupKbygLanguage])
+  const [kbygQuickImportPaste, setKbygQuickImportPaste] = useState('')
+  const [kbygQuickImportFeedback, setKbygQuickImportFeedback] = useState('')
+  useEffect(() => {
+    if (!kbygQuickImportFeedback) return
+    const t = window.setTimeout(() => setKbygQuickImportFeedback(''), 8000)
+    return () => window.clearTimeout(t)
+  }, [kbygQuickImportFeedback])
   const [translateMessage, setTranslateMessage] = useState(null)
   const [kbygSectionCopiedId, setKbygSectionCopiedId] = useState(null)
   const [comboboxOpen, setComboboxOpen] = useState(false)
@@ -1828,6 +1841,25 @@ export default function App() {
   /** Quick-fill replaces the entire field value (does not append to existing text). */
   const applyMeetupKbygQuickFill = (fieldKey, value) => {
     setKbygForm((prev) => ({ ...prev, [fieldKey]: value }))
+  }
+
+  const handleKbygQuickImportParse = () => {
+    setKbygForm((prev) => {
+      const { patch } = parseKbygQuickImport(kbygQuickImportPaste)
+      const { next, appliedKeys } = mergeKbygQuickImportPatch(prev, patch)
+      queueMicrotask(() => {
+        if (appliedKeys.length === 0) {
+          setKbygQuickImportFeedback(tKbyg.kbyg_quickImportNothing)
+          return
+        }
+        const labels = appliedKeys.map((k) => {
+          const tk = KBYG_QUICK_IMPORT_I18N_KEYS[k]
+          return tk && tKbyg[tk] ? tKbyg[tk] : k
+        })
+        setKbygQuickImportFeedback(`${tKbyg.kbyg_quickImportParsedPrefix} ${labels.join(', ')}`)
+      })
+      return next
+    })
   }
 
   const updateKbygContact = (index, field) => (e) =>
@@ -2137,6 +2169,8 @@ export default function App() {
     if (generatorType === 'knowBeforeYouGo') {
       setKbygTldrRotation(0)
       setKbygForm(KBYG_INITIAL_STATE)
+      setKbygQuickImportPaste('')
+      setKbygQuickImportFeedback('')
     } else if (generatorType === 'speakerOutreach') {
       setOutreachForm(SPEAKER_OUTREACH_INITIAL_STATE)
     } else if (generatorType === 'urlQrGenerator') {
@@ -2830,6 +2864,34 @@ export default function App() {
                 🔄 {tKbyg.kbyg_btnReset}
               </button>
             </div>
+            <fieldset className="form-fieldset">
+              <legend>{tKbyg.kbyg_quickImport}</legend>
+              <p className="form-hint">{tKbyg.kbyg_quickImportHint}</p>
+              <label>
+                {tKbyg.kbyg_quickImportPasteLabel}
+                <textarea
+                  value={kbygQuickImportPaste}
+                  onChange={(e) => setKbygQuickImportPaste(e.target.value)}
+                  placeholder={tKbyg.kbyg_quickImportPlaceholder}
+                  rows={6}
+                  autoComplete="off"
+                />
+              </label>
+              <div className="quick-draft-stack">
+                <button
+                  type="button"
+                  className="btn-quick-draft"
+                  onClick={handleKbygQuickImportParse}
+                >
+                  {tKbyg.kbyg_parseEventDetails}
+                </button>
+              </div>
+              {kbygQuickImportFeedback ? (
+                <p className="form-hint" role="status" aria-live="polite">
+                  {kbygQuickImportFeedback}
+                </p>
+              ) : null}
+            </fieldset>
             <fieldset className="form-fieldset">
               <legend>{tKbyg.kbyg_emailDetails}</legend>
               <label>{tKbyg.kbyg_recipients} <input type="text" value={kbygForm.recipients} onChange={updateKbyg('recipients')} placeholder={tKbyg.kbyg_ph_recipients} /></label>

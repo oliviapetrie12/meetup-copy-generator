@@ -76,6 +76,15 @@ const BASE_EN = {
   kbyg_contactInfo: 'Contact Info (email or Slack)',
   kbyg_addContact: '+ Add Contact',
   kbyg_quickFill: 'Quick fill',
+  kbyg_quickImport: 'Quick Import',
+  kbyg_quickImportPasteLabel: 'Paste Meetup, Luma, or event details',
+  kbyg_quickImportPlaceholder:
+    'Paste copied event text, Slack notes, Meetup/Luma pages, or an agenda…',
+  kbyg_parseEventDetails: 'Parse Event Details',
+  kbyg_quickImportHint: 'Fills empty fields only — you can edit everything afterward.',
+  kbyg_quickImportParsedPrefix: 'Parsed:',
+  kbyg_quickImportNothing:
+    'No empty fields were updated. Clear a field or paste more detail, then try again.',
   kbyg_speakerArrivalLegend: 'Speaker arrival',
   kbyg_speakerArrival: 'Speaker arrival note',
   kbyg_logistics: 'Logistics',
@@ -284,6 +293,15 @@ const BASE_ES = {
   kbyg_contactInfo: 'Contacto (correo o Slack)',
   kbyg_addContact: '+ Añadir contacto',
   kbyg_quickFill: 'Relleno rápido',
+  kbyg_quickImport: 'Importación rápida',
+  kbyg_quickImportPasteLabel: 'Pega detalles de Meetup, Luma o del evento',
+  kbyg_quickImportPlaceholder:
+    'Pega texto copiado, notas de Slack, páginas de Meetup/Luma o una agenda…',
+  kbyg_parseEventDetails: 'Analizar detalles del evento',
+  kbyg_quickImportHint: 'Solo rellena campos vacíos — puedes editar todo después.',
+  kbyg_quickImportParsedPrefix: 'Extraído:',
+  kbyg_quickImportNothing:
+    'No se actualizaron campos vacíos. Vacía un campo o pega más detalle e inténtalo de nuevo.',
   kbyg_speakerArrivalLegend: 'Llegada del ponente',
   kbyg_speakerArrival: 'Nota de llegada del ponente',
   kbyg_logistics: 'Logística',
@@ -492,6 +510,15 @@ const BASE_PT = {
   kbyg_contactInfo: 'Contato (e-mail ou Slack)',
   kbyg_addContact: '+ Adicionar contato',
   kbyg_quickFill: 'Preenchimento rápido',
+  kbyg_quickImport: 'Importação rápida',
+  kbyg_quickImportPasteLabel: 'Cole Meetup, Luma ou detalhes do evento',
+  kbyg_quickImportPlaceholder:
+    'Cole texto copiado, notas no Slack, páginas Meetup/Luma ou uma agenda…',
+  kbyg_parseEventDetails: 'Analisar detalhes do evento',
+  kbyg_quickImportHint: 'Preenche apenas campos vazios — você pode editar tudo depois.',
+  kbyg_quickImportParsedPrefix: 'Extraído:',
+  kbyg_quickImportNothing:
+    'Nenhum campo vazio foi atualizado. Limpe um campo ou cole mais detalhes e tente de novo.',
   kbyg_speakerArrivalLegend: 'Chegada do palestrante',
   kbyg_speakerArrival: 'Nota de chegada do palestrante',
   kbyg_logistics: 'Logística',
