@@ -53,15 +53,9 @@ function buildKbygIntroParagraphText(S, eventData, trim) {
   const whenLine = trim(eventData.date)
   const t = trim(eventData.title)
   if (!t && !whenLine) {
-    let s = S.thanksLeanGeneric
-    const arr = trim(eventData.arrivalTime)
-    if (arr) s = `${s} ${S.htmlArriveBy(arr)}.`
-    return s
+    return S.thanksLeanGeneric
   }
-  let s = S.kbygIntroLead(t, whenLine, S.meetupFallbackTitle)
-  const arr = trim(eventData.arrivalTime)
-  if (arr) s = `${s} ${S.htmlArriveBy(arr)}.`
-  return s
+  return S.kbygIntroLead(t, whenLine, S.meetupFallbackTitle)
 }
 
 function kbygHtmlUl(items) {
