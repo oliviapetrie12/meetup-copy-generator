@@ -479,12 +479,6 @@ const KBYG_INITIAL_STATE = {
     { name: '', role: '', contactInfo: '' },
     { name: '', role: '', contactInfo: '' },
   ],
-  speaker1Name: '',
-  speaker1Title: '',
-  speaker1TalkTitle: '',
-  speaker2Name: '',
-  speaker2Title: '',
-  speaker2TalkTitle: '',
   speakerArrivalNote: '',
   foodDetails: '',
   drinkDetails: '',
@@ -501,6 +495,16 @@ const KBYG_INITIAL_STATE = {
 
 const KBYG_FORM_STORAGE_KEY = 'meetup-kbyg-form-v1'
 
+/** Removed standalone Speakers section — strip legacy keys from persisted JSON. */
+const KBYG_LEGACY_SPEAKER_FIELD_KEYS = [
+  'speaker1Name',
+  'speaker1Title',
+  'speaker1TalkTitle',
+  'speaker2Name',
+  'speaker2Title',
+  'speaker2TalkTitle',
+]
+
 function loadKbygFormFromStorage() {
   if (typeof localStorage === 'undefined') return KBYG_INITIAL_STATE
   try {
@@ -508,9 +512,11 @@ function loadKbygFormFromStorage() {
     if (!raw) return KBYG_INITIAL_STATE
     const parsed = JSON.parse(raw)
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return KBYG_INITIAL_STATE
+    const parsedRest = { ...parsed }
+    for (const k of KBYG_LEGACY_SPEAKER_FIELD_KEYS) delete parsedRest[k]
     return {
       ...KBYG_INITIAL_STATE,
-      ...parsed,
+      ...parsedRest,
       kbygTldrInclude: {
         ...getInitialKbygTldrInclude(),
         ...(parsed.kbygTldrInclude && typeof parsed.kbygTldrInclude === 'object' ? parsed.kbygTldrInclude : {}),
@@ -2854,16 +2860,10 @@ export default function App() {
               <button type="button" onClick={addKbygContact} className="btn-add-speaker">{tKbyg.kbyg_addContact}</button>
             </fieldset>
             <fieldset className="form-fieldset">
-              <legend>{tKbyg.kbyg_speakers}</legend>
-              <label>{tKbyg.kbyg_speaker1Name} <input type="text" value={kbygForm.speaker1Name} onChange={updateKbyg('speaker1Name')} placeholder={tKbyg.kbyg_ph_speakerName} /></label>
-              <label>{tKbyg.kbyg_speaker1Title} <input type="text" value={kbygForm.speaker1Title} onChange={updateKbyg('speaker1Title')} placeholder={tKbyg.kbyg_ph_speakerTitle} /></label>
-              <label>{tKbyg.kbyg_speaker1Talk} <input type="text" value={kbygForm.speaker1TalkTitle} onChange={updateKbyg('speaker1TalkTitle')} placeholder={tKbyg.kbyg_ph_talkTitle} /></label>
-              <label>{tKbyg.kbyg_speaker2Name} <input type="text" value={kbygForm.speaker2Name} onChange={updateKbyg('speaker2Name')} placeholder={tKbyg.kbyg_ph_speakerName} /></label>
-              <label>{tKbyg.kbyg_speaker2Title} <input type="text" value={kbygForm.speaker2Title} onChange={updateKbyg('speaker2Title')} placeholder={tKbyg.kbyg_ph_speakerTitle} /></label>
-              <label>{tKbyg.kbyg_speaker2Talk} <input type="text" value={kbygForm.speaker2TalkTitle} onChange={updateKbyg('speaker2TalkTitle')} placeholder={tKbyg.kbyg_ph_talkTitle} /></label>
+              <legend>{tKbyg.kbyg_speakerArrivalLegend}</legend>
               <div className="kbyg-quick-fill-wrap">
                 <span className="form-hint kbyg-quick-fill-hint">{tKbyg.kbyg_quickFill}</span>
-                <div className="quick-fill-chips" role="group" aria-label={tKbyg.kbyg_speakerArrival}>
+                <div className="quick-fill-chips" role="group" aria-label={tKbyg.kbyg_speakerArrivalLegend}>
                   {getKbygSpeakerArrivalQuickFill(meetupKbygLanguage).map((text) => (
                     <button
                       key={text}
