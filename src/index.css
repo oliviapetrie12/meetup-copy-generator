@@ -694,14 +694,20 @@ body {
   gap: 0.4rem;
 }
 
-/** Meetup KBYG: top reset control (mirrors bottom btn-reset styling). */
+/** Meetup KBYG: emoji + language on the left, reset on the right; wraps on narrow viewports. */
 .form-kbyg-toolbar {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  margin: 0 0 0.75rem;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+}
+
+.form-kbyg-toolbar .form-language-row.form-kbyg-toolbar-settings {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: min(100%, 18rem);
 }
 
 .translate-output-bar {

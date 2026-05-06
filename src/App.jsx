@@ -2796,6 +2796,36 @@ export default function App() {
             className="form"
           >
             <div className="form-kbyg-toolbar" role="toolbar" aria-label="Form quick actions">
+              <div
+                className="form-language-row form-kbyg-toolbar-settings"
+                role="group"
+                aria-label={tKbyg.kbyg_generatorSettingsGroup}
+              >
+                <label className="checkbox-label kbyg-emoji-headers-toggle">
+                  <input
+                    type="checkbox"
+                    checked={kbygForm.kbygEmojiHeaders !== false}
+                    onChange={(e) =>
+                      setKbygForm((prev) => ({ ...prev, kbygEmojiHeaders: e.target.checked }))
+                    }
+                    aria-label={tKbyg.kbyg_enableEmojis}
+                  />
+                  <span>{tKbyg.kbyg_enableEmojis}</span>
+                </label>
+                <label>
+                  {tKbyg.languageLabel}
+                  <select
+                    value={meetupKbygLanguage}
+                    onChange={(e) => setMeetupKbygLanguage(e.target.value)}
+                  >
+                    {LANGUAGE_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
               <button type="button" onClick={handleReset} className="btn-reset">
                 🔄 {tKbyg.kbyg_btnReset}
               </button>
@@ -2985,32 +3015,6 @@ export default function App() {
               <legend>{tKbyg.kbyg_additional}</legend>
               <label>{tKbyg.kbyg_additionalNotes} <textarea value={kbygForm.additionalNotes} onChange={updateKbyg('additionalNotes')} placeholder={tKbyg.kbyg_ph_additionalNotes} rows={3} /></label>
             </fieldset>
-            <div className="form-language-row" role="group" aria-label={tKbyg.languageLabel}>
-              <label className="checkbox-label kbyg-emoji-headers-toggle">
-                <input
-                  type="checkbox"
-                  checked={kbygForm.kbygEmojiHeaders !== false}
-                  onChange={(e) =>
-                    setKbygForm((prev) => ({ ...prev, kbygEmojiHeaders: e.target.checked }))
-                  }
-                  aria-label={tKbyg.kbyg_enableEmojis}
-                />
-                <span>{tKbyg.kbyg_enableEmojis}</span>
-              </label>
-              <label>
-                {tKbyg.languageLabel}
-                <select
-                  value={meetupKbygLanguage}
-                  onChange={(e) => setMeetupKbygLanguage(e.target.value)}
-                >
-                  {LANGUAGE_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
             <button type="submit" className="btn-generate">{tKbyg.kbyg_btnGenerate}</button>
             <button type="button" onClick={handleReset} className="btn-reset">🔄 {tKbyg.kbyg_btnReset}</button>
           </form>
