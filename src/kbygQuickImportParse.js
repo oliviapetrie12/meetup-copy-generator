@@ -20,7 +20,6 @@ export const KBYG_QUICK_IMPORT_I18N_KEYS = {
   foodDetails: 'kbyg_food',
   drinkDetails: 'kbyg_drink',
   additionalNotes: 'kbyg_additionalNotes',
-  eventTitle: 'kbyg_eventTitle',
 }
 
 /** English labels for parsed keys (tests / debugging). */
@@ -38,11 +37,11 @@ export const KBYG_QUICK_IMPORT_FIELD_LABELS = {
   foodDetails: 'Food',
   drinkDetails: 'Drinks',
   additionalNotes: 'Additional notes',
-  eventTitle: 'Event title',
 }
 
-/** @typedef {{
- *   eventTitle?: string
+/**
+ * Parser patch keys (`eventTitle` excluded — manual entry; optional title parsing could be added later).
+ * @typedef {{
  *   eventDate?: string
  *   eventTime?: string
  *   arrivalTime?: string
@@ -193,22 +192,6 @@ export function parseKbygQuickImport(raw) {
   )
   if (arriveM && !patch.arrivalTime) {
     mark('arrivalTime', arriveM[1].trim())
-  }
-
-  // --- Title: first substantive line
-  if (!patch.eventTitle) {
-    for (const rawLine of lines) {
-      const line = normLine(rawLine)
-      if (!line || /^https?:\/\//i.test(line)) continue
-      if (/^(date|location|parking|agenda|when)\s*:/i.test(line)) continue
-      if (line.length > 180) continue
-      if (/^\d{1,2}:\d{2}\s*[-–—]/.test(line)) continue
-      if (/^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/i.test(line) && line.length > 40) {
-        continue
-      }
-      mark('eventTitle', line)
-      break
-    }
   }
 
   // --- Date/time from any line if sections missed
