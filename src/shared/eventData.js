@@ -10,6 +10,7 @@
  *   venue: string
  *   parking: string
  *   food: string
+ *   foodLines: string[]
  *   av: string
  *   speakerPrep: string
  *   agenda: AgendaItem[]
@@ -36,6 +37,7 @@ export function createEmptySharedEventData() {
     venue: '',
     parking: '',
     food: '',
+    foodLines: [],
     av: '',
     speakerPrep: '',
     agenda: [],
@@ -133,6 +135,7 @@ export function buildSharedEventDataFromEventPageForm(form, language, options = 
     venue: venue ? normalizeElastiFlow(venue) : '',
     parking: has(parkingField) ? normalizeElastiFlow(trim(parkingField)) : '',
     food: '',
+    foodLines: [],
     av: '',
     speakerPrep: speakerPrep ? normalizeElastiFlow(speakerPrep) : '',
     agenda: agendaPlainTextToAgendaItems(agendaBody),
@@ -149,9 +152,11 @@ export function buildSharedEventDataFromKbygForm(form, language) {
 
   const whenLine = [trim(form.eventDate), trim(form.eventTime)].filter(Boolean).join(' at ')
   const venue = [trim(form.venueName), trim(form.venueAddress)].filter(Boolean).join('\n')
-  const fd = [has(form.foodDetails) ? trim(form.foodDetails) : '', has(form.drinkDetails) ? trim(form.drinkDetails) : '']
-    .filter(Boolean)
-    .join(' · ')
+  const foodLines = [
+    has(form.foodDetails) ? trim(form.foodDetails) : '',
+    has(form.drinkDetails) ? trim(form.drinkDetails) : '',
+  ].filter(Boolean)
+  const fd = foodLines.join(' · ')
 
   let agenda = []
   if (has(form.internalAgenda)) {
@@ -170,6 +175,7 @@ export function buildSharedEventDataFromKbygForm(form, language) {
     venue,
     parking: has(form.parkingNotes) ? trim(form.parkingNotes) : '',
     food: fd,
+    foodLines,
     av: has(form.avNotes) ? trim(form.avNotes) : '',
     speakerPrep: prepParts.join('\n\n'),
     agenda,

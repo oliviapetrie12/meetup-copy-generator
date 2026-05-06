@@ -103,20 +103,30 @@ function buildKbygAgendaHtmlFromItems(items) {
  * Order: venue → parking → food & beverage → AV.
  * @param {import('../shared/eventData.js').SharedEventData} data
  * @param {(s: string) => string} trim
- * @returns {ReadonlyArray<{ sectionKey: string, title: string, body: string }>}
+ * @returns {ReadonlyArray<{ sectionKey: string, title: string, body: string, bulletLines?: string[] }>}
  */
 function kbygLogisticsStandaloneBlocks(data, trim, S) {
-  /** @type {{ sectionKey: string, title: string, body: string }[]} */
+  /** @type {{ sectionKey: string, title: string, body: string, bulletLines?: string[] }[]} */
   const blocks = []
-  const push = (sectionKey, title, raw) => {
+  const pushPara = (sectionKey, title, raw) => {
     const body = trim(raw)
     if (!body) return
     blocks.push({ sectionKey, title, body })
   }
-  push('location', S.location, data.venue)
-  push('parking', S.parking, data.parking)
-  push('foodDrinks', S.foodBeverage, data.food)
-  push('avPresentation', S.avSetup, data.av)
+  const pushBullets = (sectionKey, title, rawLines) => {
+    const cleaned = (Array.isArray(rawLines) ? rawLines : []).map(trim).filter(Boolean)
+    if (!cleaned.length) return
+    blocks.push({ sectionKey, title, body: '', bulletLines: cleaned })
+  }
+
+  pushPara('location', S.location, data.venue)
+  pushPara('parking', S.parking, data.parking)
+  if (Array.isArray(data.foodLines) && data.foodLines.length > 0) {
+    pushBullets('foodDrinks', S.foodBeverage, data.foodLines)
+  } else {
+    pushPara('foodDrinks', S.foodBeverage, data.food)
+  }
+  pushPara('avPresentation', S.avSetup, data.av)
   return blocks
 }
 
@@ -127,11 +137,28 @@ function kbygStandaloneSectionHtml(sectionKey, titlePlain, bodyText, emojisEnabl
   return `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(title)}</strong></p>${inner}</div>`
 }
 
-/** Append plain lines for one standalone block (header + body, trailing blank line). */
-function appendKbygStandalonePlainSection(lines, headingFn, sectionKey, titlePlain, bodyText) {
-  lines.push(headingFn(sectionKey, titlePlain))
-  const raw = typeof bodyText === 'string' ? bodyText : ''
-  raw.split('\n').forEach((ln) => lines.push(ln.trimEnd()))
+/**
+ * Logistics block: paragraph body, or bullet list (e.g. food vs drink lines from KBYG form).
+ * @param {{ sectionKey: string, title: string, body: string, bulletLines?: string[] }} block
+ */
+function kbygStandaloneBlockHtml(block, emojisEnabled) {
+  const title = formatSectionHeader(block.sectionKey, block.title, emojisEnabled)
+  if (block.bulletLines && block.bulletLines.length) {
+    const items = block.bulletLines.map((line) => escapeHtml(line))
+    return `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(title)}</strong></p>${kbygHtmlUl(items)}</div>`
+  }
+  return kbygStandaloneSectionHtml(block.sectionKey, block.title, block.body, emojisEnabled)
+}
+
+/** Append plain lines for one logistics block (heading, optional bullets, trailing blank line). */
+function appendKbygStandaloneBlockPlain(lines, headingFn, block) {
+  lines.push(headingFn(block.sectionKey, block.title))
+  if (block.bulletLines && block.bulletLines.length) {
+    block.bulletLines.forEach((ln) => lines.push(`- ${ln.trimEnd()}`))
+  } else {
+    const raw = typeof block.body === 'string' ? block.body : ''
+    raw.split('\n').forEach((ln) => lines.push(ln.trimEnd()))
+  }
   lines.push('')
 }
 
@@ -192,7 +219,7 @@ function appendKbygEmailHtmlBody(chunks, ctx) {
     },
     () => {
       for (const block of kbygLogisticsStandaloneBlocks(eventData, trim, S)) {
-        chunks.push(kbygStandaloneSectionHtml(block.sectionKey, block.title, block.body, emojisEnabled))
+        chunks.push(kbygStandaloneBlockHtml(block, emojisEnabled))
       }
     },
     () => {
@@ -303,7 +330,7 @@ function appendKbygEmailPlainBody(lines, ctx) {
     },
     () => {
       for (const block of kbygLogisticsStandaloneBlocks(eventData, trim, S)) {
-        appendKbygStandalonePlainSection(lines, heading, block.sectionKey, block.title, block.body)
+        appendKbygStandaloneBlockPlain(lines, heading, block)
       }
     },
     () => {
