@@ -95,6 +95,8 @@ const BASE_EN = {
   kbyg_tldrCallouts: 'Include these callouts in the TL;DR',
   kbyg_agenda: 'Agenda',
   kbyg_internalAgenda: 'Internal agenda',
+  kbyg_internalAgendaHint:
+    'Paste the agenda directly from the Meetup or Luma event page. Operational reminders will be added automatically.',
   kbyg_additional: 'Additional',
   kbyg_additionalNotes: 'Additional notes',
   kbyg_btnGenerate: 'Generate Email',
@@ -300,6 +302,8 @@ const BASE_ES = {
   kbyg_tldrCallouts: 'Incluir estos avisos en el TL;DR',
   kbyg_agenda: 'Agenda',
   kbyg_internalAgenda: 'Agenda interna',
+  kbyg_internalAgendaHint:
+    'Pega la agenda directamente desde la página del evento en Meetup o Luma. Los recordatorios operativos se añaden automáticamente.',
   kbyg_additional: 'Adicional',
   kbyg_additionalNotes: 'Notas adicionales',
   kbyg_btnGenerate: 'Generar correo',
@@ -505,6 +509,8 @@ const BASE_PT = {
   kbyg_tldrCallouts: 'Incluir estes destaques no TL;DR',
   kbyg_agenda: 'Agenda',
   kbyg_internalAgenda: 'Agenda interna',
+  kbyg_internalAgendaHint:
+    'Cole a agenda diretamente da página do evento no Meetup ou Luma. Lembretes operacionais são adicionados automaticamente.',
   kbyg_additional: 'Adicional',
   kbyg_additionalNotes: 'Notas adicionais',
   kbyg_btnGenerate: 'Gerar e-mail',

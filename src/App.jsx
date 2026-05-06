@@ -2964,7 +2964,20 @@ export default function App() {
             </fieldset>
             <fieldset className="form-fieldset">
               <legend>{tKbyg.kbyg_agenda}</legend>
-              <label>{tKbyg.kbyg_internalAgenda} <textarea value={kbygForm.internalAgenda} onChange={updateKbyg('internalAgenda')} placeholder={tKbyg.kbyg_ph_internalAgenda} rows={4} /></label>
+              <div className="kbyg-internal-agenda-field">
+                <label htmlFor="kbyg-internal-agenda">{tKbyg.kbyg_internalAgenda}</label>
+                <p id="kbyg-internal-agenda-desc" className="form-hint kbyg-internal-agenda-hint">
+                  {tKbyg.kbyg_internalAgendaHint}
+                </p>
+                <textarea
+                  id="kbyg-internal-agenda"
+                  aria-describedby="kbyg-internal-agenda-desc"
+                  value={kbygForm.internalAgenda}
+                  onChange={updateKbyg('internalAgenda')}
+                  placeholder={tKbyg.kbyg_ph_internalAgenda}
+                  rows={4}
+                />
+              </div>
             </fieldset>
             <fieldset className="form-fieldset">
               <legend>{tKbyg.kbyg_additional}</legend>

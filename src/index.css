@@ -418,6 +418,14 @@ body {
   margin-top: 0.25rem;
 }
 
+.kbyg-internal-agenda-field .kbyg-internal-agenda-hint {
+  margin-top: 0.35rem;
+  margin-bottom: 0.45rem;
+  max-width: 42rem;
+  line-height: 1.45;
+  color: #8b9099;
+}
+
 /* Update / format KBYG: lead description + subtle merge hint */
 .form-fieldset-kbyg-enhance .form-hint-kbyg-enhance-lead {
   margin-top: 0;

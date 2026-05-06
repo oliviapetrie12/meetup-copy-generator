@@ -8,6 +8,7 @@ import { getMeetupKbygPhotoLines } from '../generationLanguage.js'
 import { buildKbygTldrBulletsLean } from '../kbygTldr.js'
 import { formatKbygPlainSectionHeading, formatSectionHeader } from '../kbygSectionHeaders.js'
 import { KBYG_EMAIL_BODY_SECTION_IDS } from '../kbygEmailSectionOrder.js'
+import { augmentKbygAgendaForEmail } from '../kbygAgendaAugment.js'
 
 /** @param {object} form @param {object} opts */
 function kbygEmojisEnabled(form, opts) {
@@ -258,8 +259,9 @@ function appendKbygEmailHtmlBody(chunks, ctx) {
       chunks.push(`<p><strong>${escapeHtml(photosTitle)}</strong></p>${kbygHtmlUl(photoItems)}`)
     },
     () => {
-      if (eventData.agenda.length === 0) return
-      const agendaHtml = buildKbygAgendaHtmlFromItems(eventData.agenda)
+      const agendaItems = augmentKbygAgendaForEmail(eventData.agenda, form, S, trim)
+      if (agendaItems.length === 0) return
+      const agendaHtml = buildKbygAgendaHtmlFromItems(agendaItems)
       if (!agendaHtml) return
       const agendaTitle = formatSectionHeader('agenda', S.htmlAgendaStrong, emojisEnabled)
       chunks.push(`<p><strong>${escapeHtml(agendaTitle)}</strong></p>${agendaHtml}`)
@@ -357,9 +359,10 @@ function appendKbygEmailPlainBody(lines, ctx) {
       lines.push('')
     },
     () => {
-      if (eventData.agenda.length === 0) return
+      const agendaItems = augmentKbygAgendaForEmail(eventData.agenda, form, S, trim)
+      if (agendaItems.length === 0) return
       lines.push(heading('agenda', S.agenda))
-      agendaPlainLinesFromItems(eventData.agenda).forEach((l) => lines.push(l))
+      agendaPlainLinesFromItems(agendaItems).forEach((l) => lines.push(l))
       lines.push('')
     },
     () => {
