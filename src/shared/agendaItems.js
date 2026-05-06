@@ -1,5 +1,5 @@
 /**
- * @typedef {{ time: string, title: string, speaker: string }} AgendaItem
+ * @typedef {{ time: string, title: string, speaker: string, timePlain?: boolean }} AgendaItem
  */
 
 /**

@@ -2,7 +2,7 @@
  * Shared structured event payload used by Meetup Event Page and KBYG renderers.
  * Values are localized content only (no HTML/markdown/bullets).
  *
- * @typedef {{ time: string, title: string, speaker: string }} AgendaItem
+ * @typedef {{ time: string, title: string, speaker: string, timePlain?: boolean }} AgendaItem
  * @typedef {{
  *   title: string
  *   date: string

@@ -79,7 +79,8 @@ function buildKbygAgendaHtmlFromItems(items) {
     .map((it) => {
       const hasSlot = it.time && (it.title || it.speaker)
       if (hasSlot) {
-        let inner = `<strong>${escapeHtml(it.time)}</strong>`
+        const timeHtml = it.timePlain ? escapeHtml(it.time) : `<strong>${escapeHtml(it.time)}</strong>`
+        let inner = timeHtml
         if (it.title) inner += ` – ${escapeHtml(it.title)}`
         if (it.speaker) {
           inner += ` — <em>${escapeHtml(it.speaker)}</em>`
@@ -298,7 +299,7 @@ function agendaPlainLinesFromItems(items) {
   const lines = []
   for (const it of items) {
     if (it.time && (it.title || it.speaker)) {
-      let line = `- **${it.time}**`
+      let line = it.timePlain ? `- ${it.time}` : `- **${it.time}**`
       if (it.title) line += ` – ${it.title}`
       if (it.speaker) line += ` — ${it.speaker}`
       lines.push(line)

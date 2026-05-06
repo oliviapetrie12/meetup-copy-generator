@@ -54,6 +54,7 @@ export function augmentKbygAgendaForEmail(agendaItems, form, S, trim) {
       time: arrival,
       title: S.kbygAgendaSpeakersArriveAt(venueName),
       speaker: '',
+      timePlain: true,
     })
   }
 
