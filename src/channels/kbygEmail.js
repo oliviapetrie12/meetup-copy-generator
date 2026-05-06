@@ -190,15 +190,6 @@ function appendKbygEmailHtmlBody(chunks, ctx) {
       )
     },
     () => {
-      if (eventData.agenda.length === 0) return
-      const agendaHtml = buildKbygAgendaHtmlFromItems(eventData.agenda)
-      if (!agendaHtml) return
-      const agendaTitle = formatSectionHeader('agenda', S.htmlAgendaStrong, emojisEnabled)
-      chunks.push(
-        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(agendaTitle)}</strong></p>${agendaHtml}</div>`,
-      )
-    },
-    () => {
       for (const block of kbygLogisticsStandaloneBlocks(eventData, trim, S)) {
         chunks.push(kbygStandaloneSectionHtml(block.sectionKey, block.title, block.body, emojisEnabled))
       }
@@ -211,6 +202,24 @@ function appendKbygEmailHtmlBody(chunks, ctx) {
       )
     },
     () => {
+      if (form.includePhotos === false) return
+      const photoLines = getMeetupKbygPhotoLines(opts.language)
+      const photoItems = photoLines.map((line) => escapeHtml(line))
+      const photosTitle = formatSectionHeader('photos', S.htmlTakePhotosStrong, emojisEnabled)
+      chunks.push(
+        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(photosTitle)}</strong></p>${kbygHtmlUl(photoItems)}</div>`,
+      )
+    },
+    () => {
+      if (eventData.agenda.length === 0) return
+      const agendaHtml = buildKbygAgendaHtmlFromItems(eventData.agenda)
+      if (!agendaHtml) return
+      const agendaTitle = formatSectionHeader('agenda', S.htmlAgendaStrong, emojisEnabled)
+      chunks.push(
+        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(agendaTitle)}</strong></p>${agendaHtml}</div>`,
+      )
+    },
+    () => {
       if (!has(form.setupNotes) && !has(form.swagNotes)) return
       const su = []
       if (has(form.setupNotes)) su.push(escapeHtml(trim(form.setupNotes)))
@@ -218,15 +227,6 @@ function appendKbygEmailHtmlBody(chunks, ctx) {
       const setupTitle = formatSectionHeader('swag', S.htmlSetupStrong, emojisEnabled)
       chunks.push(
         `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(setupTitle)}</strong></p>${kbygHtmlUl(su)}</div>`,
-      )
-    },
-    () => {
-      if (form.includePhotos === false) return
-      const photoLines = getMeetupKbygPhotoLines(opts.language)
-      const photoItems = photoLines.map((line) => escapeHtml(line))
-      const photosTitle = formatSectionHeader('photos', S.htmlTakePhotosStrong, emojisEnabled)
-      chunks.push(
-        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(photosTitle)}</strong></p>${kbygHtmlUl(photoItems)}</div>`,
       )
     },
     () => {
@@ -299,12 +299,6 @@ function appendKbygEmailPlainBody(lines, ctx) {
       lines.push('')
     },
     () => {
-      if (eventData.agenda.length === 0) return
-      lines.push(heading('agenda', S.agenda))
-      agendaPlainLinesFromItems(eventData.agenda).forEach((l) => lines.push(l))
-      lines.push('')
-    },
-    () => {
       for (const block of kbygLogisticsStandaloneBlocks(eventData, trim, S)) {
         appendKbygStandalonePlainSection(lines, heading, block.sectionKey, block.title, block.body)
       }
@@ -316,16 +310,22 @@ function appendKbygEmailPlainBody(lines, ctx) {
       lines.push('')
     },
     () => {
+      if (form.includePhotos === false) return
+      lines.push(heading('photos', S.takePhotos))
+      getMeetupKbygPhotoLines(opts.language).forEach((line) => lines.push(`- ${line}`))
+      lines.push('')
+    },
+    () => {
+      if (eventData.agenda.length === 0) return
+      lines.push(heading('agenda', S.agenda))
+      agendaPlainLinesFromItems(eventData.agenda).forEach((l) => lines.push(l))
+      lines.push('')
+    },
+    () => {
       if (!has(form.setupNotes) && !has(form.swagNotes)) return
       lines.push(heading('swag', S.setup))
       if (has(form.setupNotes)) lines.push(`- ${trim(form.setupNotes)}`)
       if (has(form.swagNotes)) lines.push(`- ${trim(form.swagNotes)}`)
-      lines.push('')
-    },
-    () => {
-      if (form.includePhotos === false) return
-      lines.push(heading('photos', S.takePhotos))
-      getMeetupKbygPhotoLines(opts.language).forEach((line) => lines.push(`- ${line}`))
       lines.push('')
     },
     () => {
