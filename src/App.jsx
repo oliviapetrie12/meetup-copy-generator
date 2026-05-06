@@ -1845,10 +1845,10 @@ export default function App() {
 
   const handleKbygQuickImportParse = () => {
     setKbygForm((prev) => {
-      const { patch } = parseKbygQuickImport(kbygQuickImportPaste)
+      const { patch, meta } = parseKbygQuickImport(kbygQuickImportPaste)
       const { next, appliedKeys } = mergeKbygQuickImportPatch(prev, patch)
       queueMicrotask(() => {
-        setKbygQuickImportFeedback(formatQuickImportFeedback(appliedKeys, tKbyg))
+        setKbygQuickImportFeedback(formatQuickImportFeedback(appliedKeys, tKbyg, meta))
       })
       return next
     })
@@ -2879,7 +2879,7 @@ export default function App() {
                 </button>
               </div>
               {kbygQuickImportFeedback ? (
-                <p className="form-hint" role="status" aria-live="polite">
+                <p className="form-hint" role="status" aria-live="polite" style={{ whiteSpace: 'pre-line' }}>
                   {kbygQuickImportFeedback}
                 </p>
               ) : null}
