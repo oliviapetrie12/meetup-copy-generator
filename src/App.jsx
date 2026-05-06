@@ -45,6 +45,7 @@ import { renderEventPagePlainMarkdown } from './channels/eventPagePlain.js'
 import { renderKbygEmailHtml, renderKbygEmailPlain } from './channels/kbygEmail.js'
 import { KBYG_TLDR_ITEM_ORDER, getInitialKbygTldrInclude } from './kbygTldr.js'
 import {
+  computeArrivalTimeSuggestion,
   formatQuickImportFeedback,
   mergeKbygQuickImportPatch,
   parseKbygQuickImport,
@@ -1847,8 +1848,16 @@ export default function App() {
     setKbygForm((prev) => {
       const { patch, meta } = parseKbygQuickImport(kbygQuickImportPaste)
       const { next, appliedKeys } = mergeKbygQuickImportPatch(prev, patch)
+      const eventTimeResolved = (next.eventTime || '').trim() || (prev.eventTime || '').trim()
+      const arrivalResolved = (next.arrivalTime || '').trim() || (prev.arrivalTime || '').trim()
+      /** @type {{ arrivalTimeSuggestion?: string }} */
+      const suggestions = {}
+      if (eventTimeResolved && !arrivalResolved) {
+        const s = computeArrivalTimeSuggestion(eventTimeResolved)
+        if (s) suggestions.arrivalTimeSuggestion = s
+      }
       queueMicrotask(() => {
-        setKbygQuickImportFeedback(formatQuickImportFeedback(appliedKeys, tKbyg, meta))
+        setKbygQuickImportFeedback(formatQuickImportFeedback(appliedKeys, tKbyg, meta, suggestions))
       })
       return next
     })

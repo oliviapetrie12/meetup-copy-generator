@@ -1,8 +1,8 @@
+import { getInitialKbygTldrInclude } from './kbygTldr.js'
+
 /**
- * Confidence-based Quick Import parser for KBYG forms.
- * Helpers: address/venue signals, splitVenueAndAddress (high-confidence only),
- * isParkingLine / isParkingContent, isArrivalInstructionLine, calculateConfidence,
- * normalizeWhitespace, extractDate / extractStartTime / extractArrivalTime.
+ * Section-aware, confidence-based Quick Import parser for KBYG forms.
+ * Flow: detectSections → section-specific extraction + conservative fallbacks.
  * Never fills eventTitle. Merge only writes empty string fields.
  */
 
@@ -34,6 +34,9 @@ export const KBYG_QUICK_IMPORT_I18N_KEYS = {
   parkingNotes: 'kbyg_parkingLabel',
   speakerArrivalNote: 'kbyg_speakerArrival',
   internalAgenda: 'kbyg_internalAgenda',
+  additionalNotes: 'kbyg_additionalNotes',
+  foodDetails: 'kbyg_food',
+  drinkDetails: 'kbyg_drink',
 }
 
 export const KBYG_QUICK_IMPORT_FIELD_LABELS = {
@@ -47,6 +50,9 @@ export const KBYG_QUICK_IMPORT_FIELD_LABELS = {
   parkingNotes: 'Parking',
   speakerArrivalNote: 'Speaker arrival',
   internalAgenda: 'Agenda',
+  additionalNotes: 'Additional notes',
+  foodDetails: 'Food details',
+  drinkDetails: 'Drink details',
 }
 
 /**
@@ -61,6 +67,10 @@ export const KBYG_QUICK_IMPORT_FIELD_LABELS = {
  *   internalAgenda?: string
  *   meetupLink?: string
  *   lumaLink?: string
+ *   additionalNotes?: string
+ *   foodDetails?: string
+ *   drinkDetails?: string
+ *   kbygTldrInclude?: Partial<Record<string, boolean>>
  * }} KbygQuickImportPatch */
 
 /**
@@ -70,10 +80,16 @@ export const KBYG_QUICK_IMPORT_FIELD_LABELS = {
  *   parkingSectionSeen: boolean
  *   parkingKeywordLinesSeen: boolean
  *   parkingFilled: boolean
+ *   rsvpSectionSeen: boolean
+ *   rsvpFilled: boolean
+ *   foodSignalsSeen: boolean
+ *   foodFilled: boolean
+ *   needsReview: string[]
+ *   internal?: { hostGuess?: string, coHostGuess?: string }
  * }} QuickImportParseMeta
  */
 
-// --- Normalization & emoji -------------------------------------------------
+// --- Normalization ---------------------------------------------------------
 
 export function normalizeWhitespace(s) {
   if (s == null || typeof s !== 'string') return ''
@@ -90,10 +106,173 @@ export function normalizeWhitespace(s) {
   return t.trim()
 }
 
+/** Typographic quotes and bullets → ASCII for predictable downstream matching */
+export function normalizePunctuation(s) {
+  return String(s || '')
+    .replace(/[\u2018\u2019\u0060\u00B4]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/\u2026/g, '...')
+    .replace(/[\u2022\u2023\u25E6\u2043]/g, '•')
+}
+
+/**
+ * Agenda: unicode dashes, am/pm casing, bullet cleanup, spacing.
+ * @param {string} text
+ */
+export function normalizeAgenda(text) {
+  let t = String(text || '').replace(/\r\n/g, '\n')
+  t = normalizePunctuation(t)
+  t = t.replace(/[\u2013\u2014\u2212]/g, ' – ')
+  t = t.replace(/\s*-\s*-\s*/g, ' – ')
+  const lines = t.split('\n').map((line) => {
+    let L = line.trimEnd()
+    L = L.replace(/^\s*[-*•·]\s*/, '- ')
+    L = L.replace(/\b(\d{1,2}:\d{2})\s*[-–—]\s*(\d{1,2}:\d{2})\s*([ap])\.?\s*m\.?\b/gi, (_, a, b, ap) => {
+      const suf = ap.toUpperCase() === 'A' ? 'AM' : 'PM'
+      return `${a} – ${b} ${suf}`
+    })
+    L = L.replace(/\b(\d{1,2}:\d{2})\s*([ap])\.?\s*m\.?\b/gi, (_, time, ap) => {
+      const suf = ap.toUpperCase() === 'A' ? 'AM' : 'PM'
+      return `${time} ${suf}`
+    })
+    return L
+  })
+  return normalizeWhitespace(lines.join('\n'))
+}
+
+export function normalizeParkingBlock(s) {
+  return normalizeWhitespace(normalizePunctuation(String(s || '')))
+}
+
 export function stripEmojiPrefix(s) {
   return String(s || '')
     .replace(/^[\s\uFE0F\u200d]*([\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]+[\s\uFE0F]*)+/gu, '')
     .trim()
+}
+
+// --- Section detection ------------------------------------------------------
+
+const LABELED_ARRIVAL_BODY_STOP =
+  /^(?:📍|🅿|🗓|📅|📝|📋|📌)?\s*(location|venue|parking|address|where\b|date\s*(?:and\s*)?time|when\b|agenda|schedule|program|meetup|rsvp|registration)\b/i
+
+/**
+ * @typedef {{ id: string, matchers: RegExp[] }} SectionRule
+ */
+
+/** @type {SectionRule[]} Order: more specific headings before loose ones */
+const SECTION_RULES = [
+  {
+    id: 'datetime',
+    matchers: [/^(?:📅|🗓)?\s*date\s*(?:and\s*)?time/i, /^when\b/i, /^event\s+time/i],
+  },
+  {
+    id: 'agenda',
+    matchers: [/^(?:📝|📋)?\s*agenda\b/i, /^schedule\b/i, /^program\b/i, /^talks?\b/i],
+  },
+  {
+    id: 'location',
+    matchers: [/^(?:📍)?\s*location\b/i, /^venue\b/i, /^where\b/i, /^address\b/i],
+  },
+  {
+    id: 'parking',
+    matchers: [/^(?:🅿|🚗)?\s*parking\b/i, /^where\s+to\s+park/i],
+  },
+  {
+    id: 'rsvp',
+    matchers: [
+      /^(?:📌|🎯|✅)?\s*rsvp\b/i,
+      /^rsvp\s+instructions/i,
+      /^registration\s+instructions/i,
+      /^registration\s+required\b/i,
+      /^(?:📝)?\s*registration\s+instructions?\b/i,
+    ],
+  },
+  {
+    id: 'arrival',
+    matchers: [
+      /^(?:🔑|🚪)?\s*arrival\s+instructions?\s*:?/i,
+      /^check-in\s+instructions?\s*:?/i,
+      /^check-in\s*:/i,
+    ],
+  },
+]
+
+function matchSectionHeader(normLine) {
+  const n = normLine
+  for (const rule of SECTION_RULES) {
+    for (const rx of rule.matchers) {
+      const head = n.split(':')[0]
+      if (rx.test(head.trim()) || rx.test(n)) return rule
+    }
+  }
+  return null
+}
+
+/**
+ * Step 1: split paste into labeled sections + preamble (lines before any heading).
+ * @returns {{ byId: Record<string, string>, preamble: string, ordered: { id: string, body: string }[] }}
+ */
+export function detectSections(rawText) {
+  const text = String(rawText || '').replace(/\r\n/g, '\n')
+  const lines = text.split('\n').map((l) => l.replace(/\s+$/, ''))
+  const normLine = (l) =>
+    l
+      .replace(/^#{1,6}\s+/, '')
+      .replace(/^\*\*\s*|\s*\*\*$/g, '')
+      .trim()
+
+  /** @type {Record<string, string>} */
+  const byId = {}
+  let i = 0
+  /** @type {string[]} */
+  const preambleLines = []
+
+  while (i < lines.length) {
+    const rawLine = lines[i]
+    const n = normLine(rawLine)
+    if (!n) {
+      i += 1
+      continue
+    }
+    const rule = matchSectionHeader(n)
+    if (!rule) {
+      preambleLines.push(lines[i])
+      i += 1
+      continue
+    }
+
+    const restInline = n.includes(':') ? n.replace(/^[^:]+:\s*/, '').trim() : ''
+    const buf = []
+    if (restInline) buf.push(restInline)
+    i += 1
+    while (i < lines.length) {
+      const nextRaw = lines[i]
+      const nn = normLine(nextRaw)
+      if (!nn) {
+        i += 1
+        continue
+      }
+      if (matchSectionHeader(nn)) break
+      if (rule.id === 'arrival' && LABELED_ARRIVAL_BODY_STOP.test(nn)) break
+      buf.push(lines[i])
+      i += 1
+    }
+    const body = buf.join('\n').trim()
+    if (body) {
+      byId[rule.id] = byId[rule.id] ? `${byId[rule.id]}\n\n${body}` : body
+      quickImportDebug({
+        phase: 'section',
+        line: rule.id,
+        type: 'section_block',
+        field: rule.id,
+        detail: body.slice(0, 60),
+      })
+    }
+  }
+
+  const preamble = preambleLines.join('\n').trim()
+  const ordered = Object.entries(byId).map(([id, body]) => ({ id, body }))
+  return { byId, preamble, ordered }
 }
 
 // --- Address / venue signals -----------------------------------------------
@@ -114,7 +293,6 @@ export function hasAddressSignals(s) {
   return false
 }
 
-/** RHS of "Name - …" must show address-like signals (looser than full line). */
 export function rhsHasAddressIndicators(s) {
   const t = stripEmojiPrefix(String(s || ''))
   if (!t) return false
@@ -145,7 +323,6 @@ export function isAddressLine(s) {
   return hasAddressSignals(t)
 }
 
-/** Short label suitable for venue name (not an address line). */
 export function looksLikeVenueName(s) {
   const t = stripEmojiPrefix(String(s || '').trim())
   if (!t || t.length > 100) return false
@@ -156,9 +333,8 @@ export function looksLikeVenueName(s) {
 }
 
 /**
- * Confidence for venue split: high → safe to fill; medium/low → skip auto-fill.
- * @param {'venueSplit'} type
- * @param {{ left: string, right: string }} ctx
+ * @param {'venueSplit'|'parkingBlock'|'parkingKeywords'|'rsvpBlock'|'foodMention'|'cohostHint'} type
+ * @param {Record<string, unknown>} ctx
  * @returns {'high' | 'medium' | 'low'}
  */
 export function calculateConfidence(type, ctx) {
@@ -182,13 +358,34 @@ export function calculateConfidence(type, ctx) {
   if (type === 'parkingKeywords') {
     return ctx.lineCount >= 1 ? 'medium' : 'low'
   }
+  if (type === 'rsvpBlock') {
+    const b = normalizeWhitespace(String(ctx.body || ''))
+    if (b.length < 10) return 'low'
+    let score = 0
+    if (/\brsvp\b/i.test(b)) score += 2
+    if (/\bregister(?:ation)?\b/i.test(b)) score += 1
+    if (/\bregistration\s+required\b/i.test(b)) score += 2
+    if (/\bplease\s+provide\s+your\s+email\b/i.test(b)) score += 2
+    if (/\bplease\s+rsvp\b/i.test(b)) score += 2
+    if (/\b(?:meetup|luma|eventbrite)\b/i.test(b)) score += 1
+    return score >= 2 ? 'high' : score === 1 ? 'medium' : 'low'
+  }
+  if (type === 'foodMention') {
+    const line = String(ctx.line || '')
+    if (/\b(?:pizza|catering|refreshments|breakfast|lunch|dinner|snacks)\b/i.test(line)) return 'high'
+    if (/\b(?:food|drinks?)\s+(?:will\s+be|are|provided|served)\b/i.test(line)) return 'high'
+    if (/\b(?:complimentary)\s+(?:food|drinks?|refreshments)\b/i.test(line)) return 'high'
+    return 'low'
+  }
+  if (type === 'cohostHint') {
+    const line = String(ctx.line || '')
+    if (/thank\s+you\s+to\s+.+\s+for\s+hosting/i.test(line)) return 'high'
+    if (/\bco-?host/i.test(line)) return 'medium'
+    return 'low'
+  }
   return 'medium'
 }
 
-/**
- * Split "Venue - address" on first spaced hyphen (ASCII or en/em dash).
- * Returns null unless confidence is high.
- */
 export function splitVenueAndAddress(line) {
   const trimmed = String(line || '').trim()
   let idx = trimmed.indexOf(' - ')
@@ -212,7 +409,7 @@ export function splitVenueAndAddress(line) {
   }
 }
 
-// --- Arrival prose (never goes to address) ---------------------------------
+// --- Arrival prose ---------------------------------------------------------
 
 export function isArrivalInstructionLine(line) {
   const raw = String(line || '').trim()
@@ -251,6 +448,62 @@ export function isParkingContent(block) {
   if (PARKING_KEYWORD_RE.test(s)) return true
   if (/\b(?:park|parking|garage|lot|stall|spot)\b/i.test(s) && s.length >= 12) return true
   return false
+}
+
+// --- RSVP (high-confidence phrases) ---------------------------------------
+
+const RSVP_INLINE_RE =
+  /\b(?:please\s+provide\s+your\s+email\s+when\s+you\s+register|please\s+rsvp\s+using|registration\s+required|rsvp\s+on\s+meetup)\b/i
+
+export function isRsvpInstructionLine(line) {
+  const s = String(line || '').trim()
+  if (!s) return false
+  if (RSVP_INLINE_RE.test(s)) return true
+  if (/^rsvp\s*:/i.test(s)) return true
+  return false
+}
+
+// --- Food / drinks ---------------------------------------------------------
+
+const DRINK_WORD_RE = /\b(?:beer|wine|coffee|soda|soft\s+drinks?|beverages)\b/i
+
+export function extractFoodDrinkSnippet(line) {
+  const raw = String(line || '').trim()
+  if (!raw) return null
+  const conf = calculateConfidence('foodMention', { line: raw })
+  if (conf !== 'high') return null
+  return normalizeWhitespace(raw.replace(/^[-*•]\s*/, ''))
+}
+
+// --- Host / co-host (metadata only + needs-review flag) --------------------
+
+/**
+ * @returns {{ hostGuess?: string, coHostGuess?: string, needsReviewCohost: boolean }}
+ */
+export function extractHostMetadata(text) {
+  const blob = String(text || '').slice(0, 10000)
+  let hostGuess
+  let coHostGuess
+  let needsReviewCohost = false
+
+  const hosting = blob.match(/thank\s+you\s+to\s+(.+?)\s+for\s+hosting/i)
+  if (hosting) {
+    hostGuess = stripEmojiPrefix(hosting[1].trim()).replace(/\s+/g, ' ')
+    if (/\s+and\s+/i.test(hostGuess)) needsReviewCohost = true
+  }
+
+  const co = blob.match(/\bco-?hosted\s+by\s+(.+?)(?:\.|$)/i)
+  if (co) coHostGuess = stripEmojiPrefix(co[1].trim()).replace(/\s+/g, ' ')
+
+  const dual = blob.match(
+    /\b([A-Z][\w.&\s-]{2,60}?)\s+and\s+([A-Z][\w.&\s-]{2,60}?)\s+(?:present|host|co-host)/i,
+  )
+  if (dual && calculateConfidence('cohostHint', { line: dual[0] }) !== 'low') {
+    needsReviewCohost = true
+    if (!coHostGuess) coHostGuess = `${dual[1].trim()} / ${dual[2].trim()}`
+  }
+
+  return { hostGuess, coHostGuess, needsReviewCohost }
 }
 
 // --- Date / time extraction ------------------------------------------------
@@ -317,13 +570,52 @@ export function extractArrivalTime(text) {
   return ''
 }
 
-// --- Section bodies --------------------------------------------------------
+/**
+ * Suggest "arrive 30 minutes before start" for feedback only (caller does not merge by default).
+ * @param {string} eventTimeStr e.g. "5:30 PM"
+ * @returns {string | null}
+ */
+export function computeArrivalTimeSuggestion(eventTimeStr) {
+  const s = String(eventTimeStr || '').trim()
+  if (!s) return null
+  let m = s.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i)
+  if (!m) {
+    m = s.match(/(\d{1,2}):(\d{2})\s*([ap])\.?m\.?/i)
+    if (!m) return null
+  }
+  let hh = parseInt(m[1], 10)
+  const mi = parseInt(m[2], 10)
+  let ap = (m[3] || '').replace(/\./g, '').toUpperCase()
+  if (ap === 'A' || ap === 'AM') ap = 'AM'
+  else if (ap === 'P' || ap === 'PM') ap = 'PM'
+  else if (m[3] && /pm/i.test(m[3])) ap = 'PM'
+  else if (m[3] && /am/i.test(m[3])) ap = 'AM'
+  else ap = hh >= 12 ? 'PM' : 'AM'
 
-const LABELED_ARRIVAL_BODY_STOP =
-  /^(?:📍|🅿|🗓|📅|📝|📋)?\s*(location|venue|parking|address|where\b|date\s*(?:and\s*)?time|when\b|agenda|schedule|program|meetup|food|drinks|notes?)\b/i
+  let mins =
+    ap === 'AM'
+      ? hh === 12
+        ? mi
+        : hh * 60 + mi
+      : hh === 12
+        ? 12 * 60 + mi
+        : (hh + 12) * 60 + mi
 
-function parseVenueSectionBody(block, mark, meta) {
-  meta.venueSectionSeen = true
+  mins -= 30
+  if (mins < 0) mins += 24 * 60
+
+  const h24 = Math.floor(mins / 60)
+  const rem = mins % 60
+  const outAp = h24 >= 12 ? 'PM' : 'AM'
+  let h12 = h24 % 12
+  if (h12 === 0) h12 = 12
+  return `${h12}:${String(rem).padStart(2, '0')} ${outAp}`
+}
+
+// --- Venue section body ----------------------------------------------------
+
+function parseVenueSectionBody(block, mark, meta, countAsLabeledSection = true) {
+  if (countAsLabeledSection) meta.venueSectionSeen = true
   let venueName = ''
   const addressParts = []
 
@@ -362,15 +654,6 @@ function parseVenueSectionBody(block, mark, meta) {
   }
 }
 
-function normalizeAgendaText(s) {
-  return normalizeWhitespace(s)
-    .split('\n')
-    .map((l) => l.trimEnd())
-    .join('\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
-}
-
 function applyDateTimeFromBlock(block, mark) {
   const d = extractDate(block)
   const t = extractStartTime(block)
@@ -378,6 +661,24 @@ function applyDateTimeFromBlock(block, mark) {
   if (d) mark('eventDate', d)
   if (t) mark('eventTime', t)
   if (arr) mark('arrivalTime', arr)
+}
+
+function applyRsvpSection(body, mark, meta) {
+  meta.rsvpSectionSeen = true
+  const norm = normalizeWhitespace(body)
+  const conf = calculateConfidence('rsvpBlock', { body: norm })
+  if (conf !== 'high') return
+  if (norm) {
+    mark('additionalNotes', norm)
+    meta.rsvpFilled = true
+  }
+}
+
+function preambleLooksLikeVenue(preamble) {
+  const p = String(preamble || '').trim()
+  if (!p) return false
+  if (splitVenueAndAddress(p.split('\n')[0]?.trim() || '')) return true
+  return p.split('\n').some((ln) => isAddressLine(ln) || looksLikeVenueName(ln))
 }
 
 /**
@@ -393,6 +694,12 @@ export function parseKbygQuickImport(raw) {
     parkingSectionSeen: false,
     parkingKeywordLinesSeen: false,
     parkingFilled: false,
+    rsvpSectionSeen: false,
+    rsvpFilled: false,
+    foodSignalsSeen: false,
+    foodFilled: false,
+    needsReview: [],
+    internal: {},
   }
 
   if (!text.trim()) {
@@ -401,6 +708,7 @@ export function parseKbygQuickImport(raw) {
 
   /** @type {KbygQuickImportPatch} */
   const patch = {}
+
   /** @type {string[]} */
   const labels = []
 
@@ -408,12 +716,31 @@ export function parseKbygQuickImport(raw) {
 
   const mark = (key, value) => {
     if (disabled.has(key)) return
+    if (key === 'kbygTldrInclude' && value && typeof value === 'object') {
+      const cur = { ...(patch.kbygTldrInclude || {}) }
+      for (const [k, v] of Object.entries(value)) {
+        if (v === true) cur[k] = true
+      }
+      patch.kbygTldrInclude = cur
+      return
+    }
     const v = typeof value === 'string' ? value.trim() : ''
     if (!v || patch[key]) return
     patch[key] = v
     const label = KBYG_QUICK_IMPORT_FIELD_LABELS[key]
     if (label) labels.push(label)
     quickImportDebug({ phase: 'mark', field: key, detail: v.slice(0, 80) })
+  }
+
+  const markTldr = (partial) => {
+    if (!partial || typeof partial !== 'object') return
+    const cur = patch.kbygTldrInclude || {}
+    /** @type {Record<string, boolean>} */
+    const next = { ...cur }
+    for (const [k, v] of Object.entries(partial)) {
+      if (v === true) next[k] = true
+    }
+    patch.kbygTldrInclude = next
   }
 
   const urls = []
@@ -426,120 +753,30 @@ export function parseKbygQuickImport(raw) {
   if (meetup) mark('meetupLink', meetup)
   if (luma) mark('lumaLink', luma)
 
-  const lines = text.split('\n').map((l) => l.replace(/\s+$/, ''))
-  const normLine = (l) =>
-    l
-      .replace(/^#{1,3}\s+/, '')
-      .replace(/^\*\*\s*|\s*\*\*$/g, '')
-      .trim()
+  const { byId: sections, preamble } = detectSections(text)
 
-  const headerMatchers = [
-    {
-      keys: [/^(?:📅|🗓)?\s*date\s*(?:and\s*)?time/i, /^when\b/i, /^event\s+time/i],
-      assign: 'datetime',
-    },
-    { keys: [/^(?:📝|📋)?\s*agenda\b/i, /^schedule\b/i, /^program\b/i, /^talks?\b/i], assign: 'agenda' },
-    {
-      keys: [/^(?:📍)?\s*location\b/i, /^venue\b/i, /^where\b/i, /^address\b/i],
-      assign: 'venue',
-    },
-    { keys: [/^(?:🅿|🚗)?\s*parking\b/i, /^where\s+to\s+park/i], assign: 'parking' },
-    {
-      keys: [
-        /^arrival\s+instructions?\s*:?/i,
-        /^check-in\s+instructions?\s*:?/i,
-        /^check-in\s*:/i,
-      ],
-      assign: 'arrivalLabeled',
-    },
-  ]
-
-  /** @type {Record<string, string>} */
-  const sections = {}
-  let i = 0
-  while (i < lines.length) {
-    const rawLine = lines[i]
-    const line = normLine(rawLine)
-    if (!line) {
-      i += 1
-      continue
-    }
-
-    let matched = false
-    for (const hm of headerMatchers) {
-      const hit = hm.keys.some((rx) => {
-        const head = line.split(':')[0]
-        return rx.test(head.trim()) || rx.test(line)
-      })
-      if (!hit) continue
-      matched = true
-      const restInline = line.includes(':') ? line.replace(/^[^:]+:\s*/, '').trim() : ''
-      const buf = []
-      if (restInline) buf.push(restInline)
-      i += 1
-      while (i < lines.length) {
-        const next = lines[i]
-        const n = normLine(next)
-        if (!n) {
-          i += 1
-          continue
-        }
-        const isNextHeader = headerMatchers.some((h) =>
-          h.keys.some((rx) => {
-            const head = n.split(':')[0]
-            return rx.test(head.trim()) || rx.test(n)
-          }),
-        )
-        if (isNextHeader) break
-        if (hm.assign === 'arrivalLabeled' && LABELED_ARRIVAL_BODY_STOP.test(n)) break
-        buf.push(lines[i])
-        i += 1
-      }
-      const body = buf.join('\n').trim()
-      if (body) sections[hm.assign] = sections[hm.assign] ? `${sections[hm.assign]}\n\n${body}` : body
-      quickImportDebug({
-        phase: 'section',
-        line: hm.assign,
-        type: 'section_block',
-        field: hm.assign,
-        detail: body.slice(0, 60),
-      })
-      break
-    }
-    if (!matched) i += 1
+  if (sections.location) {
+    parseVenueSectionBody(sections.location, mark, meta, true)
+  } else if (preambleLooksLikeVenue(preamble)) {
+    parseVenueSectionBody(preamble, mark, meta, false)
   }
 
   if (sections.datetime) applyDateTimeFromBlock(sections.datetime, mark)
 
-  if (sections.venue) {
-    parseVenueSectionBody(sections.venue, mark, meta)
-  }
-
   if (sections.parking) {
     meta.parkingSectionSeen = true
-    const norm = normalizeWhitespace(sections.parking)
+    const norm = normalizeParkingBlock(sections.parking)
     const conf = calculateConfidence('parkingBlock', { body: norm })
-    if (conf === 'high' || conf === 'medium') {
+    if (conf === 'high') {
       mark('parkingNotes', norm)
       meta.parkingFilled = true
+      markTldr({ parking: true })
     }
   }
 
-  const keywordParkingLines = lines
-    .map((l) => normLine(l))
-    .filter((l) => l && isParkingLine(l))
-  if (keywordParkingLines.length > 0) {
-    meta.parkingKeywordLinesSeen = true
-    const conf = calculateConfidence('parkingKeywords', { lineCount: keywordParkingLines.length })
-    if (!patch.parkingNotes && (conf === 'high' || conf === 'medium')) {
-      mark('parkingNotes', normalizeWhitespace(keywordParkingLines.join('\n')))
-      meta.parkingFilled = true
-    }
-  }
-
-  if (sections.arrivalLabeled) {
+  if (sections.arrival) {
     const prose = normalizeWhitespace(
-      sections.arrivalLabeled
+      sections.arrival
         .split('\n')
         .map((ln) => stripEmojiPrefix(ln.trim()))
         .filter(Boolean)
@@ -548,12 +785,45 @@ export function parseKbygQuickImport(raw) {
     if (prose) mark('speakerArrivalNote', prose)
   }
 
-  if (sections.agenda) mark('internalAgenda', normalizeAgendaText(sections.agenda))
+  if (sections.agenda) {
+    mark('internalAgenda', normalizeAgenda(sections.agenda))
+    applyFoodSignalsFromBlock(sections.agenda, mark, meta, patch, markTldr)
+  }
+
+  if (sections.rsvp) {
+    applyRsvpSection(sections.rsvp, mark, meta)
+  }
+
+  const lines = text.split('\n').map((l) => l.replace(/\s+$/, ''))
+  const normLine = (l) =>
+    l
+      .replace(/^#{1,6}\s+/, '')
+      .replace(/^\*\*\s*|\s*\*\*$/g, '')
+      .trim()
+
+  const keywordParkingLines = lines
+    .map((l) => normLine(l))
+    .filter((l) => l && isParkingLine(l))
+  if (keywordParkingLines.length > 0) {
+    meta.parkingKeywordLinesSeen = true
+    const conf = calculateConfidence('parkingKeywords', { lineCount: keywordParkingLines.length })
+    if (!patch.parkingNotes && (conf === 'high' || conf === 'medium')) {
+      mark('parkingNotes', normalizeParkingBlock(keywordParkingLines.join('\n')))
+      meta.parkingFilled = true
+      markTldr({ parking: true })
+    }
+  }
+
+  const hostMeta = extractHostMetadata(text)
+  if (hostMeta.hostGuess || hostMeta.coHostGuess) {
+    meta.internal = { hostGuess: hostMeta.hostGuess, coHostGuess: hostMeta.coHostGuess }
+  }
+  if (hostMeta.needsReviewCohost) meta.needsReview.push('cohost')
 
   if (!patch.arrivalTime) {
     const fromAgenda = sections.agenda ? extractArrivalTime(sections.agenda) : ''
     const fromBlob = extractArrivalTime(text)
-    const pick = fromBlob || fromAgenda
+    const pick = fromAgenda || fromBlob
     if (pick) mark('arrivalTime', pick)
   }
 
@@ -582,10 +852,37 @@ export function parseKbygQuickImport(raw) {
       )
     })
     if (agendaLines.length >= 3) {
-      mark('internalAgenda', agendaLines.join('\n'))
+      mark('internalAgenda', normalizeAgenda(agendaLines.join('\n')))
       hints.push('Agenda detected from time-stamped lines')
     }
   }
+
+  if (!sections.agenda && preamble) {
+    applyFoodSignalsFromBlock(preamble, mark, meta, patch, markTldr)
+  }
+
+  if (!patch.additionalNotes && !sections.rsvp) {
+    const rsvpLines = lines
+      .map((l) => normLine(l))
+      .filter((l) => l && isRsvpInstructionLine(l))
+    if (rsvpLines.length) {
+      meta.rsvpSectionSeen = true
+      const joined = normalizeWhitespace(rsvpLines.join('\n'))
+      if (calculateConfidence('rsvpBlock', { body: joined }) === 'high') {
+        mark('additionalNotes', joined)
+        meta.rsvpFilled = true
+      }
+    }
+  }
+
+  if (meta.venueSectionSeen && !meta.venueFilled) meta.needsReview.push('venue_address')
+  if ((meta.parkingSectionSeen || meta.parkingKeywordLinesSeen) && !meta.parkingFilled) {
+    meta.needsReview.push('parking')
+  }
+  if (meta.rsvpSectionSeen && !meta.rsvpFilled) meta.needsReview.push('rsvp')
+
+  const dedupe = new Set(meta.needsReview)
+  meta.needsReview = [...dedupe]
 
   const seen = new Set()
   const filledLabels = labels.filter((l) => {
@@ -595,6 +892,31 @@ export function parseKbygQuickImport(raw) {
   })
 
   return { patch, filledLabels, hints, meta }
+}
+
+/**
+ * @param {KbygQuickImportPatch} patchRef
+ * @param {(p: Record<string, boolean>) => void} markTldr
+ */
+function applyFoodSignalsFromBlock(block, mark, meta, patchRef, markTldr) {
+  const lines = String(block || '').split('\n')
+  for (const raw of lines) {
+    const line = raw.trim()
+    if (!line) continue
+    meta.foodSignalsSeen = true
+    const snippet = extractFoodDrinkSnippet(line)
+    if (!snippet) continue
+    if (DRINK_WORD_RE.test(line) && !/\b(?:pizza|food|lunch|dinner|snacks|catering|refreshments)\b/i.test(line)) {
+      if (!patchRef.drinkDetails) {
+        mark('drinkDetails', snippet)
+        meta.foodFilled = true
+      }
+    } else if (!patchRef.foodDetails) {
+      mark('foodDetails', snippet)
+      meta.foodFilled = true
+    }
+  }
+  if (meta.foodFilled) markTldr({ food_drinks: true })
 }
 
 export function mergeKbygQuickImportPatch(prev, patch) {
@@ -607,6 +929,21 @@ export function mergeKbygQuickImportPatch(prev, patch) {
     if (disabled.has(key)) continue
     if (value == null || value === '') continue
     if (key === 'contacts') continue
+    if (key === 'kbygTldrInclude' && value && typeof value === 'object') {
+      const cur = { ...getInitialKbygTldrInclude(), ...(next.kbygTldrInclude || {}) }
+      let touched = false
+      for (const [k, v] of Object.entries(value)) {
+        if (v === true && !cur[k]) {
+          cur[k] = true
+          touched = true
+        }
+      }
+      if (touched) {
+        next.kbygTldrInclude = cur
+        appliedKeys.push('kbygTldrInclude')
+      }
+      continue
+    }
     const cur = next[key]
     if (typeof cur === 'string' && cur.trim() !== '') continue
     next[key] = value
@@ -625,29 +962,16 @@ export function mergeKbygQuickImportPatch(prev, patch) {
  * @param {string[]} appliedKeys
  * @param {Record<string, string>} t
  * @param {QuickImportParseMeta} [meta]
+ * @param {{ arrivalTimeSuggestion?: string }} [suggestions]
  */
-export function formatQuickImportFeedback(appliedKeys, t, meta) {
-  if (!appliedKeys || appliedKeys.length === 0) return t.kbyg_quickImportNothing
+export function formatQuickImportFeedback(appliedKeys, t, meta, suggestions) {
+  const sug = suggestions?.arrivalTimeSuggestion
 
-  const check = t.kbyg_quickImportFeedbackCheck
-  const set = new Set(appliedKeys)
-  const hasLinks = set.has('meetupLink') || set.has('lumaLink')
+  const warn = t.kbyg_quickImportFeedbackWarn || '⚠'
+  const parsedLines = buildParsedLines(appliedKeys, t)
+  const needsReviewLines = buildNeedsReviewLines(meta, t, warn)
 
-  /** @type {string[]} */
-  const parsedLines = []
-  if (set.has('eventDate')) parsedLines.push(`${check} ${t.kbyg_quickImportFb_date}`)
-  if (set.has('eventTime')) parsedLines.push(`${check} ${t.kbyg_quickImportFb_time}`)
-  if (set.has('venueName') || set.has('venueAddress')) parsedLines.push(`${check} ${t.kbyg_quickImportFb_venue}`)
-  if (set.has('internalAgenda')) parsedLines.push(`${check} ${t.kbyg_quickImportFb_agenda}`)
-  if (hasLinks) parsedLines.push(`${check} ${t.kbyg_quickImportFb_eventLinks}`)
-  if (set.has('parkingNotes')) parsedLines.push(`${check} ${t.kbyg_quickImportFb_parking}`)
-  if (set.has('speakerArrivalNote')) parsedLines.push(`${check} ${t.kbyg_quickImportFb_arrivalInstructions}`)
-  if (set.has('arrivalTime')) parsedLines.push(`${check} ${t.kbyg_quickImportFb_arrivalTime}`)
-
-  /** @type {string[]} */
-  const skippedLines = []
-  skippedLines.push(`- ${t.kbyg_quickImportFb_eventTitle}: ${t.kbyg_quickImportReason_manualOnly}`)
-
+  const skippedLines = [`- ${t.kbyg_quickImportFb_eventTitle}: ${t.kbyg_quickImportReason_manualOnly}`]
   if (meta) {
     if (meta.venueSectionSeen && !meta.venueFilled) {
       skippedLines.push(`- ${t.kbyg_quickImportFb_venue}: ${t.kbyg_quickImportReason_lowConfidence}`)
@@ -657,7 +981,66 @@ export function formatQuickImportFeedback(appliedKeys, t, meta) {
     }
   }
 
-  const parsedBlock = `${t.kbyg_quickImportFeedbackParsedHeader}\n${parsedLines.join('\n')}`
-  const skippedBlock = `${t.kbyg_quickImportFeedbackSkippedHeader}\n${skippedLines.join('\n')}`
-  return `${parsedBlock}\n\n${skippedBlock}`
+  /** @type {string[]} */
+  const blocks = []
+  const nothingElse =
+    (!appliedKeys || appliedKeys.length === 0) &&
+    !parsedLines.length &&
+    (!needsReviewLines || needsReviewLines.length === 0) &&
+    !sug
+  if (nothingElse) {
+    blocks.push(t.kbyg_quickImportNothing)
+  } else if (parsedLines.length) {
+    blocks.push(`${t.kbyg_quickImportFeedbackSuccessHeader}\n${parsedLines.join('\n')}`)
+  }
+  if (needsReviewLines.length) {
+    blocks.push(`${t.kbyg_quickImportFeedbackNeedsReviewHeader}\n${needsReviewLines.join('\n')}`)
+  }
+  if (sug) {
+    const sugLine = t.kbyg_quickImportSuggestionArrival.replace('{{time}}', sug)
+    blocks.push(`${t.kbyg_quickImportSuggestionHeader}\n${warn} ${sugLine}`)
+  }
+  blocks.push(`${t.kbyg_quickImportFeedbackSkippedHeader}\n${skippedLines.join('\n')}`)
+  return blocks.filter(Boolean).join('\n\n')
+}
+
+/**
+ * @param {string[]} appliedKeys
+ * @param {Record<string, string>} t
+ */
+function buildParsedLines(appliedKeys, t) {
+  const set = new Set(appliedKeys || [])
+  const check = t.kbyg_quickImportFeedbackCheck
+  /** @type {string[]} */
+  const parsedLines = []
+  if (set.has('eventDate')) parsedLines.push(`${check} ${t.kbyg_quickImportFb_date}`)
+  if (set.has('eventTime')) parsedLines.push(`${check} ${t.kbyg_quickImportFb_time}`)
+  if (set.has('venueName') || set.has('venueAddress')) parsedLines.push(`${check} ${t.kbyg_quickImportFb_venue}`)
+  if (set.has('internalAgenda')) parsedLines.push(`${check} ${t.kbyg_quickImportFb_agenda}`)
+  const hasLinks = set.has('meetupLink') || set.has('lumaLink')
+  if (hasLinks) parsedLines.push(`${check} ${t.kbyg_quickImportFb_eventLinks}`)
+  if (set.has('parkingNotes')) parsedLines.push(`${check} ${t.kbyg_quickImportFb_parking}`)
+  if (set.has('speakerArrivalNote')) parsedLines.push(`${check} ${t.kbyg_quickImportFb_arrivalInstructions}`)
+  if (set.has('arrivalTime')) parsedLines.push(`${check} ${t.kbyg_quickImportFb_arrivalTime}`)
+  if (set.has('additionalNotes')) parsedLines.push(`${check} ${t.kbyg_quickImportFb_rsvpNotes}`)
+  if (set.has('foodDetails') || set.has('drinkDetails')) parsedLines.push(`${check} ${t.kbyg_quickImportFb_foodDrinks}`)
+  if (set.has('kbygTldrInclude')) parsedLines.push(`${check} ${t.kbyg_quickImportFb_tldrCallouts}`)
+  return parsedLines
+}
+
+/**
+ * @param {QuickImportParseMeta | undefined} meta
+ * @param {Record<string, string>} t
+ */
+function buildNeedsReviewLines(meta, t, warn) {
+  if (!meta) return []
+  if (!meta.needsReview?.length) return []
+  /** @type {string[]} */
+  const out = []
+  const nr = new Set(meta.needsReview || [])
+  if (nr.has('venue_address')) out.push(`${warn} ${t.kbyg_quickImportNr_venue}`)
+  if (nr.has('parking')) out.push(`${warn} ${t.kbyg_quickImportNr_parking}`)
+  if (nr.has('rsvp')) out.push(`${warn} ${t.kbyg_quickImportNr_rsvp}`)
+  if (nr.has('cohost')) out.push(`${warn} ${t.kbyg_quickImportNr_cohost}`)
+  return out
 }
