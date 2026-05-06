@@ -3319,7 +3319,10 @@ export default function App() {
                       </div>
                     )}
                     {kbygEmailHtml ? (
-                      <div className="meetup-page-preview output-text" dangerouslySetInnerHTML={{ __html: kbygEmailHtml }} />
+                      <div
+                        className="meetup-page-preview kbyg-email-html-preview"
+                        dangerouslySetInnerHTML={{ __html: kbygEmailHtml }}
+                      />
                     ) : (
                       <pre className="output-text">{generatedCopy}</pre>
                     )}

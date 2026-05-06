@@ -15,19 +15,9 @@ function kbygEmojisEnabled(form, opts) {
   return form?.kbygEmojiHeaders !== false
 }
 
-const KBYG_LINK_INLINE_STYLE = 'color:#1D4ED8;text-decoration:underline;'
-
-/**
- * Minimal list styles for email clients: nested block tags inside &lt;li&gt; (e.g. &lt;p&gt;) often paste into Gmail/Docs
- * with doubled spacing; keep bullets as inline text where possible.
- */
-const KBYG_EMAIL_UL_STYLE =
-  'margin:8px 0 0;padding:0 0 0 20px;list-style-type:disc;'
-const KBYG_EMAIL_LI_STYLE = 'margin:0 0 4px;padding:0;line-height:1.45;'
-
-/** Clickable label only (no raw URL in the visible HTML). */
+/** Clickable label only (no raw URL in the visible HTML). Omit inline font/size styles so Gmail paste stays Normal / Sans Serif. */
 function kbygExternalLinkHtml(url, labelText) {
-  return `<a href="${escapeHtmlAttr(url)}" target="_blank" rel="noopener noreferrer" style="${KBYG_LINK_INLINE_STYLE}">${escapeHtml(labelText)}</a>`
+  return `<a href="${escapeHtmlAttr(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(labelText)}</a>`
 }
 
 /**
@@ -66,12 +56,11 @@ function buildKbygIntroParagraphText(S, eventData, trim) {
   return S.kbygIntroLead(t, whenLine, S.meetupFallbackTitle)
 }
 
+/** Semantic list only — no inline font-size/line-height so pasted HTML adopts Gmail “Normal” formatting. */
 function kbygHtmlUl(items) {
   if (!items.length) return ''
-  const lis = items
-    .map((t) => `<li style="${KBYG_EMAIL_LI_STYLE}">${t}</li>`)
-    .join('')
-  return `<ul style="${KBYG_EMAIL_UL_STYLE}">${lis}</ul>`
+  const lis = items.map((t) => `<li>${t}</li>`).join('')
+  return `<ul>${lis}</ul>`
 }
 
 /** @param {import('../shared/agendaItems.js').AgendaItem[]} items */
@@ -84,18 +73,18 @@ function buildKbygAgendaHtmlFromItems(items) {
         let inner = `<strong>${escapeHtml(it.time)}</strong>`
         if (it.title) inner += ` – ${escapeHtml(it.title)}`
         if (it.speaker) {
-          inner += ` — <span style="font-style:italic;color:#374151;">${escapeHtml(it.speaker)}</span>`
+          inner += ` — <em>${escapeHtml(it.speaker)}</em>`
         }
-        return `<li style="${KBYG_EMAIL_LI_STYLE}">${inner}</li>`
+        return `<li>${inner}</li>`
       }
       const text = [it.title, it.speaker].filter(Boolean).join(' — ')
       if (!text) return ''
-      return `<li style="${KBYG_EMAIL_LI_STYLE}">${escapeHtml(text)}</li>`
+      return `<li>${escapeHtml(text)}</li>`
     })
     .filter(Boolean)
     .join('')
   if (!lis) return ''
-  return `<ul style="${KBYG_EMAIL_UL_STYLE}">${lis}</ul>`
+  return `<ul>${lis}</ul>`
 }
 
 /**
@@ -130,11 +119,11 @@ function kbygLogisticsStandaloneBlocks(data, trim, S) {
   return blocks
 }
 
-/** One KBYG section: bold header + body paragraph(s); matches spacing of other sections. */
+/** One KBYG section: bold header + body paragraph(s). */
 function kbygStandaloneSectionHtml(sectionKey, titlePlain, bodyText, emojisEnabled) {
   const title = formatSectionHeader(sectionKey, titlePlain, emojisEnabled)
-  const inner = `<p style="margin:0;line-height:1.5;">${escapeHtml(bodyText).replace(/\n/g, '<br>')}</p>`
-  return `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(title)}</strong></p>${inner}</div>`
+  const inner = escapeHtml(bodyText).replace(/\n/g, '<br>')
+  return `<p><strong>${escapeHtml(title)}</strong></p><p>${inner}</p>`
 }
 
 /**
@@ -145,7 +134,7 @@ function kbygStandaloneBlockHtml(block, emojisEnabled) {
   const title = formatSectionHeader(block.sectionKey, block.title, emojisEnabled)
   if (block.bulletLines && block.bulletLines.length) {
     const items = block.bulletLines.map((line) => escapeHtml(line))
-    return `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(title)}</strong></p>${kbygHtmlUl(items)}</div>`
+    return `<p><strong>${escapeHtml(title)}</strong></p>${kbygHtmlUl(items)}`
   }
   return kbygStandaloneSectionHtml(block.sectionKey, block.title, block.body, emojisEnabled)
 }
@@ -196,26 +185,20 @@ function appendKbygEmailHtmlBody(chunks, ctx) {
       if (tldrBullets.length === 0) return
       const tldrItems = tldrBullets.map((i) => escapeHtml(i))
       const tldrTitle = formatSectionHeader('reminder', S.tldrHeading, emojisEnabled)
-      chunks.push(
-        `<div style="margin:0 0 16px;"><p style="margin:0 0 12px;line-height:1.5;"><span style="background-color:#fff3cd;padding:2px 6px;font-weight:bold;border-radius:3px;">${escapeHtml(tldrTitle)}</span></p>${kbygHtmlUl(tldrItems)}</div>`,
-      )
+      chunks.push(`<p><strong>${escapeHtml(tldrTitle)}</strong></p>${kbygHtmlUl(tldrItems)}`)
     },
     () => {
       const eventLinkItems = kbygEventPageLinkItemsHtml(form, trim, has, S)
       if (eventLinkItems.length === 0) return
       const eventPageTitle = formatSectionHeader('registration', S.eventPage, emojisEnabled)
-      chunks.push(
-        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(eventPageTitle)}</strong></p>${kbygHtmlUl(eventLinkItems)}</div>`,
-      )
+      chunks.push(`<p><strong>${escapeHtml(eventPageTitle)}</strong></p>${kbygHtmlUl(eventLinkItems)}`)
     },
     () => {
       const contactEntries = filterKbygContactEntries(form, has, trim)
       if (contactEntries.length === 0) return
       const contactItems = mapKbygContactLines(contactEntries, trim)
       const contactsTitle = formatSectionHeader('contact', S.htmlHelpfulContactsStrong, emojisEnabled)
-      chunks.push(
-        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(contactsTitle)}</strong></p>${kbygHtmlUl(contactItems)}</div>`,
-      )
+      chunks.push(`<p><strong>${escapeHtml(contactsTitle)}</strong></p>${kbygHtmlUl(contactItems)}`)
     },
     () => {
       for (const block of kbygLogisticsStandaloneBlocks(eventData, trim, S)) {
@@ -226,7 +209,7 @@ function appendKbygEmailHtmlBody(chunks, ctx) {
       if (!has(form.speakerArrivalNote)) return
       const arrivalTitle = formatSectionHeader('arrivalInstructions', S.htmlSpeakerArrivalStrong, emojisEnabled)
       chunks.push(
-        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(arrivalTitle)}</strong></p><p style="margin:0;line-height:1.5;">${escapeHtml(trim(form.speakerArrivalNote)).replace(/\n/g, '<br>')}</p></div>`,
+        `<p><strong>${escapeHtml(arrivalTitle)}</strong></p><p>${escapeHtml(trim(form.speakerArrivalNote)).replace(/\n/g, '<br>')}</p>`,
       )
     },
     () => {
@@ -234,18 +217,14 @@ function appendKbygEmailHtmlBody(chunks, ctx) {
       const photoLines = getMeetupKbygPhotoLines(opts.language)
       const photoItems = photoLines.map((line) => escapeHtml(line))
       const photosTitle = formatSectionHeader('photos', S.htmlTakePhotosStrong, emojisEnabled)
-      chunks.push(
-        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(photosTitle)}</strong></p>${kbygHtmlUl(photoItems)}</div>`,
-      )
+      chunks.push(`<p><strong>${escapeHtml(photosTitle)}</strong></p>${kbygHtmlUl(photoItems)}`)
     },
     () => {
       if (eventData.agenda.length === 0) return
       const agendaHtml = buildKbygAgendaHtmlFromItems(eventData.agenda)
       if (!agendaHtml) return
       const agendaTitle = formatSectionHeader('agenda', S.htmlAgendaStrong, emojisEnabled)
-      chunks.push(
-        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(agendaTitle)}</strong></p>${agendaHtml}</div>`,
-      )
+      chunks.push(`<p><strong>${escapeHtml(agendaTitle)}</strong></p>${agendaHtml}`)
     },
     () => {
       if (!has(form.setupNotes) && !has(form.swagNotes)) return
@@ -253,21 +232,15 @@ function appendKbygEmailHtmlBody(chunks, ctx) {
       if (has(form.setupNotes)) su.push(escapeHtml(trim(form.setupNotes)))
       if (has(form.swagNotes)) su.push(escapeHtml(trim(form.swagNotes)))
       const setupTitle = formatSectionHeader('swag', S.htmlSetupStrong, emojisEnabled)
-      chunks.push(
-        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(setupTitle)}</strong></p>${kbygHtmlUl(su)}</div>`,
-      )
+      chunks.push(`<p><strong>${escapeHtml(setupTitle)}</strong></p>${kbygHtmlUl(su)}`)
     },
     () => {
       if (!has(form.additionalNotes)) return
       const noteLines = trim(form.additionalNotes).split(/\n/).map((s) => s.trim()).filter(Boolean)
       if (noteLines.length === 0) return
-      const notesBlocks = noteLines
-        .map((line) => `<p style="margin:0 0 8px;line-height:1.5;">${escapeHtml(line)}</p>`)
-        .join('')
+      const notesBlocks = noteLines.map((line) => `<p>${escapeHtml(line)}</p>`).join('')
       const additionalTitle = formatSectionHeader(null, S.htmlAdditionalStrong, emojisEnabled)
-      chunks.push(
-        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(additionalTitle)}</strong></p>${notesBlocks}</div>`,
-      )
+      chunks.push(`<p><strong>${escapeHtml(additionalTitle)}</strong></p>${notesBlocks}`)
     },
   ]
 
@@ -391,11 +364,9 @@ export function renderKbygEmailHtml(eventData, form, opts = {}) {
 
   const chunks = []
 
-  chunks.push(`<p style="margin:0 0 16px;line-height:1.5;">Hi ${escapeHtml(names)},</p>`)
+  chunks.push(`<p>Hi ${escapeHtml(names)},</p>`)
 
-  chunks.push(
-    `<p style="margin:0 0 16px;line-height:1.5;">${escapeHtml(buildKbygIntroParagraphText(S, eventData, trim))}</p>`,
-  )
+  chunks.push(`<p>${escapeHtml(buildKbygIntroParagraphText(S, eventData, trim))}</p>`)
 
   const tldrBullets = buildKbygTldrBulletsLean(form, opts)
   appendKbygEmailHtmlBody(chunks, {
@@ -410,10 +381,11 @@ export function renderKbygEmailHtml(eventData, form, opts = {}) {
   })
 
   // Optional custom sign-off can be added later; no default "looking forward" / name block.
-  chunks.push(`<p style="margin:0;line-height:1.5;">${escapeHtml(S.closingQuestion)}</p>`)
+  chunks.push(`<p>${escapeHtml(S.closingQuestion)}</p>`)
 
   const body = chunks.join('')
-  return `<div style="font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.5;color:#202124;">${body}</div>`
+  /** Wrapper only — no inline font-size/font-family so Gmail treats pasted content as default Normal / Sans Serif. */
+  return `<div>${body}</div>`
 }
 
 /**

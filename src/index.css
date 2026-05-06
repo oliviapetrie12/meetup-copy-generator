@@ -1023,6 +1023,33 @@ body {
   overflow-y: auto;
 }
 
+/* KBYG HTML: typography via CSS only so copied markup stays free of font-size/font-family (Gmail “Normal” / Sans Serif). */
+.meetup-page-preview.kbyg-email-html-preview {
+  font-size: 15px;
+  line-height: 1.5;
+  color: #202124;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.meetup-page-preview.kbyg-email-html-preview p {
+  margin: 0 0 1em;
+}
+
+.meetup-page-preview.kbyg-email-html-preview ul {
+  margin: 0.35em 0 1em;
+  padding-left: 1.5rem;
+  list-style-type: disc;
+}
+
+.meetup-page-preview.kbyg-email-html-preview li {
+  margin: 0 0 0.35em;
+}
+
+.meetup-page-preview.kbyg-email-html-preview a {
+  color: #1d4ed8;
+}
+
 .output-placeholder {
   margin: 0;
   color: #a09080;
