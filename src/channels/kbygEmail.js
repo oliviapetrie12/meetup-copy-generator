@@ -17,6 +17,14 @@ function kbygEmojisEnabled(form, opts) {
 
 const KBYG_LINK_INLINE_STYLE = 'color:#1D4ED8;text-decoration:underline;'
 
+/**
+ * Minimal list styles for email clients: nested block tags inside &lt;li&gt; (e.g. &lt;p&gt;) often paste into Gmail/Docs
+ * with doubled spacing; keep bullets as inline text where possible.
+ */
+const KBYG_EMAIL_UL_STYLE =
+  'margin:8px 0 0;padding:0 0 0 20px;list-style-type:disc;'
+const KBYG_EMAIL_LI_STYLE = 'margin:0 0 4px;padding:0;line-height:1.45;'
+
 /** Clickable label only (no raw URL in the visible HTML). */
 function kbygExternalLinkHtml(url, labelText) {
   return `<a href="${escapeHtmlAttr(url)}" target="_blank" rel="noopener noreferrer" style="${KBYG_LINK_INLINE_STYLE}">${escapeHtml(labelText)}</a>`
@@ -61,9 +69,9 @@ function buildKbygIntroParagraphText(S, eventData, trim) {
 function kbygHtmlUl(items) {
   if (!items.length) return ''
   const lis = items
-    .map((t) => `<li style="margin:0 0 6px;line-height:1.5;">${t}</li>`)
+    .map((t) => `<li style="${KBYG_EMAIL_LI_STYLE}">${t}</li>`)
     .join('')
-  return `<ul style="margin:8px 0 0;padding-left:24px;list-style-type:disc;">${lis}</ul>`
+  return `<ul style="${KBYG_EMAIL_UL_STYLE}">${lis}</ul>`
 }
 
 /** @param {import('../shared/agendaItems.js').AgendaItem[]} items */
@@ -73,22 +81,21 @@ function buildKbygAgendaHtmlFromItems(items) {
     .map((it) => {
       const hasSlot = it.time && (it.title || it.speaker)
       if (hasSlot) {
-        let inner = `<p style="margin:0 0 6px;line-height:1.45;"><strong>${escapeHtml(it.time)}</strong>`
-        if (it.title) inner += ` ${escapeHtml(it.title)}`
-        inner += '</p>'
+        let inner = `<strong>${escapeHtml(it.time)}</strong>`
+        if (it.title) inner += ` – ${escapeHtml(it.title)}`
         if (it.speaker) {
-          inner += `<p style="margin:0;line-height:1.45;font-style:italic;color:#374151;">${escapeHtml(it.speaker)}</p>`
+          inner += ` — <span style="font-style:italic;color:#374151;">${escapeHtml(it.speaker)}</span>`
         }
-        return `<li style="margin:0 0 14px;">${inner}</li>`
+        return `<li style="${KBYG_EMAIL_LI_STYLE}">${inner}</li>`
       }
       const text = [it.title, it.speaker].filter(Boolean).join(' — ')
       if (!text) return ''
-      return `<li style="margin:0 0 10px;"><p style="margin:0;line-height:1.45;">${escapeHtml(text)}</p></li>`
+      return `<li style="${KBYG_EMAIL_LI_STYLE}">${escapeHtml(text)}</li>`
     })
     .filter(Boolean)
     .join('')
   if (!lis) return ''
-  return `<ul style="margin:8px 0 0;padding-left:24px;list-style-type:disc;">${lis}</ul>`
+  return `<ul style="${KBYG_EMAIL_UL_STYLE}">${lis}</ul>`
 }
 
 /**
@@ -251,8 +258,10 @@ function agendaPlainLinesFromItems(items) {
   const lines = []
   for (const it of items) {
     if (it.time && (it.title || it.speaker)) {
-      lines.push(`- **${it.time}**${it.title ? ` ${it.title}` : ''}`)
-      if (it.speaker) lines.push(`  ${it.speaker}`)
+      let line = `- **${it.time}**`
+      if (it.title) line += ` – ${it.title}`
+      if (it.speaker) line += ` — ${it.speaker}`
+      lines.push(line)
     } else if (it.title || it.speaker) {
       lines.push(`- ${[it.title, it.speaker].filter(Boolean).join(' — ')}`)
     }
