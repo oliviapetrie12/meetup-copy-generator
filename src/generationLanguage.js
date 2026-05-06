@@ -432,6 +432,8 @@ export function getMeetupKbygStrings(lang) {
       parkingBookingIntro: 'Reserve parking in advance:',
       parkingBookLinkDefaultLabel: 'Book Parking',
       kbygAgendaSpeakersArriveAt: (venueName) => `Speakers arrive at ${venueName}`,
+      /** Agenda prepend when venue name is blank but arrival time is known */
+      kbygAgendaSpeakersArrivePlain: 'Speakers arrive',
       kbygAgendaCleanupReminder:
         'Please help throw away trash and tidy up before leaving.',
     },
@@ -517,6 +519,7 @@ export function getMeetupKbygStrings(lang) {
       parkingBookingIntro: 'Reserva estacionamiento con anticipación:',
       parkingBookLinkDefaultLabel: 'Reservar estacionamiento',
       kbygAgendaSpeakersArriveAt: (venueName) => `Los ponentes llegan a ${venueName}`,
+      kbygAgendaSpeakersArrivePlain: 'Los ponentes llegan',
       kbygAgendaCleanupReminder:
         'Ayuda a tirar la basura y a dejar el espacio ordenado antes de irte.',
     },
@@ -602,6 +605,7 @@ export function getMeetupKbygStrings(lang) {
       parkingBookingIntro: 'Reserve estacionamento com antecedência:',
       parkingBookLinkDefaultLabel: 'Reservar estacionamento',
       kbygAgendaSpeakersArriveAt: (venueName) => `Os palestrantes chegam em ${venueName}`,
+      kbygAgendaSpeakersArrivePlain: 'Os palestrantes chegam',
       kbygAgendaCleanupReminder:
         'Ajude a jogar o lixo fora e a organizar o espaço antes de sair.',
     },
