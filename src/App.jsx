@@ -45,7 +45,7 @@ import { renderEventPagePlainMarkdown } from './channels/eventPagePlain.js'
 import { renderKbygEmailHtml, renderKbygEmailPlain } from './channels/kbygEmail.js'
 import { KBYG_TLDR_ITEM_ORDER, getInitialKbygTldrInclude } from './kbygTldr.js'
 import {
-  KBYG_QUICK_IMPORT_I18N_KEYS,
+  formatQuickImportFeedback,
   mergeKbygQuickImportPatch,
   parseKbygQuickImport,
 } from './kbygQuickImportParse.js'
@@ -1848,15 +1848,7 @@ export default function App() {
       const { patch } = parseKbygQuickImport(kbygQuickImportPaste)
       const { next, appliedKeys } = mergeKbygQuickImportPatch(prev, patch)
       queueMicrotask(() => {
-        if (appliedKeys.length === 0) {
-          setKbygQuickImportFeedback(tKbyg.kbyg_quickImportNothing)
-          return
-        }
-        const labels = appliedKeys.map((k) => {
-          const tk = KBYG_QUICK_IMPORT_I18N_KEYS[k]
-          return tk && tKbyg[tk] ? tKbyg[tk] : k
-        })
-        setKbygQuickImportFeedback(`${tKbyg.kbyg_quickImportParsedPrefix} ${labels.join(', ')}`)
+        setKbygQuickImportFeedback(formatQuickImportFeedback(appliedKeys, tKbyg))
       })
       return next
     })

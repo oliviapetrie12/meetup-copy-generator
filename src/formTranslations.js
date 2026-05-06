@@ -81,10 +81,18 @@ const BASE_EN = {
   kbyg_quickImportPlaceholder:
     'Paste copied event text, Slack notes, Meetup/Luma pages, or an agenda…',
   kbyg_parseEventDetails: 'Parse Event Details',
-  kbyg_quickImportHint: 'Fills empty fields only — you can edit everything afterward.',
+  kbyg_quickImportHint:
+    'Fills only date, time, links, agenda, and labeled arrival instructions. Venue, parking, and title stay manual.',
   kbyg_quickImportParsedPrefix: 'Parsed:',
+  kbyg_quickImportFb_date: 'date',
+  kbyg_quickImportFb_time: 'time',
+  kbyg_quickImportFb_agenda: 'agenda',
+  kbyg_quickImportFb_eventLinks: 'event links',
+  kbyg_quickImportFb_arrivalInstructions: 'arrival instructions',
+  kbyg_quickImportFb_arrivalTime: 'arrival time',
+  kbyg_quickImportManualReviewSuffix: 'Location and parking were left for manual review.',
   kbyg_quickImportNothing:
-    'No empty fields were updated. Clear a field or paste more detail, then try again.',
+    'Nothing new was added. Paste labeled sections (date/time, agenda, arrival instructions) or URLs, or clear fields first.',
   kbyg_speakerArrivalLegend: 'Speaker arrival',
   kbyg_speakerArrival: 'Speaker arrival note',
   kbyg_logistics: 'Logistics',
@@ -298,10 +306,19 @@ const BASE_ES = {
   kbyg_quickImportPlaceholder:
     'Pega texto copiado, notas de Slack, páginas de Meetup/Luma o una agenda…',
   kbyg_parseEventDetails: 'Analizar detalles del evento',
-  kbyg_quickImportHint: 'Solo rellena campos vacíos — puedes editar todo después.',
+  kbyg_quickImportHint:
+    'Solo rellena fecha, hora, enlaces, agenda e instrucciones de llegada etiquetadas. Lugar, parking y título siguen siendo manuales.',
   kbyg_quickImportParsedPrefix: 'Extraído:',
+  kbyg_quickImportFb_date: 'fecha',
+  kbyg_quickImportFb_time: 'hora',
+  kbyg_quickImportFb_agenda: 'agenda',
+  kbyg_quickImportFb_eventLinks: 'enlaces del evento',
+  kbyg_quickImportFb_arrivalInstructions: 'instrucciones de llegada',
+  kbyg_quickImportFb_arrivalTime: 'hora de llegada',
+  kbyg_quickImportManualReviewSuffix:
+    'Ubicación y parking quedaron para revisión manual.',
   kbyg_quickImportNothing:
-    'No se actualizaron campos vacíos. Vacía un campo o pega más detalle e inténtalo de nuevo.',
+    'No se añadió nada nuevo. Pega secciones etiquetadas (fecha/hora, agenda, instrucciones de llegada) o URLs, o vacía campos antes.',
   kbyg_speakerArrivalLegend: 'Llegada del ponente',
   kbyg_speakerArrival: 'Nota de llegada del ponente',
   kbyg_logistics: 'Logística',
@@ -515,10 +532,19 @@ const BASE_PT = {
   kbyg_quickImportPlaceholder:
     'Cole texto copiado, notas no Slack, páginas Meetup/Luma ou uma agenda…',
   kbyg_parseEventDetails: 'Analisar detalhes do evento',
-  kbyg_quickImportHint: 'Preenche apenas campos vazios — você pode editar tudo depois.',
+  kbyg_quickImportHint:
+    'Preenche só data, hora, links, agenda e instruções de chegada com rótulo. Local, estacionamento e título continuam manuais.',
   kbyg_quickImportParsedPrefix: 'Extraído:',
+  kbyg_quickImportFb_date: 'data',
+  kbyg_quickImportFb_time: 'hora',
+  kbyg_quickImportFb_agenda: 'agenda',
+  kbyg_quickImportFb_eventLinks: 'links do evento',
+  kbyg_quickImportFb_arrivalInstructions: 'instruções de chegada',
+  kbyg_quickImportFb_arrivalTime: 'horário de chegada',
+  kbyg_quickImportManualReviewSuffix:
+    'Local e estacionamento ficaram para revisão manual.',
   kbyg_quickImportNothing:
-    'Nenhum campo vazio foi atualizado. Limpe um campo ou cole mais detalhes e tente de novo.',
+    'Nada novo foi adicionado. Cole seções com rótulo (data/hora, agenda, instruções de chegada) ou URLs, ou limpe campos antes.',
   kbyg_speakerArrivalLegend: 'Chegada do palestrante',
   kbyg_speakerArrival: 'Nota de chegada do palestrante',
   kbyg_logistics: 'Logística',
