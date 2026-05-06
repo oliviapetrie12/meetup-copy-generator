@@ -671,6 +671,12 @@ body {
   font: inherit;
 }
 
+.form-language-row .checkbox-label.kbyg-emoji-headers-toggle {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+}
+
 .translate-output-bar {
   display: flex;
   flex-wrap: wrap;

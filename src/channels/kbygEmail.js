@@ -6,6 +6,13 @@ import { escapeHtml, escapeHtmlAttr } from '../htmlEscape.js'
 import { getMeetupKbygStrings, normalizeLanguage } from '../generationLanguage.js'
 import { getMeetupKbygPhotoLines } from '../generationLanguage.js'
 import { buildKbygTldrBulletsLean } from '../kbygTldr.js'
+import { formatKbygPlainSectionHeading, formatSectionHeader } from '../kbygSectionHeaders.js'
+
+/** @param {object} form @param {object} opts */
+function kbygEmojisEnabled(form, opts) {
+  if (typeof opts.emojisEnabled === 'boolean') return opts.emojisEnabled
+  return form?.kbygEmojiHeaders !== false
+}
 
 /** @param {import('../shared/eventData.js').SharedEventData} eventData */
 function buildKbygIntroParagraphText(S, eventData, trim) {
@@ -94,6 +101,7 @@ export function renderKbygEmailHtml(eventData, form, opts = {}) {
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const has = (s) => trim(s).length > 0
   const names = trim(form.greetingNames) || 'everyone'
+  const emojisEnabled = kbygEmojisEnabled(form, opts)
 
   const chunks = []
 
@@ -106,23 +114,26 @@ export function renderKbygEmailHtml(eventData, form, opts = {}) {
   const tldrBullets = buildKbygTldrBulletsLean(form, opts)
   if (tldrBullets.length > 0) {
     const tldrItems = tldrBullets.map((i) => escapeHtml(i))
+    const tldrTitle = formatSectionHeader('reminder', S.tldrHeading, emojisEnabled)
     chunks.push(
-      `<div style="margin:0 0 16px;"><p style="margin:0 0 12px;line-height:1.5;"><span style="background-color:#fff3cd;padding:2px 6px;font-weight:bold;border-radius:3px;">${escapeHtml(S.tldrHeading)}</span></p>${kbygHtmlUl(tldrItems)}</div>`,
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 12px;line-height:1.5;"><span style="background-color:#fff3cd;padding:2px 6px;font-weight:bold;border-radius:3px;">${escapeHtml(tldrTitle)}</span></p>${kbygHtmlUl(tldrItems)}</div>`,
     )
   }
 
   const logisticsItems = logisticsHtmlItemsFromEventData(eventData, S)
   if (logisticsItems.length > 0) {
+    const logisticsTitle = formatSectionHeader('location', S.logisticsHeading, emojisEnabled)
     chunks.push(
-      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.logisticsHeading)}</strong></p>${kbygHtmlUl(logisticsItems)}</div>`,
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(logisticsTitle)}</strong></p>${kbygHtmlUl(logisticsItems)}</div>`,
     )
   }
 
   if (eventData.agenda.length > 0) {
     const agendaHtml = buildKbygAgendaHtmlFromItems(eventData.agenda)
     if (agendaHtml) {
+      const agendaTitle = formatSectionHeader('agenda', S.htmlAgendaStrong, emojisEnabled)
       chunks.push(
-        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlAgendaStrong)}</strong></p>${agendaHtml}</div>`,
+        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(agendaTitle)}</strong></p>${agendaHtml}</div>`,
       )
     }
   }
@@ -141,14 +152,16 @@ export function renderKbygEmailHtml(eventData, form, opts = {}) {
     speakerItems.push(escapeHtml(t))
   }
   if (speakerItems.length) {
+    const speakerTitle = formatSectionHeader('speaker', S.htmlSpeakerStrong, emojisEnabled)
     chunks.push(
-      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlSpeakerStrong)}</strong></p>${kbygHtmlUl(speakerItems)}</div>`,
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(speakerTitle)}</strong></p>${kbygHtmlUl(speakerItems)}</div>`,
     )
   }
 
   if (has(form.speakerArrivalNote)) {
+    const arrivalTitle = formatSectionHeader('arrivalInstructions', S.htmlSpeakerArrivalStrong, emojisEnabled)
     chunks.push(
-      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlSpeakerArrivalStrong)}</strong></p><p style="margin:0;line-height:1.5;">${escapeHtml(trim(form.speakerArrivalNote)).replace(/\n/g, '<br>')}</p></div>`,
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(arrivalTitle)}</strong></p><p style="margin:0;line-height:1.5;">${escapeHtml(trim(form.speakerArrivalNote)).replace(/\n/g, '<br>')}</p></div>`,
     )
   }
 
@@ -166,8 +179,9 @@ export function renderKbygEmailHtml(eventData, form, opts = {}) {
         `${escapeHtml(S.htmlLumaLink)}: <a href="${escapeHtmlAttr(u)}" style="color:#1D4ED8;text-decoration:underline;">${escapeHtml(u)}</a>`,
       )
     }
+    const eventPageTitle = formatSectionHeader('registration', S.htmlEventPageStrong, emojisEnabled)
     chunks.push(
-      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlEventPageStrong)}</strong></p>${kbygHtmlUl(linkItems)}</div>`,
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(eventPageTitle)}</strong></p>${kbygHtmlUl(linkItems)}</div>`,
     )
   }
 
@@ -187,8 +201,9 @@ export function renderKbygEmailHtml(eventData, form, opts = {}) {
       else line = role
       return escapeHtml(line)
     })
+    const contactsTitle = formatSectionHeader('contact', S.htmlHelpfulContactsStrong, emojisEnabled)
     chunks.push(
-      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlHelpfulContactsStrong)}</strong></p>${kbygHtmlUl(contactItems)}</div>`,
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(contactsTitle)}</strong></p>${kbygHtmlUl(contactItems)}</div>`,
     )
   }
 
@@ -196,16 +211,18 @@ export function renderKbygEmailHtml(eventData, form, opts = {}) {
     const su = []
     if (has(form.setupNotes)) su.push(escapeHtml(trim(form.setupNotes)))
     if (has(form.swagNotes)) su.push(escapeHtml(trim(form.swagNotes)))
+    const setupTitle = formatSectionHeader('swag', S.htmlSetupStrong, emojisEnabled)
     chunks.push(
-      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlSetupStrong)}</strong></p>${kbygHtmlUl(su)}</div>`,
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(setupTitle)}</strong></p>${kbygHtmlUl(su)}</div>`,
     )
   }
 
   if (form.includePhotos !== false) {
     const photoLines = getMeetupKbygPhotoLines(opts.language)
     const photoItems = photoLines.map((line) => escapeHtml(line))
+    const photosTitle = formatSectionHeader('photos', S.htmlTakePhotosStrong, emojisEnabled)
     chunks.push(
-      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlTakePhotosStrong)}</strong></p>${kbygHtmlUl(photoItems)}</div>`,
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(photosTitle)}</strong></p>${kbygHtmlUl(photoItems)}</div>`,
     )
   }
 
@@ -215,8 +232,9 @@ export function renderKbygEmailHtml(eventData, form, opts = {}) {
       const notesBlocks = noteLines
         .map((line) => `<p style="margin:0 0 8px;line-height:1.5;">${escapeHtml(line)}</p>`)
         .join('')
+      const additionalTitle = formatSectionHeader(null, S.htmlAdditionalStrong, emojisEnabled)
       chunks.push(
-        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(S.htmlAdditionalStrong)}</strong></p>${notesBlocks}</div>`,
+        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(additionalTitle)}</strong></p>${notesBlocks}</div>`,
       )
     }
   }
@@ -250,7 +268,8 @@ export function renderKbygEmailPlain(eventData, form, opts = {}) {
   const S = getMeetupKbygStrings(normalizeLanguage(opts.language))
   const trim = (s) => (typeof s === 'string' ? s.trim() : '')
   const has = (s) => trim(s).length > 0
-  const sectionTitle = (title) => `**${title}**`
+  const emojisEnabled = kbygEmojisEnabled(form, opts)
+  const heading = (sectionKey, title) => formatKbygPlainSectionHeading(sectionKey, title, emojisEnabled)
 
   const lines = []
   const names = trim(form.greetingNames) || 'everyone'
@@ -262,20 +281,20 @@ export function renderKbygEmailPlain(eventData, form, opts = {}) {
 
   const tldrBulletsPlain = buildKbygTldrBulletsLean(form, opts)
   if (tldrBulletsPlain.length > 0) {
-    lines.push(sectionTitle(S.tldrHeading))
+    lines.push(heading('reminder', S.tldrHeading))
     tldrBulletsPlain.forEach((b) => lines.push(`- ${b}`))
     lines.push('')
   }
 
   const logisticsPlain = logisticsPlainLinesFromEventData(eventData, S)
   if (logisticsPlain.length > 0) {
-    lines.push(sectionTitle(S.logisticsHeading))
+    lines.push(heading('location', S.logisticsHeading))
     logisticsPlain.forEach((l) => lines.push(`- ${l}`))
     lines.push('')
   }
 
   if (eventData.agenda.length > 0) {
-    lines.push(sectionTitle(S.agenda))
+    lines.push(heading('agenda', S.agenda))
     agendaPlainLinesFromItems(eventData.agenda).forEach((l) => lines.push(l))
     lines.push('')
   }
@@ -283,7 +302,7 @@ export function renderKbygEmailPlain(eventData, form, opts = {}) {
   const sp1 = has(form.speaker1Name) || has(form.speaker1Title) || has(form.speaker1TalkTitle)
   const sp2 = has(form.speaker2Name) || has(form.speaker2Title) || has(form.speaker2TalkTitle)
   if (sp1 || sp2) {
-    lines.push(sectionTitle(S.speaker))
+    lines.push(heading('speaker', S.speaker))
     if (sp1) {
       let t = trim(form.speaker1Name) || S.speaker1Default
       if (has(form.speaker1Title)) t += `, ${trim(form.speaker1Title)}`
@@ -300,13 +319,13 @@ export function renderKbygEmailPlain(eventData, form, opts = {}) {
   }
 
   if (has(form.speakerArrivalNote)) {
-    lines.push(sectionTitle(S.speakerArrival))
+    lines.push(heading('arrivalInstructions', S.speakerArrival))
     lines.push(trim(form.speakerArrivalNote))
     lines.push('')
   }
 
   if (has(form.meetupLink) || has(form.lumaLink)) {
-    lines.push(sectionTitle(S.eventPage))
+    lines.push(heading('registration', S.eventPage))
     if (has(form.meetupLink)) lines.push(`- ${S.meetupLabel}: ${trim(form.meetupLink)}`)
     if (has(form.lumaLink)) lines.push(`- ${S.lumaLabel}: ${trim(form.lumaLink)}`)
     lines.push('')
@@ -314,7 +333,7 @@ export function renderKbygEmailPlain(eventData, form, opts = {}) {
 
   const contactEntries = (form.contacts || []).filter((c) => has(c.name) || has(c.role) || has(c.contactInfo))
   if (contactEntries.length > 0) {
-    lines.push(sectionTitle(S.helpfulContacts))
+    lines.push(heading('contact', S.helpfulContacts))
     contactEntries.forEach((c) => {
       const name = trim(c.name)
       const role = trim(c.role)
@@ -331,14 +350,14 @@ export function renderKbygEmailPlain(eventData, form, opts = {}) {
   }
 
   if (has(form.setupNotes) || has(form.swagNotes)) {
-    lines.push(sectionTitle(S.setup))
+    lines.push(heading('swag', S.setup))
     if (has(form.setupNotes)) lines.push(`- ${trim(form.setupNotes)}`)
     if (has(form.swagNotes)) lines.push(`- ${trim(form.swagNotes)}`)
     lines.push('')
   }
 
   if (form.includePhotos !== false) {
-    lines.push(sectionTitle(S.takePhotos))
+    lines.push(heading('photos', S.takePhotos))
     getMeetupKbygPhotoLines(opts.language).forEach((line) => lines.push(`- ${line}`))
     lines.push('')
   }
@@ -346,7 +365,7 @@ export function renderKbygEmailPlain(eventData, form, opts = {}) {
   if (has(form.additionalNotes)) {
     const noteLines = trim(form.additionalNotes).split(/\n/).map((s) => s.trim()).filter(Boolean)
     if (noteLines.length > 0) {
-      lines.push(sectionTitle(S.additionalNotes))
+      lines.push(heading(null, S.additionalNotes))
       noteLines.forEach((line) => lines.push(line))
       lines.push('')
     }

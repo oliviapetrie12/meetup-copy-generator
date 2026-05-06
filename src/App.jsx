@@ -494,6 +494,7 @@ const KBYG_INITIAL_STATE = {
   includePhotos: true,
   generateTldr: true,
   kbygTldrInclude: getInitialKbygTldrInclude(),
+  kbygEmojiHeaders: true,
 }
 
 const KBYG_FORM_STORAGE_KEY = 'meetup-kbyg-form-v1'
@@ -517,6 +518,9 @@ function loadKbygFormFromStorage() {
         : Object.prototype.hasOwnProperty.call(parsed, 'includeTakePhotos')
           ? parsed.includeTakePhotos
           : KBYG_INITIAL_STATE.includePhotos,
+      kbygEmojiHeaders: Object.prototype.hasOwnProperty.call(parsed, 'kbygEmojiHeaders')
+        ? parsed.kbygEmojiHeaders
+        : KBYG_INITIAL_STATE.kbygEmojiHeaders,
     }
   } catch {
     return KBYG_INITIAL_STATE
@@ -614,6 +618,15 @@ function buildKnowBeforeYouGoEmailHtml(form, opts = {}) {
 function generateKnowBeforeYouGoEmail(form, opts = {}) {
   const eventData = buildSharedEventDataFromKbygForm(form, normalizeLanguage(opts.language))
   return renderKbygEmailPlain(eventData, form, opts)
+}
+
+/** Options passed to Meetup KBYG plain + HTML renderers (emoji headers default on). */
+function meetupKbygRenderOpts(form, tldrRotation, language) {
+  return {
+    tldrRotation,
+    language,
+    emojisEnabled: form.kbygEmojiHeaders !== false,
+  }
 }
 
 const OUTREACH_SUBJECT_VARIANTS = [
@@ -1597,6 +1610,29 @@ export default function App() {
     [generatorType, generatedCopy],
   )
 
+  const generatedCopyRef = useRef(generatedCopy)
+  generatedCopyRef.current = generatedCopy
+  const kbygEmojiHeadersPrevRef = useRef(null)
+
+  useEffect(() => {
+    kbygEmojiHeadersPrevRef.current = null
+  }, [generatorType])
+
+  /** Refresh plain + HTML output when emoji header toggle changes (after initial preview exists). */
+  useEffect(() => {
+    if (generatorType !== 'knowBeforeYouGo') return
+    const enabled = kbygForm.kbygEmojiHeaders !== false
+    const prev = kbygEmojiHeadersPrevRef.current
+    kbygEmojiHeadersPrevRef.current = enabled
+    if (prev === null) return
+    if (prev === enabled) return
+    if (!generatedCopyRef.current.trim()) return
+    const opts = meetupKbygRenderOpts(kbygForm, kbygTldrRotation, meetupKbygLanguage)
+    setGeneratedSubject(generateKnowBeforeYouGoSubject(kbygForm, opts))
+    setGeneratedCopy(generateKnowBeforeYouGoEmail(kbygForm, opts))
+    setKbygEmailHtml(buildKnowBeforeYouGoEmailHtml(kbygForm, opts))
+  }, [kbygForm.kbygEmojiHeaders, generatorType, kbygTldrRotation, meetupKbygLanguage])
+
   const query = (form.chapterOrCity || '').trim().toLowerCase()
   const filteredGroups = query
     ? USER_GROUPS.filter((g) => g.toLowerCase().includes(query))
@@ -1883,7 +1919,7 @@ export default function App() {
   const handleGenerate = async () => {
     if (generatorType === 'knowBeforeYouGo') {
       setKbygTldrRotation(0)
-      const opts = { tldrRotation: 0, language: meetupKbygLanguage }
+      const opts = meetupKbygRenderOpts(kbygForm, 0, meetupKbygLanguage)
       const remote = await tryRemoteGenerate({
         generator: 'meetupKbyg',
         language: meetupKbygLanguage,
@@ -2006,7 +2042,7 @@ export default function App() {
   const handleRegenKbygTldr = () => {
     const next = kbygTldrRotation + 1
     setKbygTldrRotation(next)
-    const opts = { tldrRotation: next, language: meetupKbygLanguage }
+    const opts = meetupKbygRenderOpts(kbygForm, next, meetupKbygLanguage)
     setGeneratedSubject(generateKnowBeforeYouGoSubject(kbygForm, opts))
     setGeneratedCopy(generateKnowBeforeYouGoEmail(kbygForm, opts))
     setKbygEmailHtml(buildKnowBeforeYouGoEmailHtml(kbygForm, opts))
@@ -2906,6 +2942,17 @@ export default function App() {
               <label>{tKbyg.kbyg_additionalNotes} <textarea value={kbygForm.additionalNotes} onChange={updateKbyg('additionalNotes')} placeholder={tKbyg.kbyg_ph_additionalNotes} rows={3} /></label>
             </fieldset>
             <div className="form-language-row" role="group" aria-label={tKbyg.languageLabel}>
+              <label className="checkbox-label kbyg-emoji-headers-toggle">
+                <input
+                  type="checkbox"
+                  checked={kbygForm.kbygEmojiHeaders !== false}
+                  onChange={(e) =>
+                    setKbygForm((prev) => ({ ...prev, kbygEmojiHeaders: e.target.checked }))
+                  }
+                  aria-label={tKbyg.kbyg_enableEmojis}
+                />
+                <span>{tKbyg.kbyg_enableEmojis}</span>
+              </label>
               <label>
                 {tKbyg.languageLabel}
                 <select
