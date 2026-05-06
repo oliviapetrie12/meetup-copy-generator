@@ -1,6 +1,12 @@
 /**
  * Heuristic paste parser for Meetup / Luma / messy event text → KBYG form patches.
  * Fills only extracted fields; callers merge into existing form (typically fill-empty-only).
+ *
+ * Mapping rules (conservative):
+ * - Never emit eventTitle (manual entry only).
+ * - Venue address: only lines that look like postal addresses; never arrival/check-in prose.
+ * - Arrival/check-in prose → speaker arrival note (and/or additional notes via sections).
+ * - Date/time/arrival clock values only when a regex matches confidently (no guessing AM/PM alone).
  */
 
 const URL_RE = /https?:\/\/[^\s\]<)"',]+/gi
@@ -40,7 +46,7 @@ export const KBYG_QUICK_IMPORT_FIELD_LABELS = {
 }
 
 /**
- * Parser patch keys (`eventTitle` excluded — manual entry; optional title parsing could be added later).
+ * Parser patch keys (`eventTitle` intentionally omitted — never auto-filled).
  * @typedef {{
  *   eventDate?: string
  *   eventTime?: string
@@ -56,6 +62,171 @@ export const KBYG_QUICK_IMPORT_FIELD_LABELS = {
  *   drinkDetails?: string
  *   additionalNotes?: string
  * }} KbygQuickImportPatch */
+
+/**
+ * Fix glued sentences (e.g. missing space after period; "advanceImproving" → "advance. Improving").
+ * Used on parking and other prose blobs where HTML paste drops spaces.
+ */
+export function normalizeWhitespace(s) {
+  if (s == null || typeof s !== 'string') return ''
+  let t = s.replace(/\r\n/g, '\n')
+  t = t.replace(/([.!?])([A-Za-z])/g, '$1 $2')
+  t = t.replace(/\b([a-z]{3,})([A-Z][a-z]{2,})\b/g, '$1. $2')
+  t = t
+    .split('\n')
+    .map((line) => line.replace(/[ \t]+/g, ' ').trim())
+    .join('\n')
+  t = t.replace(/\n{3,}/g, '\n\n')
+  return t.trim()
+}
+
+/**
+ * Weekday + month + day, optional ordinal (May 13th), optional year.
+ * Conservative: must start with a full weekday name.
+ */
+export function extractDate(text) {
+  const blob = String(text || '').slice(0, 12000)
+  const re =
+    /\b((?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)),\s+((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*)\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s*,\s*\d{4})?\b/i
+  const m = blob.match(re)
+  if (!m) return ''
+  const ord = m[0].match(/\d{1,2}(st|nd|rd|th)/i)
+  const dayNum = m[3]
+  const dayStr = ord ? `${dayNum}${ord[1]}` : dayNum
+  return `${m[1]}, ${m[2]} ${dayStr}`.trim()
+}
+
+/** Normalize "5:30" + am/pm → "5:30 PM" */
+function formatClock(hoursMinutes, ampmRaw) {
+  const ap = (ampmRaw || '').toUpperCase()
+  const suffix = ap.startsWith('A') ? 'AM' : 'PM'
+  return `${hoursMinutes.trim()} ${suffix}`
+}
+
+/**
+ * Prefer event start from a time range: "5:30-8:00 pm" → "5:30 PM".
+ * Otherwise first "h:mm am/pm" in the blob.
+ */
+export function extractStartTime(text) {
+  const blob = String(text || '').slice(0, 12000)
+  let m = blob.match(/\b(\d{1,2}:\d{2})\s*[-–—]\s*\d{1,2}:\d{2}\s*(am|pm)\b/i)
+  if (m) return formatClock(m[1], m[2])
+  m = blob.match(/\b(\d{1,2}:\d{2})\s*[-–—]\s*\d{1,2}:\d{2}\s*(AM|PM)\b/)
+  if (m) return formatClock(m[1], m[2])
+  m = blob.match(/\b(\d{1,2}:\d{2})\s*(am|pm)\b/i)
+  if (m) return formatClock(m[1], m[2])
+  m = blob.match(/\b(\d{1,2}:\d{2})\s*(AM|PM)\b/)
+  if (m) return `${m[1]} ${m[2]}`
+  return ''
+}
+
+/**
+ * Speakers arrive at / Arrive by / Please arrive by — only when meridiem is present or clearly adjacent.
+ */
+export function extractArrivalTime(text) {
+  const blob = String(text || '').slice(0, 14000)
+  const patterns = [
+    /\b(?:speakers?|speaker)\s+arrive\s+(?:at|by)\s+(\d{1,2}:\d{2})\s*(AM|PM|am|pm)\b/i,
+    /\barrive\s+(?:at|by)\s+(\d{1,2}:\d{2})\s*(AM|PM|am|pm)\b/i,
+    /\bplease\s+arrive\s+(?:by\s+)?(\d{1,2}:\d{2})\s*(AM|PM|am|pm)\b/i,
+    /\b(?:arrive\s+by|doors\s+open|please\s+arrive)\s*[:\s]+(\d{1,2}:\d{2})\s*(AM|PM|am|pm)\b/i,
+  ]
+  for (const re of patterns) {
+    const match = blob.match(re)
+    if (!match) continue
+    const hm = match[1]
+    let ap = match[2]
+    if (!ap) continue
+    return formatClock(hm, ap)
+  }
+  const relaxed = blob.match(
+    /\b(?:speakers?|speaker)\s+arrive\s+(?:at|by)\s+(\d{1,2}:\d{2})\b|\barrive\s+(?:at|by)\s+(\d{1,2}:\d{2})\b/i,
+  )
+  if (relaxed) {
+    const hm = relaxed[1] || relaxed[2]
+    const idx = relaxed.index ?? blob.search(relaxed[0])
+    const window = blob.slice(idx, idx + (relaxed[0]?.length || 0) + 40)
+    let ampm = ''
+    if (/\bpm\b/i.test(window)) ampm = 'pm'
+    else if (/\bam\b/i.test(window)) ampm = 'am'
+    if (ampm) return formatClock(hm, ampm)
+  }
+  return ''
+}
+
+/** Street / ZIP signals only (no instruction detection); avoids recursion with isArrivalInstructionLine. */
+export function hasAddressSignals(s) {
+  const t = (s || '').trim()
+  if (!t) return false
+  if (/\b\d{5}(?:-\d{4})?\b/.test(t)) return true
+  if (/\b[A-Z]{2}\s+\d{5}(?:-\d{4})?\b/.test(t)) return true
+  if (
+    /\d+\s+[NSEW]?\s*[\w.'\s-]+\s+(?:Street|St\.?|Avenue|Ave\.?|Road|Rd\.?|Boulevard|Blvd\.?|Drive|Dr\.?|Plaza|Lane|Ln\.?|Court|Ct\.?|Way|Place|Pl\.?|Highway|Hwy)\b/i.test(
+      t,
+    )
+  )
+    return true
+  if (/\d+(?:st|nd|rd|th)\s+floor\b/i.test(t)) return true
+  if (/\b(?:suite|ste\.?|unit)\s*#?[a-z0-9-]+\b/i.test(t)) return true
+  return false
+}
+
+/**
+ * True only for lines that look like a postal/street address (conservative).
+ * Arrival prose must fail this check.
+ */
+export function isAddressLine(s) {
+  const t = (s || '').trim()
+  if (!t || isArrivalInstructionLine(t)) return false
+  return hasAddressSignals(t)
+}
+
+/**
+ * Arrival / check-in / building access prose — never mapped to venue address.
+ */
+export function isArrivalInstructionLine(line) {
+  const raw = (line || '').trim()
+  if (!raw) return false
+  const t = raw.replace(/^[^:]+:\s*/, '').trim() || raw
+
+  if (/arrival\s+instructions?\b/i.test(raw)) return true
+  if (/^(?:arrival|check[\s-]?in)\s+instructions?\b/i.test(raw)) return true
+  if (/^getting\s+there\b/i.test(raw)) return true
+  if (/\bcheck\s*in\b/i.test(t) && !hasAddressSignals(raw)) return true
+  if (/\bcheck-in\b/i.test(t) && !hasAddressSignals(raw)) return true
+  if (/^upon\s+arrival\b/i.test(t)) return true
+  if (/\bbring\s+an\s+ID\b/i.test(t)) return true
+  if (/\bplease\s+bring\b/i.test(t)) return true
+  if (/\bbring\s+(?:your|an)\s+ID\b/i.test(t)) return true
+  if (/\belevator\b/i.test(t)) return true
+  if (/\bfront\s+desk\b/i.test(t)) return true
+  if (/\benter\s+through\b/i.test(t)) return true
+  if (/^please\b/i.test(t) && !hasAddressSignals(raw)) return true
+  if (/\bsecurity\b/i.test(t) && /\b(?:desk|check|badge)\b/i.test(t)) return true
+  return false
+}
+
+/** Suite/floor line that continues an address block (must follow a real address line). */
+function isAddressContinuationLine(s) {
+  const t = (s || '').trim()
+  if (!t || isArrivalInstructionLine(t)) return false
+  return /\b(?:suite|ste\.?|floor|fl\.?|bldg|building)\b/i.test(t) || /\d+(?:st|nd|rd|th)\s+floor/i.test(t)
+}
+
+/**
+ * Split one line "Venue Name - 222 Street …" when RHS passes isAddressLine.
+ * @returns {{ venueName: string, venueAddress: string } | null}
+ */
+export function splitVenueAndAddress(line) {
+  const m = line.trim().match(/^(.+?)\s*[-–—]\s+(.+)$/)
+  if (!m) return null
+  const left = m[1].trim()
+  const right = m[2].trim()
+  if (!left || !right) return null
+  if (!isAddressLine(right)) return null
+  if (left.length > 120) return null
+  return { venueName: left, venueAddress: right }
+}
 
 /**
  * @param {string} raw
@@ -81,7 +252,6 @@ export function parseKbygQuickImport(raw) {
     if (label) labels.push(label)
   }
 
-  // --- URLs (assign first of each host type)
   const urls = []
   let m
   const re = new RegExp(URL_RE.source, URL_RE.flags)
@@ -99,7 +269,6 @@ export function parseKbygQuickImport(raw) {
       .replace(/^\*\*\s*|\s*\*\*$/g, '')
       .trim()
 
-  // --- Section headers (emoji / English / markdown)
   const headerMatchers = [
     {
       keys: [/^(?:📅|🗓)?\s*date\s*(?:and\s*)?time/i, /^when\b/i, /^event\s+time/i],
@@ -167,13 +336,9 @@ export function parseKbygQuickImport(raw) {
   }
 
   if (sections.datetime) {
-    const dt = parseDateTimeSection(sections.datetime)
-    if (dt.date) mark('eventDate', dt.date)
-    if (dt.time) mark('eventTime', dt.time)
-    if (dt.arrival) mark('arrivalTime', dt.arrival)
+    applyDateTimeFromBlock(sections.datetime, mark)
   }
 
-  /** Instructions peeled from location blob (same-line dash addresses, mis-merged paragraphs). */
   let arrivalFromVenue = ''
   if (sections.venue) {
     const pv = parseVenueLocationBlock(sections.venue)
@@ -182,43 +347,40 @@ export function parseKbygQuickImport(raw) {
     arrivalFromVenue = pv.instructions || ''
   }
 
-  if (sections.parking) mark('parkingNotes', sections.parking)
+  if (sections.parking) {
+    mark('parkingNotes', normalizeWhitespace(sections.parking))
+  }
 
   const arrivalMerged = [sections.arrival, arrivalFromVenue].filter(Boolean).join('\n\n').trim()
-  if (arrivalMerged) mark('speakerArrivalNote', arrivalMerged)
+  if (arrivalMerged) {
+    mark('speakerArrivalNote', normalizeWhitespace(arrivalMerged))
+  }
   if (sections.agenda) mark('internalAgenda', normalizeAgendaText(sections.agenda))
-  if (sections.food) mark('foodDetails', sections.food)
-  if (sections.drinks) mark('drinkDetails', sections.drinks)
-  if (sections.notes) mark('additionalNotes', sections.notes)
+  if (sections.food) mark('foodDetails', normalizeWhitespace(sections.food))
+  if (sections.drinks) mark('drinkDetails', normalizeWhitespace(sections.drinks))
+  if (sections.notes) mark('additionalNotes', normalizeWhitespace(sections.notes))
 
-  // --- Inline arrival phrases (whole text)
-  const arriveM = text.match(
-    /(?:arrive\s+by|arrival|doors\s+open|please\s+arrive)\s*[:\s]+(\d{1,2}:\d{2}\s*(?:AM|PM)?)/i,
-  )
-  if (arriveM && !patch.arrivalTime) {
-    mark('arrivalTime', arriveM[1].trim())
+  if (!patch.arrivalTime) {
+    const fromAgenda = sections.agenda ? extractArrivalTime(sections.agenda) : ''
+    const fromBlob = extractArrivalTime(text)
+    const pick = fromBlob || fromAgenda
+    if (pick) mark('arrivalTime', pick)
   }
 
-  // --- Date/time from any line if sections missed
-  if (!patch.eventDate || !patch.eventTime) {
-    const blob = text.slice(0, 4000)
-    const joint = blob.match(
-      /((?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+\w+\s+\d{1,2},?\s+\d{4})\s+(?:at|·|@)\s*(\d{1,2}:\d{2}\s*(?:AM|PM))/i,
-    )
-    if (joint) {
-      if (!patch.eventDate) mark('eventDate', joint[1].trim())
-      if (!patch.eventTime) mark('eventTime', joint[2].trim())
-    } else {
-      const dateOnly = blob.match(
-        /((?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+\w+\s+\d{1,2},?\s+\d{4})/i,
-      )
-      if (dateOnly && !patch.eventDate) mark('eventDate', dateOnly[1].trim())
-      const timeOnly = blob.match(/\b(\d{1,2}:\d{2}\s*(?:AM|PM))\b/)
-      if (timeOnly && !patch.eventTime) mark('eventTime', timeOnly[1].trim())
-    }
+  const blob = text.slice(0, 12000)
+
+  if (!patch.eventDate) {
+    const fromSection = sections.datetime ? extractDate(sections.datetime) : ''
+    const d = fromSection || extractDate(blob)
+    if (d && d.length < 120) mark('eventDate', d)
   }
 
-  // --- Agenda fallback: lines that look like timed slots
+  if (!patch.eventTime) {
+    const fromSection = sections.datetime ? extractStartTime(sections.datetime) : ''
+    const t = fromSection || extractStartTime(blob)
+    if (t) mark('eventTime', t)
+  }
+
   if (!patch.internalAgenda) {
     const agendaLines = lines.filter((l) => {
       const s = l.trim()
@@ -229,13 +391,12 @@ export function parseKbygQuickImport(raw) {
         /^\d{1,2}:\d{2}\s*(?:AM|PM)\s*[-–—]\s*.+/i.test(s)
       )
     })
-    if (agendaLines.length >= 2) {
+    if (agendaLines.length >= 3) {
       mark('internalAgenda', agendaLines.join('\n'))
       hints.push('Agenda detected from time-stamped lines')
     }
   }
 
-  // Dedupe labels for UI
   const seen = new Set()
   const filledLabels = labels.filter((l) => {
     if (seen.has(l)) return false
@@ -248,6 +409,7 @@ export function parseKbygQuickImport(raw) {
 
 /**
  * Merge parser patch into prior form state (does not overwrite non-empty string fields).
+ * eventTitle is never applied from the parser.
  * @returns {{ next: typeof prev, appliedKeys: string[] }}
  */
 export function mergeKbygQuickImportPatch(prev, patch) {
@@ -256,6 +418,7 @@ export function mergeKbygQuickImportPatch(prev, patch) {
   /** @type {string[]} */
   const appliedKeys = []
   for (const [key, value] of Object.entries(patch)) {
+    if (key === 'eventTitle') continue
     if (value == null || value === '') continue
     if (key === 'contacts') continue
     const cur = next[key]
@@ -272,104 +435,18 @@ export function mergeKbygQuickImportPatch(prev, patch) {
   return { next, appliedKeys: deduped }
 }
 
-function parseDateTimeSection(block) {
-  const out = { date: '', time: '', arrival: '' }
-  const arrive = block.match(/(?:arrive|arrival)\s*[:\s]+(\d{1,2}:\d{2}\s*(?:AM|PM)?)/i)
-  if (arrive) out.arrival = arrive[1].trim()
-
-  const joint = block.match(
-    /((?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+\w+\s+\d{1,2},?\s+\d{4})\s+(?:at|·)\s*(\d{1,2}:\d{2}\s*(?:AM|PM))/i,
-  )
-  if (joint) {
-    out.date = joint[1].trim()
-    out.time = joint[2].trim()
-    return out
-  }
-
-  const atSplit = block.split(/\s+at\s+/i)
-  if (atSplit.length >= 2) {
-    const left = atSplit[0].trim()
-    const right = atSplit.slice(1).join(' at ').trim()
-    if (/Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday/i.test(left)) out.date = left
-    const tm = right.match(/(\d{1,2}:\d{2}\s*(?:AM|PM))/i)
-    if (tm) out.time = tm[1].trim()
-  }
-
-  if (!out.date && /Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday/i.test(block)) {
-    const dm = block.match(/((?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+\w+\s+\d{1,2},?\s+\d{4})/i)
-    if (dm) out.date = dm[1].trim()
-  }
-  if (!out.time) {
-    const tm = block.match(/\b(\d{1,2}:\d{2}\s*(?:AM|PM))\b/)
-    if (tm) out.time = tm[1].trim()
-  }
-
-  return out
-}
-
-/** US-heavy heuristics: street numbers, zip, floor/suite, common suffixes. */
-function looksLikeStreetAddress(s) {
-  const t = (s || '').trim()
-  if (!t) return false
-  if (/\b\d{5}(?:-\d{4})?\b/.test(t)) return true
-  if (/\b[A-Z]{2}\s+\d{5}(?:-\d{4})?\b/.test(t)) return true
-  if (
-    /\d+\s+[NSEW]?\s*[\w\s,.-]+\s+(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Plaza|Lane|Ln|Court|Ct|Way|Place|Pl|Highway|Hwy)\b/i.test(
-      t,
-    )
-  )
-    return true
-  if (/\d+(?:st|nd|rd|th)\s+floor\b/i.test(t)) return true
-  if (/\b(?:suite|ste\.?|unit)\s*#?[a-z0-9-]+\b/i.test(t)) return true
-  if (/^\d+\s+[A-Za-z]/.test(t) && t.length >= 12 && /,/.test(t)) return true
-  return false
-}
-
-function isInstructionLine(line) {
-  const raw = (line || '').trim()
-  if (!raw) return false
-  const t = raw.replace(/^[^:]+:\s*/, '').trim() || raw
-
-  if (/^(?:arrival|check[\s-]?in)\s+instructions?\b/i.test(raw)) return true
-  if (/arrival\s+instructions?\b/i.test(raw)) return true
-  if (/^getting\s+there\b/i.test(raw)) return true
-  if (/^upon\s+arrival\b/i.test(t)) return true
-  if (/^please\s+(?:bring|arrive|check|note)/i.test(t)) return true
-  if (/\bplease\s+bring\b/i.test(t)) return true
-  if (/\bbring\s+(?:your|an)\s+ID\b/i.test(t)) return true
-  if (/\bcheck[\s-]?in\b/i.test(t) && !looksLikeStreetAddress(t)) return true
-  if (/\benter\s+through\b/i.test(t)) return true
-  if (/\belevator\b/i.test(t)) return true
-  if (/\bfront\s+desk\b/i.test(t)) return true
-  if (/\bsecurity\b/i.test(t) && /\b(?:desk|check|badge|building)\b/i.test(t)) return true
-  if (/^please\b/i.test(t) && !looksLikeStreetAddress(t)) return true
-  return false
-}
-
-function looksLikeAddressContinuation(s) {
-  const t = (s || '').trim()
-  if (!t || isInstructionLine(t)) return false
-  return /\b(?:suite|ste\.?|floor|fl\.?|bldg|building)\b/i.test(t) || /\d+(?:st|nd|rd|th)\s+floor/i.test(t)
+/** Apply date/time/arrival from a Date & time section block. */
+function applyDateTimeFromBlock(block, mark) {
+  const d = extractDate(block)
+  const t = extractStartTime(block)
+  const arr = extractArrivalTime(block)
+  if (d) mark('eventDate', d)
+  if (t) mark('eventTime', t)
+  if (arr) mark('arrivalTime', arr)
 }
 
 /**
- * "Org Name - 123 Main St ..." → name + address when RHS looks like an address.
- * @returns {{ name: string, addressLine: string } | null}
- */
-function trySplitNameDashAddress(line) {
-  const m = line.trim().match(/^(.+?)\s*[-–—]\s+(.+)$/)
-  if (!m) return null
-  const left = m[1].trim()
-  const right = m[2].trim()
-  if (!left || !right) return null
-  if (looksLikeStreetAddress(right)) return { name: left, addressLine: right }
-  if (/^\d/.test(right) && right.length >= 10 && /[a-z]/i.test(right)) return { name: left, addressLine: right }
-  return null
-}
-
-/**
- * Split pasted location text into venue name, postal-style address only, and prose instructions.
- * @returns {{ name: string, address: string, instructions: string }}
+ * Split location section into venue name, address-only lines, and instruction lines.
  */
 function parseVenueLocationBlock(block) {
   const lines = block.split('\n').map((l) => l.trim()).filter(Boolean)
@@ -377,7 +454,7 @@ function parseVenueLocationBlock(block) {
   const instructionLines = []
   const remaining = []
   for (const line of lines) {
-    if (isInstructionLine(line)) instructionLines.push(line)
+    if (isArrivalInstructionLine(line)) instructionLines.push(line)
     else remaining.push(line)
   }
 
@@ -386,59 +463,82 @@ function parseVenueLocationBlock(block) {
   }
 
   let name = ''
-  const addressParts = []
+  /** @type {string[]} */
+  let addressParts = []
 
   if (remaining.length === 1) {
     const only = remaining[0]
-    const dash = trySplitNameDashAddress(only)
-    if (dash) {
-      name = dash.name
-      addressParts.push(dash.addressLine)
+    const split = splitVenueAndAddress(only)
+    if (split) {
+      name = split.venueName
+      addressParts.push(split.venueAddress)
     } else {
       const commaIdx = only.indexOf(',')
       const tail = commaIdx > 0 ? only.slice(commaIdx + 1).trim() : ''
-      if (commaIdx > 0 && tail && looksLikeStreetAddress(tail)) {
-        name = only.slice(0, commaIdx).trim()
-        addressParts.push(tail)
-      } else if (looksLikeStreetAddress(only)) {
+      if (commaIdx > 0 && tail && isAddressLine(tail)) {
+        const head = only.slice(0, commaIdx).trim()
+        if (head.length <= 100 && !isArrivalInstructionLine(head)) {
+          name = head
+          addressParts.push(tail)
+        }
+      } else if (isAddressLine(only)) {
         addressParts.push(only)
-      } else {
-        name = only
+      } else if (!isArrivalInstructionLine(only)) {
+        name = only.length <= 120 ? only : ''
       }
     }
   } else {
     const first = remaining[0]
-    const dash = trySplitNameDashAddress(first)
-    if (dash) {
-      name = dash.name
-      addressParts.push(dash.addressLine)
+    const split = splitVenueAndAddress(first)
+    if (split) {
+      name = split.venueName
+      addressParts.push(split.venueAddress)
       for (let i = 1; i < remaining.length; i++) {
         const L = remaining[i]
-        if (looksLikeStreetAddress(L) || looksLikeAddressContinuation(L)) addressParts.push(L)
+        if (isAddressLine(L) || (addressParts.length > 0 && isAddressContinuationLine(L))) addressParts.push(L)
         else instructionLines.push(L)
       }
     } else {
-      name = first
+      const head = first
+      if (!isAddressLine(head) && head.length <= 120) name = head
       const tailLines = remaining.slice(1)
       const tailJoined = tailLines.join('\n')
-      if (looksLikeStreetAddress(tailJoined)) {
+      if (isAddressLine(tailJoined)) {
         addressParts.push(tailJoined)
       } else {
         for (const L of tailLines) {
-          if (looksLikeStreetAddress(L) || looksLikeAddressContinuation(L)) addressParts.push(L)
+          if (isAddressLine(L) || (addressParts.length > 0 && isAddressContinuationLine(L))) addressParts.push(L)
           else instructionLines.push(L)
         }
       }
     }
   }
 
+  addressParts = filterAddressLines(addressParts)
+
   const address = addressParts.join('\n').trim()
   const instructions = instructionLines.join('\n').trim()
   return { name: name.trim(), address, instructions }
 }
 
+/** Drop any line that is not a confident address (or valid continuation). */
+function filterAddressLines(parts) {
+  const out = []
+  for (const line of parts) {
+    const L = line.trim()
+    if (!L) continue
+    if (isArrivalInstructionLine(L)) continue
+    if (isAddressLine(L)) {
+      out.push(L)
+      continue
+    }
+    if (out.length > 0 && isAddressContinuationLine(L)) out.push(L)
+  }
+  return out
+}
+
 function normalizeAgendaText(s) {
-  return s
+  return normalizeWhitespace(s)
     .split('\n')
     .map((l) => l.trimEnd())
     .join('\n')
