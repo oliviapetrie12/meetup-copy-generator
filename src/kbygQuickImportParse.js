@@ -173,14 +173,19 @@ export function parseKbygQuickImport(raw) {
     if (dt.arrival) mark('arrivalTime', dt.arrival)
   }
 
+  /** Instructions peeled from location blob (same-line dash addresses, mis-merged paragraphs). */
+  let arrivalFromVenue = ''
   if (sections.venue) {
-    const { name, address } = splitVenue(sections.venue)
-    if (name) mark('venueName', name)
-    if (address) mark('venueAddress', address)
+    const pv = parseVenueLocationBlock(sections.venue)
+    if (pv.name) mark('venueName', pv.name)
+    if (pv.address) mark('venueAddress', pv.address)
+    arrivalFromVenue = pv.instructions || ''
   }
 
   if (sections.parking) mark('parkingNotes', sections.parking)
-  if (sections.arrival) mark('speakerArrivalNote', sections.arrival)
+
+  const arrivalMerged = [sections.arrival, arrivalFromVenue].filter(Boolean).join('\n\n').trim()
+  if (arrivalMerged) mark('speakerArrivalNote', arrivalMerged)
   if (sections.agenda) mark('internalAgenda', normalizeAgendaText(sections.agenda))
   if (sections.food) mark('foodDetails', sections.food)
   if (sections.drinks) mark('drinkDetails', sections.drinks)
@@ -302,19 +307,134 @@ function parseDateTimeSection(block) {
   return out
 }
 
-function splitVenue(block) {
+/** US-heavy heuristics: street numbers, zip, floor/suite, common suffixes. */
+function looksLikeStreetAddress(s) {
+  const t = (s || '').trim()
+  if (!t) return false
+  if (/\b\d{5}(?:-\d{4})?\b/.test(t)) return true
+  if (/\b[A-Z]{2}\s+\d{5}(?:-\d{4})?\b/.test(t)) return true
+  if (
+    /\d+\s+[NSEW]?\s*[\w\s,.-]+\s+(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Plaza|Lane|Ln|Court|Ct|Way|Place|Pl|Highway|Hwy)\b/i.test(
+      t,
+    )
+  )
+    return true
+  if (/\d+(?:st|nd|rd|th)\s+floor\b/i.test(t)) return true
+  if (/\b(?:suite|ste\.?|unit)\s*#?[a-z0-9-]+\b/i.test(t)) return true
+  if (/^\d+\s+[A-Za-z]/.test(t) && t.length >= 12 && /,/.test(t)) return true
+  return false
+}
+
+function isInstructionLine(line) {
+  const raw = (line || '').trim()
+  if (!raw) return false
+  const t = raw.replace(/^[^:]+:\s*/, '').trim() || raw
+
+  if (/^(?:arrival|check[\s-]?in)\s+instructions?\b/i.test(raw)) return true
+  if (/arrival\s+instructions?\b/i.test(raw)) return true
+  if (/^getting\s+there\b/i.test(raw)) return true
+  if (/^upon\s+arrival\b/i.test(t)) return true
+  if (/^please\s+(?:bring|arrive|check|note)/i.test(t)) return true
+  if (/\bplease\s+bring\b/i.test(t)) return true
+  if (/\bbring\s+(?:your|an)\s+ID\b/i.test(t)) return true
+  if (/\bcheck[\s-]?in\b/i.test(t) && !looksLikeStreetAddress(t)) return true
+  if (/\benter\s+through\b/i.test(t)) return true
+  if (/\belevator\b/i.test(t)) return true
+  if (/\bfront\s+desk\b/i.test(t)) return true
+  if (/\bsecurity\b/i.test(t) && /\b(?:desk|check|badge|building)\b/i.test(t)) return true
+  if (/^please\b/i.test(t) && !looksLikeStreetAddress(t)) return true
+  return false
+}
+
+function looksLikeAddressContinuation(s) {
+  const t = (s || '').trim()
+  if (!t || isInstructionLine(t)) return false
+  return /\b(?:suite|ste\.?|floor|fl\.?|bldg|building)\b/i.test(t) || /\d+(?:st|nd|rd|th)\s+floor/i.test(t)
+}
+
+/**
+ * "Org Name - 123 Main St ..." → name + address when RHS looks like an address.
+ * @returns {{ name: string, addressLine: string } | null}
+ */
+function trySplitNameDashAddress(line) {
+  const m = line.trim().match(/^(.+?)\s*[-–—]\s+(.+)$/)
+  if (!m) return null
+  const left = m[1].trim()
+  const right = m[2].trim()
+  if (!left || !right) return null
+  if (looksLikeStreetAddress(right)) return { name: left, addressLine: right }
+  if (/^\d/.test(right) && right.length >= 10 && /[a-z]/i.test(right)) return { name: left, addressLine: right }
+  return null
+}
+
+/**
+ * Split pasted location text into venue name, postal-style address only, and prose instructions.
+ * @returns {{ name: string, address: string, instructions: string }}
+ */
+function parseVenueLocationBlock(block) {
   const lines = block.split('\n').map((l) => l.trim()).filter(Boolean)
-  if (lines.length >= 2) {
-    return { name: lines[0], address: lines.slice(1).join('\n') }
+
+  const instructionLines = []
+  const remaining = []
+  for (const line of lines) {
+    if (isInstructionLine(line)) instructionLines.push(line)
+    else remaining.push(line)
   }
-  const comma = block.indexOf(',')
-  if (comma > 0 && comma < block.length - 3) {
-    return {
-      name: block.slice(0, comma).trim(),
-      address: block.slice(comma + 1).trim(),
+
+  if (remaining.length === 0) {
+    return { name: '', address: '', instructions: instructionLines.join('\n').trim() }
+  }
+
+  let name = ''
+  const addressParts = []
+
+  if (remaining.length === 1) {
+    const only = remaining[0]
+    const dash = trySplitNameDashAddress(only)
+    if (dash) {
+      name = dash.name
+      addressParts.push(dash.addressLine)
+    } else {
+      const commaIdx = only.indexOf(',')
+      const tail = commaIdx > 0 ? only.slice(commaIdx + 1).trim() : ''
+      if (commaIdx > 0 && tail && looksLikeStreetAddress(tail)) {
+        name = only.slice(0, commaIdx).trim()
+        addressParts.push(tail)
+      } else if (looksLikeStreetAddress(only)) {
+        addressParts.push(only)
+      } else {
+        name = only
+      }
+    }
+  } else {
+    const first = remaining[0]
+    const dash = trySplitNameDashAddress(first)
+    if (dash) {
+      name = dash.name
+      addressParts.push(dash.addressLine)
+      for (let i = 1; i < remaining.length; i++) {
+        const L = remaining[i]
+        if (looksLikeStreetAddress(L) || looksLikeAddressContinuation(L)) addressParts.push(L)
+        else instructionLines.push(L)
+      }
+    } else {
+      name = first
+      const tailLines = remaining.slice(1)
+      const tailJoined = tailLines.join('\n')
+      if (looksLikeStreetAddress(tailJoined)) {
+        addressParts.push(tailJoined)
+      } else {
+        for (const L of tailLines) {
+          if (looksLikeStreetAddress(L) || looksLikeAddressContinuation(L)) addressParts.push(L)
+          else instructionLines.push(L)
+        }
+      }
     }
   }
-  return { name: block, address: '' }
+
+  const address = addressParts.join('\n').trim()
+  const instructions = instructionLines.join('\n').trim()
+  return { name: name.trim(), address, instructions }
 }
 
 function normalizeAgendaText(s) {
