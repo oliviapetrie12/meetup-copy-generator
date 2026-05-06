@@ -14,6 +14,39 @@ function kbygEmojisEnabled(form, opts) {
   return form?.kbygEmojiHeaders !== false
 }
 
+const KBYG_LINK_INLINE_STYLE = 'color:#1D4ED8;text-decoration:underline;'
+
+/** Clickable label only (no raw URL in the visible HTML). */
+function kbygExternalLinkHtml(url, labelText) {
+  return `<a href="${escapeHtmlAttr(url)}" target="_blank" rel="noopener noreferrer" style="${KBYG_LINK_INLINE_STYLE}">${escapeHtml(labelText)}</a>`
+}
+
+/**
+ * Meetup + Luma rows for Event page section (HTML list cells are anchors only).
+ * @returns {string[]} inner HTML fragments for each &lt;li&gt;
+ */
+function kbygEventPageLinkItemsHtml(form, trim, has, S) {
+  /** @type {string[]} */
+  const items = []
+  if (has(form.meetupLink)) items.push(kbygExternalLinkHtml(trim(form.meetupLink), S.meetupEventLinkLabel))
+  if (has(form.lumaLink)) items.push(kbygExternalLinkHtml(trim(form.lumaLink), S.lumaRegistrationLinkLabel))
+  return items
+}
+
+/**
+ * Plain-text bullets: markdown links so Paste retains clickable destinations where supported; avoids naked long URLs in the body lines.
+ */
+function appendKbygEventPagePlain(lines, headingFn, form, S, trim, has) {
+  /** @type {string[]} */
+  const bullets = []
+  if (has(form.meetupLink)) bullets.push(`- [${S.meetupEventLinkLabel}](${trim(form.meetupLink)})`)
+  if (has(form.lumaLink)) bullets.push(`- [${S.lumaRegistrationLinkLabel}](${trim(form.lumaLink)})`)
+  if (!bullets.length) return
+  lines.push(headingFn('registration', S.eventPage))
+  bullets.forEach((b) => lines.push(b))
+  lines.push('')
+}
+
 /** @param {import('../shared/eventData.js').SharedEventData} eventData */
 function buildKbygIntroParagraphText(S, eventData, trim) {
   const whenLine = trim(eventData.date)
@@ -129,8 +162,34 @@ export function renderKbygEmailHtml(eventData, form, opts = {}) {
     )
   }
 
-  for (const block of kbygLogisticsStandaloneBlocks(eventData, trim, S)) {
-    chunks.push(kbygStandaloneSectionHtml(block.sectionKey, block.title, block.body, emojisEnabled))
+  const eventLinkItems = kbygEventPageLinkItemsHtml(form, trim, has, S)
+  if (eventLinkItems.length > 0) {
+    const eventPageTitle = formatSectionHeader('registration', S.eventPage, emojisEnabled)
+    chunks.push(
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(eventPageTitle)}</strong></p>${kbygHtmlUl(eventLinkItems)}</div>`,
+    )
+  }
+
+  const contactEntries = (form.contacts || []).filter((c) => has(c.name) || has(c.role) || has(c.contactInfo))
+  if (contactEntries.length > 0) {
+    const contactItems = contactEntries.map((c) => {
+      const name = trim(c.name)
+      const role = trim(c.role)
+      const info = trim(c.contactInfo)
+      let main = ''
+      if (name && info) main = `${name} (${info})`
+      else if (name) main = name
+      else if (info) main = info
+      let line = ''
+      if (main && role) line = `${main} – ${role}`
+      else if (main) line = main
+      else line = role
+      return escapeHtml(line)
+    })
+    const contactsTitle = formatSectionHeader('contact', S.htmlHelpfulContactsStrong, emojisEnabled)
+    chunks.push(
+      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(contactsTitle)}</strong></p>${kbygHtmlUl(contactItems)}</div>`,
+    )
   }
 
   if (eventData.agenda.length > 0) {
@@ -141,6 +200,10 @@ export function renderKbygEmailHtml(eventData, form, opts = {}) {
         `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(agendaTitle)}</strong></p>${agendaHtml}</div>`,
       )
     }
+  }
+
+  for (const block of kbygLogisticsStandaloneBlocks(eventData, trim, S)) {
+    chunks.push(kbygStandaloneSectionHtml(block.sectionKey, block.title, block.body, emojisEnabled))
   }
 
   const speakerItems = []
@@ -167,48 +230,6 @@ export function renderKbygEmailHtml(eventData, form, opts = {}) {
     const arrivalTitle = formatSectionHeader('arrivalInstructions', S.htmlSpeakerArrivalStrong, emojisEnabled)
     chunks.push(
       `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(arrivalTitle)}</strong></p><p style="margin:0;line-height:1.5;">${escapeHtml(trim(form.speakerArrivalNote)).replace(/\n/g, '<br>')}</p></div>`,
-    )
-  }
-
-  if (has(form.meetupLink) || has(form.lumaLink)) {
-    const linkItems = []
-    if (has(form.meetupLink)) {
-      const u = trim(form.meetupLink)
-      linkItems.push(
-        `${escapeHtml(S.htmlMeetupLink)}: <a href="${escapeHtmlAttr(u)}" style="color:#1D4ED8;text-decoration:underline;">${escapeHtml(u)}</a>`,
-      )
-    }
-    if (has(form.lumaLink)) {
-      const u = trim(form.lumaLink)
-      linkItems.push(
-        `${escapeHtml(S.htmlLumaLink)}: <a href="${escapeHtmlAttr(u)}" style="color:#1D4ED8;text-decoration:underline;">${escapeHtml(u)}</a>`,
-      )
-    }
-    const eventPageTitle = formatSectionHeader('registration', S.htmlEventPageStrong, emojisEnabled)
-    chunks.push(
-      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(eventPageTitle)}</strong></p>${kbygHtmlUl(linkItems)}</div>`,
-    )
-  }
-
-  const contactEntries = (form.contacts || []).filter((c) => has(c.name) || has(c.role) || has(c.contactInfo))
-  if (contactEntries.length > 0) {
-    const contactItems = contactEntries.map((c) => {
-      const name = trim(c.name)
-      const role = trim(c.role)
-      const info = trim(c.contactInfo)
-      let main = ''
-      if (name && info) main = `${name} (${info})`
-      else if (name) main = name
-      else if (info) main = info
-      let line = ''
-      if (main && role) line = `${main} – ${role}`
-      else if (main) line = main
-      else line = role
-      return escapeHtml(line)
-    })
-    const contactsTitle = formatSectionHeader('contact', S.htmlHelpfulContactsStrong, emojisEnabled)
-    chunks.push(
-      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(contactsTitle)}</strong></p>${kbygHtmlUl(contactItems)}</div>`,
     )
   }
 
@@ -291,14 +312,34 @@ export function renderKbygEmailPlain(eventData, form, opts = {}) {
     lines.push('')
   }
 
-  for (const block of kbygLogisticsStandaloneBlocks(eventData, trim, S)) {
-    appendKbygStandalonePlainSection(lines, heading, block.sectionKey, block.title, block.body)
+  appendKbygEventPagePlain(lines, heading, form, S, trim, has)
+
+  const contactEntries = (form.contacts || []).filter((c) => has(c.name) || has(c.role) || has(c.contactInfo))
+  if (contactEntries.length > 0) {
+    lines.push(heading('contact', S.helpfulContacts))
+    contactEntries.forEach((c) => {
+      const name = trim(c.name)
+      const role = trim(c.role)
+      const info = trim(c.contactInfo)
+      let main = ''
+      if (name && info) main = `${name} (${info})`
+      else if (name) main = name
+      else if (info) main = info
+      if (main && role) lines.push(`- ${main} – ${role}`)
+      else if (main) lines.push(`- ${main}`)
+      else if (role) lines.push(`- ${role}`)
+    })
+    lines.push('')
   }
 
   if (eventData.agenda.length > 0) {
     lines.push(heading('agenda', S.agenda))
     agendaPlainLinesFromItems(eventData.agenda).forEach((l) => lines.push(l))
     lines.push('')
+  }
+
+  for (const block of kbygLogisticsStandaloneBlocks(eventData, trim, S)) {
+    appendKbygStandalonePlainSection(lines, heading, block.sectionKey, block.title, block.body)
   }
 
   const sp1 = has(form.speaker1Name) || has(form.speaker1Title) || has(form.speaker1TalkTitle)
@@ -323,31 +364,6 @@ export function renderKbygEmailPlain(eventData, form, opts = {}) {
   if (has(form.speakerArrivalNote)) {
     lines.push(heading('arrivalInstructions', S.speakerArrival))
     lines.push(trim(form.speakerArrivalNote))
-    lines.push('')
-  }
-
-  if (has(form.meetupLink) || has(form.lumaLink)) {
-    lines.push(heading('registration', S.eventPage))
-    if (has(form.meetupLink)) lines.push(`- ${S.meetupLabel}: ${trim(form.meetupLink)}`)
-    if (has(form.lumaLink)) lines.push(`- ${S.lumaLabel}: ${trim(form.lumaLink)}`)
-    lines.push('')
-  }
-
-  const contactEntries = (form.contacts || []).filter((c) => has(c.name) || has(c.role) || has(c.contactInfo))
-  if (contactEntries.length > 0) {
-    lines.push(heading('contact', S.helpfulContacts))
-    contactEntries.forEach((c) => {
-      const name = trim(c.name)
-      const role = trim(c.role)
-      const info = trim(c.contactInfo)
-      let main = ''
-      if (name && info) main = `${name} (${info})`
-      else if (name) main = name
-      else if (info) main = info
-      if (main && role) lines.push(`- ${main} – ${role}`)
-      else if (main) lines.push(`- ${main}`)
-      else if (role) lines.push(`- ${role}`)
-    })
     lines.push('')
   }
 

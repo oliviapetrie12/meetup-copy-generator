@@ -362,6 +362,10 @@ export function getMeetupKbygStrings(lang) {
       eventPage: 'Event page',
       meetupLabel: 'Meetup',
       lumaLabel: 'Luma',
+      /** Short hyperlink label for Meetup URL (no raw URL in preview copy). */
+      meetupEventLinkLabel: 'Meetup Event',
+      /** Short hyperlink label for Luma URL (no raw URL in preview copy). */
+      lumaRegistrationLinkLabel: 'Luma Registration',
       helpfulContacts: 'Helpful contacts',
       foodBeverage: 'Food & beverage',
       setup: 'Setup',
@@ -439,6 +443,8 @@ export function getMeetupKbygStrings(lang) {
       eventPage: 'Página del evento',
       meetupLabel: 'Meetup',
       lumaLabel: 'Luma',
+      meetupEventLinkLabel: 'Evento en Meetup',
+      lumaRegistrationLinkLabel: 'Registro en Luma',
       helpfulContacts: 'Contactos útiles',
       foodBeverage: 'Comida y bebidas',
       setup: 'Montaje',
@@ -517,6 +523,8 @@ export function getMeetupKbygStrings(lang) {
       eventPage: 'Página do evento',
       meetupLabel: 'Meetup',
       lumaLabel: 'Luma',
+      meetupEventLinkLabel: 'Evento no Meetup',
+      lumaRegistrationLinkLabel: 'Inscrição no Luma',
       helpfulContacts: 'Contatos úteis',
       foodBeverage: 'Comida e bebidas',
       setup: 'Montagem',
