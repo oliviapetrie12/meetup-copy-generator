@@ -601,19 +601,16 @@ export function getMeetupKbygPhotoLines(lang) {
       'Capture a few photos of the setup and space',
       'Take photos during the talk (speaker + audience)',
       'Get a few candid networking shots',
-      'Optional: short video clips for social',
     ],
     es: [
       'Captura algunas fotos del montaje y del espacio',
       'Fotos durante la charla (ponente + público)',
       'Algunas fotos espontáneas de networking',
-      'Opcional: clips cortos para redes',
     ],
     pt: [
       'Tire algumas fotos da montagem e do espaço',
       'Fotos durante a palestra (palestrante + público)',
       'Algumas fotos espontâneas do networking',
-      'Opcional: vídeos curtos para redes sociais',
     ],
   }
   return M[n] || M.en
