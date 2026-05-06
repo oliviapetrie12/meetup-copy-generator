@@ -204,26 +204,6 @@ function appendKbygEmailHtmlBody(chunks, ctx) {
       }
     },
     () => {
-      const speakerItems = []
-      if (has(form.speaker1Name) || has(form.speaker1Title) || has(form.speaker1TalkTitle)) {
-        let t = trim(form.speaker1Name) || S.speaker1Default
-        if (has(form.speaker1Title)) t += `, ${trim(form.speaker1Title)}`
-        if (has(form.speaker1TalkTitle)) t += ` — ${trim(form.speaker1TalkTitle)}`
-        speakerItems.push(escapeHtml(t))
-      }
-      if (has(form.speaker2Name) || has(form.speaker2Title) || has(form.speaker2TalkTitle)) {
-        let t = trim(form.speaker2Name) || S.speaker2Default
-        if (has(form.speaker2Title)) t += `, ${trim(form.speaker2Title)}`
-        if (has(form.speaker2TalkTitle)) t += ` — ${trim(form.speaker2TalkTitle)}`
-        speakerItems.push(escapeHtml(t))
-      }
-      if (!speakerItems.length) return
-      const speakerTitle = formatSectionHeader('speaker', S.htmlSpeakerStrong, emojisEnabled)
-      chunks.push(
-        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(speakerTitle)}</strong></p>${kbygHtmlUl(speakerItems)}</div>`,
-      )
-    },
-    () => {
       if (!has(form.speakerArrivalNote)) return
       const arrivalTitle = formatSectionHeader('arrivalInstructions', S.htmlSpeakerArrivalStrong, emojisEnabled)
       chunks.push(
@@ -328,25 +308,6 @@ function appendKbygEmailPlainBody(lines, ctx) {
       for (const block of kbygLogisticsStandaloneBlocks(eventData, trim, S)) {
         appendKbygStandalonePlainSection(lines, heading, block.sectionKey, block.title, block.body)
       }
-    },
-    () => {
-      const sp1 = has(form.speaker1Name) || has(form.speaker1Title) || has(form.speaker1TalkTitle)
-      const sp2 = has(form.speaker2Name) || has(form.speaker2Title) || has(form.speaker2TalkTitle)
-      if (!sp1 && !sp2) return
-      lines.push(heading('speaker', S.speaker))
-      if (sp1) {
-        let t = trim(form.speaker1Name) || S.speaker1Default
-        if (has(form.speaker1Title)) t += `, ${trim(form.speaker1Title)}`
-        if (has(form.speaker1TalkTitle)) t += ` — ${trim(form.speaker1TalkTitle)}`
-        lines.push(`- ${t}`)
-      }
-      if (sp2) {
-        let t = trim(form.speaker2Name) || S.speaker2Default
-        if (has(form.speaker2Title)) t += `, ${trim(form.speaker2Title)}`
-        if (has(form.speaker2TalkTitle)) t += ` — ${trim(form.speaker2TalkTitle)}`
-        lines.push(`- ${t}`)
-      }
-      lines.push('')
     },
     () => {
       if (!has(form.speakerArrivalNote)) return
