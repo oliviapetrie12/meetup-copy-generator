@@ -1,17 +1,29 @@
 /**
- * Heuristic paste parser for Meetup / Luma / messy event text → KBYG form patches.
- * Fills only extracted fields; callers merge into existing form (typically fill-empty-only).
+ * Classification-based Quick Import parser (Meetup / Luma / pasted notes → KBYG patch).
  *
- * Mapping rules (conservative):
- * - Never emit eventTitle (manual entry only).
- * - Venue address: only lines that look like postal addresses; never arrival/check-in prose.
- * - Arrival/check-in prose → speaker arrival note (and/or additional notes via sections).
- * - Date/time/arrival clock values only when a regex matches confidently (no guessing AM/PM alone).
+ * Rules:
+ * - Never writes eventTitle (manual only; merge also ignores it).
+ * - Each logical line is classified before mapping; no blind sequential filling.
+ * - Venue address: only lines passing isAddressLine after sanitization; never arrival prose.
+ * - Low confidence → omit field (no guessing).
  */
 
 const URL_RE = /https?:\/\/[^\s\]<)"',]+/gi
 
-/** Maps patch keys → `getGeneratorUiTranslations` keys for success messages (same labels as form fields). */
+/** Dev-only: line → type → field (toggle via Vite import.meta.env.DEV). */
+function quickImportDebug(payload) {
+  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV) {
+    const { phase, line, type, field, detail } = payload
+    console.log('[QuickImport]', phase, {
+      line: line != null ? String(line).slice(0, 120) : undefined,
+      classified: type,
+      field: field ?? null,
+      detail,
+    })
+  }
+}
+
+/** Maps patch keys → `getGeneratorUiTranslations` keys for success messages. */
 export const KBYG_QUICK_IMPORT_I18N_KEYS = {
   meetupLink: 'kbyg_meetupLink',
   lumaLink: 'kbyg_lumaLink',
@@ -28,7 +40,6 @@ export const KBYG_QUICK_IMPORT_I18N_KEYS = {
   additionalNotes: 'kbyg_additionalNotes',
 }
 
-/** English labels for parsed keys (tests / debugging). */
 export const KBYG_QUICK_IMPORT_FIELD_LABELS = {
   meetupLink: 'Meetup link',
   lumaLink: 'Luma link',
@@ -46,7 +57,6 @@ export const KBYG_QUICK_IMPORT_FIELD_LABELS = {
 }
 
 /**
- * Parser patch keys (`eventTitle` intentionally omitted — never auto-filled).
  * @typedef {{
  *   eventDate?: string
  *   eventTime?: string
@@ -64,14 +74,16 @@ export const KBYG_QUICK_IMPORT_FIELD_LABELS = {
  * }} KbygQuickImportPatch */
 
 /**
- * Fix glued sentences (e.g. missing space after period; "advanceImproving" → "advance. Improving").
- * Used on parking and other prose blobs where HTML paste drops spaces.
+ * Restore spacing after punctuation, fix glued words/sentences, collapse duplicate spaces.
+ * Parking / prose blobs often lose spaces when pasted from HTML/PDF.
  */
 export function normalizeWhitespace(s) {
   if (s == null || typeof s !== 'string') return ''
   let t = s.replace(/\r\n/g, '\n')
   t = t.replace(/([.!?])([A-Za-z])/g, '$1 $2')
-  t = t.replace(/\b([a-z]{3,})([A-Z][a-z]{2,})\b/g, '$1. $2')
+  t = t.replace(/([,;:)])([A-Za-z])/g, '$1 $2')
+  t = t.replace(/\b([a-z]{2,})([A-Z][a-z]{2,})\b/g, '$1. $2')
+  t = t.replace(/([.!?])(?=[A-Za-z])/g, '$1 ')
   t = t
     .split('\n')
     .map((line) => line.replace(/[ \t]+/g, ' ').trim())
@@ -80,10 +92,6 @@ export function normalizeWhitespace(s) {
   return t.trim()
 }
 
-/**
- * Weekday + month + day, optional ordinal (May 13th), optional year.
- * Conservative: must start with a full weekday name.
- */
 export function extractDate(text) {
   const blob = String(text || '').slice(0, 12000)
   const re =
@@ -96,17 +104,12 @@ export function extractDate(text) {
   return `${m[1]}, ${m[2]} ${dayStr}`.trim()
 }
 
-/** Normalize "5:30" + am/pm → "5:30 PM" */
 function formatClock(hoursMinutes, ampmRaw) {
   const ap = (ampmRaw || '').toUpperCase()
   const suffix = ap.startsWith('A') ? 'AM' : 'PM'
   return `${hoursMinutes.trim()} ${suffix}`
 }
 
-/**
- * Prefer event start from a time range: "5:30-8:00 pm" → "5:30 PM".
- * Otherwise first "h:mm am/pm" in the blob.
- */
 export function extractStartTime(text) {
   const blob = String(text || '').slice(0, 12000)
   let m = blob.match(/\b(\d{1,2}:\d{2})\s*[-–—]\s*\d{1,2}:\d{2}\s*(am|pm)\b/i)
@@ -120,9 +123,6 @@ export function extractStartTime(text) {
   return ''
 }
 
-/**
- * Speakers arrive at / Arrive by / Please arrive by — only when meridiem is present or clearly adjacent.
- */
 export function extractArrivalTime(text) {
   const blob = String(text || '').slice(0, 14000)
   const patterns = [
@@ -135,7 +135,7 @@ export function extractArrivalTime(text) {
     const match = blob.match(re)
     if (!match) continue
     const hm = match[1]
-    let ap = match[2]
+    const ap = match[2]
     if (!ap) continue
     return formatClock(hm, ap)
   }
@@ -154,9 +154,36 @@ export function extractArrivalTime(text) {
   return ''
 }
 
-/** Street / ZIP signals only (no instruction detection); avoids recursion with isArrivalInstructionLine. */
+/** Leading emoji / pictographs (venue lines often include 📍🔑). */
+export function stripEmojiPrefix(s) {
+  return String(s || '')
+    .replace(/^[\s\uFE0F\u200d]*([\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]+[\s\uFE0F]*)+/gu, '')
+    .trim()
+}
+
+/**
+ * RHS of "Name - …" must show address indicators (digits, street types, zip, floor, etc.).
+ * Looser than full-line isAddressLine — used only for split decision.
+ */
+export function rhsHasAddressIndicators(s) {
+  const t = stripEmojiPrefix(String(s || ''))
+  if (!t) return false
+  if (/\d/.test(t)) return true
+  if (/\b\d{5}(?:-\d{4})?\b/.test(t)) return true
+  if (/\b[A-Z]{2}\s+\d{5}(?:-\d{4})?\b/.test(t)) return true
+  if (
+    /\b(?:St\.?|Avenue|Ave\.?|Road|Rd\.?|Boulevard|Blvd\.?|Drive|Dr\.?|Plaza|Lane|Ln\.?|Court|Ct\.?|Way|Place|Pl\.?|Highway|Hwy)\b/i.test(
+      t,
+    )
+  )
+    return true
+  if (/\b(?:Floor|Suite|Ste\.?|Unit)\b/i.test(t)) return true
+  if (/\d+(?:st|nd|rd|th)\s+floor\b/i.test(t)) return true
+  return false
+}
+
 export function hasAddressSignals(s) {
-  const t = (s || '').trim()
+  const t = stripEmojiPrefix(String(s || ''))
   if (!t) return false
   if (/\b\d{5}(?:-\d{4})?\b/.test(t)) return true
   if (/\b[A-Z]{2}\s+\d{5}(?:-\d{4})?\b/.test(t)) return true
@@ -171,27 +198,15 @@ export function hasAddressSignals(s) {
   return false
 }
 
-/**
- * True only for lines that look like a postal/street address (conservative).
- * Arrival prose must fail this check.
- */
-export function isAddressLine(s) {
-  const t = (s || '').trim()
-  if (!t || isArrivalInstructionLine(t)) return false
-  return hasAddressSignals(t)
-}
-
-/**
- * Arrival / check-in / building access prose — never mapped to venue address.
- */
 export function isArrivalInstructionLine(line) {
-  const raw = (line || '').trim()
+  const raw = String(line || '').trim()
   if (!raw) return false
-  const t = raw.replace(/^[^:]+:\s*/, '').trim() || raw
+  const probe = stripEmojiPrefix(raw)
+  const t = probe.replace(/^[^:]+:\s*/, '').trim() || probe
 
-  if (/arrival\s+instructions?\b/i.test(raw)) return true
-  if (/^(?:arrival|check[\s-]?in)\s+instructions?\b/i.test(raw)) return true
-  if (/^getting\s+there\b/i.test(raw)) return true
+  if (/arrival\s+instructions?\b/i.test(probe)) return true
+  if (/^(?:arrival|check[\s-]?in)\s+instructions?\b/i.test(probe)) return true
+  if (/^getting\s+there\b/i.test(probe)) return true
   if (/\bcheck\s*in\b/i.test(t) && !hasAddressSignals(raw)) return true
   if (/\bcheck-in\b/i.test(t) && !hasAddressSignals(raw)) return true
   if (/^upon\s+arrival\b/i.test(t)) return true
@@ -206,26 +221,132 @@ export function isArrivalInstructionLine(line) {
   return false
 }
 
-/** Suite/floor line that continues an address block (must follow a real address line). */
+/** Address-only content for venue field: strip leading emoji; drop if instruction prose. */
+export function sanitizeAddressLine(s) {
+  let t = stripEmojiPrefix(String(s || '').trim())
+  if (!t) return ''
+  if (isArrivalInstructionLine(t)) return ''
+  return t.trim()
+}
+
+export function isAddressLine(s) {
+  const t = sanitizeAddressLine(s)
+  if (!t || isArrivalInstructionLine(t)) return false
+  return hasAddressSignals(t)
+}
+
+export function splitVenueAndAddress(line) {
+  const trimmed = String(line || '').trim()
+  let idx = trimmed.indexOf(' - ')
+  let sepLen = 3
+  if (idx === -1) {
+    const m = trimmed.match(/\s[–—]\s/)
+    if (m && m.index !== undefined) {
+      idx = m.index
+      sepLen = m[0].length
+    }
+  }
+  if (idx === -1) return null
+  const left = trimmed.slice(0, idx).trim()
+  const right = trimmed.slice(idx + sepLen).trim()
+  if (!left || !right) return null
+  if (!rhsHasAddressIndicators(right)) return null
+  const venueName = stripEmojiPrefix(left)
+  if (!venueName || venueName.length > 120) return null
+  const venueAddress = sanitizeAddressLine(right)
+  if (!venueAddress || !isAddressLine(venueAddress)) return null
+  return { venueName, venueAddress }
+}
+
 function isAddressContinuationLine(s) {
-  const t = (s || '').trim()
+  const t = sanitizeAddressLine(s)
   if (!t || isArrivalInstructionLine(t)) return false
   return /\b(?:suite|ste\.?|floor|fl\.?|bldg|building)\b/i.test(t) || /\d+(?:st|nd|rd|th)\s+floor/i.test(t)
 }
 
 /**
- * Split one line "Venue Name - 222 Street …" when RHS passes isAddressLine.
- * @returns {{ venueName: string, venueAddress: string } | null}
+ * Classify each non-empty line in a Location section; collect name, address lines, instructions.
  */
-export function splitVenueAndAddress(line) {
-  const m = line.trim().match(/^(.+?)\s*[-–—]\s+(.+)$/)
-  if (!m) return null
-  const left = m[1].trim()
-  const right = m[2].trim()
-  if (!left || !right) return null
-  if (!isAddressLine(right)) return null
-  if (left.length > 120) return null
-  return { venueName: left, venueAddress: right }
+function parseVenueLocationBlock(block) {
+  const rawLines = String(block || '').split('\n')
+  let venueName = ''
+  const addressLines = []
+  const instructionLines = []
+
+  for (const rawLine of rawLines) {
+    const line = rawLine.trim()
+    if (!line) continue
+
+    quickImportDebug({ phase: 'venue-line', line, type: 'raw', detail: 'classify' })
+
+    if (isArrivalInstructionLine(line)) {
+      instructionLines.push(line)
+      quickImportDebug({ phase: 'venue-line', line, type: 'arrival_instruction', field: 'speakerArrivalNote' })
+      continue
+    }
+
+    const split = splitVenueAndAddress(line)
+    if (split) {
+      if (!venueName) venueName = split.venueName
+      addressLines.push(split.venueAddress)
+      quickImportDebug({
+        phase: 'venue-line',
+        line,
+        type: 'venue_dash_address',
+        field: 'venueName + venueAddress',
+        detail: { name: split.venueName, addr: split.venueAddress },
+      })
+      continue
+    }
+
+    const sanitized = sanitizeAddressLine(line)
+    if (sanitized && isAddressLine(sanitized)) {
+      addressLines.push(sanitized)
+      quickImportDebug({ phase: 'venue-line', line: sanitized, type: 'address', field: 'venueAddress' })
+      continue
+    }
+
+    if (addressLines.length > 0 && isAddressContinuationLine(line)) {
+      const cont = sanitizeAddressLine(line)
+      if (cont) {
+        addressLines.push(cont)
+        quickImportDebug({ phase: 'venue-line', line: cont, type: 'address_continuation', field: 'venueAddress' })
+      }
+      continue
+    }
+
+    if (
+      !venueName &&
+      line.length <= 100 &&
+      !rhsHasAddressIndicators(line) &&
+      !/\d{5}/.test(line) &&
+      !isArrivalInstructionLine(line)
+    ) {
+      venueName = stripEmojiPrefix(line)
+      quickImportDebug({ phase: 'venue-line', line, type: 'venue_name_only', field: 'venueName' })
+      continue
+    }
+
+    if (/\b(?:please|bring|arrival|check|elevator|desk|register)\b/i.test(stripEmojiPrefix(line))) {
+      instructionLines.push(line)
+      quickImportDebug({ phase: 'venue-line', line, type: 'arrival_instruction_fallback', field: 'speakerArrivalNote' })
+      continue
+    }
+
+    quickImportDebug({ phase: 'venue-line', line, type: 'skipped_low_confidence', detail: 'omit' })
+  }
+
+  const filteredAddr = []
+  for (const L of addressLines) {
+    const x = sanitizeAddressLine(L)
+    if (x && isAddressLine(x)) filteredAddr.push(x)
+  }
+
+  return {
+    name: venueName.trim(),
+    address: filteredAddr.join('\n').trim(),
+    instructions: instructionLines.join('\n').trim(),
+  }
 }
 
 /**
@@ -245,11 +366,13 @@ export function parseKbygQuickImport(raw) {
   const labels = []
 
   const mark = (key, value) => {
+    if (key === 'eventTitle') return
     const v = typeof value === 'string' ? value.trim() : ''
     if (!v || patch[key]) return
     patch[key] = v
     const label = KBYG_QUICK_IMPORT_FIELD_LABELS[key]
     if (label) labels.push(label)
+    quickImportDebug({ phase: 'mark', field: key, detail: v.slice(0, 80) })
   }
 
   const urls = []
@@ -259,8 +382,14 @@ export function parseKbygQuickImport(raw) {
 
   const meetup = urls.find((u) => /meetup\.com/i.test(u))
   const luma = urls.find((u) => /(?:luma\.|lu\.ma)/i.test(u))
-  if (meetup) mark('meetupLink', meetup)
-  if (luma) mark('lumaLink', luma)
+  if (meetup) {
+    quickImportDebug({ phase: 'url', line: meetup, type: 'meetup', field: 'meetupLink' })
+    mark('meetupLink', meetup)
+  }
+  if (luma) {
+    quickImportDebug({ phase: 'url', line: luma, type: 'luma', field: 'lumaLink' })
+    mark('lumaLink', luma)
+  }
 
   const lines = text.split('\n').map((l) => l.replace(/\s+$/, ''))
   const normLine = (l) =>
@@ -330,6 +459,13 @@ export function parseKbygQuickImport(raw) {
       }
       const body = buf.join('\n').trim()
       if (body) sections[hm.assign] = sections[hm.assign] ? `${sections[hm.assign]}\n\n${body}` : body
+      quickImportDebug({
+        phase: 'section',
+        line: hm.assign,
+        type: 'section_block',
+        field: hm.assign,
+        detail: body.slice(0, 60),
+      })
       break
     }
     if (!matched) i += 1
@@ -348,13 +484,23 @@ export function parseKbygQuickImport(raw) {
   }
 
   if (sections.parking) {
-    mark('parkingNotes', normalizeWhitespace(sections.parking))
+    const pk = normalizeWhitespace(sections.parking)
+    quickImportDebug({ phase: 'parking', type: 'normalized', field: 'parkingNotes', detail: pk.slice(0, 80) })
+    mark('parkingNotes', pk)
   }
 
-  const arrivalMerged = [sections.arrival, arrivalFromVenue].filter(Boolean).join('\n\n').trim()
-  if (arrivalMerged) {
-    mark('speakerArrivalNote', normalizeWhitespace(arrivalMerged))
-  }
+  const arrivalMerged = [sections.arrival, arrivalFromVenue]
+    .filter(Boolean)
+    .map((block) =>
+      block
+        .split('\n')
+        .map((ln) => stripEmojiPrefix(ln.trim()))
+        .filter(Boolean)
+        .join('\n'),
+    )
+    .join('\n\n')
+    .trim()
+  if (arrivalMerged) mark('speakerArrivalNote', normalizeWhitespace(arrivalMerged))
   if (sections.agenda) mark('internalAgenda', normalizeAgendaText(sections.agenda))
   if (sections.food) mark('foodDetails', normalizeWhitespace(sections.food))
   if (sections.drinks) mark('drinkDetails', normalizeWhitespace(sections.drinks))
@@ -407,11 +553,6 @@ export function parseKbygQuickImport(raw) {
   return { patch, filledLabels, hints }
 }
 
-/**
- * Merge parser patch into prior form state (does not overwrite non-empty string fields).
- * eventTitle is never applied from the parser.
- * @returns {{ next: typeof prev, appliedKeys: string[] }}
- */
 export function mergeKbygQuickImportPatch(prev, patch) {
   /** @type {Record<string, unknown>} */
   const next = { ...prev }
@@ -435,7 +576,6 @@ export function mergeKbygQuickImportPatch(prev, patch) {
   return { next, appliedKeys: deduped }
 }
 
-/** Apply date/time/arrival from a Date & time section block. */
 function applyDateTimeFromBlock(block, mark) {
   const d = extractDate(block)
   const t = extractStartTime(block)
@@ -443,98 +583,6 @@ function applyDateTimeFromBlock(block, mark) {
   if (d) mark('eventDate', d)
   if (t) mark('eventTime', t)
   if (arr) mark('arrivalTime', arr)
-}
-
-/**
- * Split location section into venue name, address-only lines, and instruction lines.
- */
-function parseVenueLocationBlock(block) {
-  const lines = block.split('\n').map((l) => l.trim()).filter(Boolean)
-
-  const instructionLines = []
-  const remaining = []
-  for (const line of lines) {
-    if (isArrivalInstructionLine(line)) instructionLines.push(line)
-    else remaining.push(line)
-  }
-
-  if (remaining.length === 0) {
-    return { name: '', address: '', instructions: instructionLines.join('\n').trim() }
-  }
-
-  let name = ''
-  /** @type {string[]} */
-  let addressParts = []
-
-  if (remaining.length === 1) {
-    const only = remaining[0]
-    const split = splitVenueAndAddress(only)
-    if (split) {
-      name = split.venueName
-      addressParts.push(split.venueAddress)
-    } else {
-      const commaIdx = only.indexOf(',')
-      const tail = commaIdx > 0 ? only.slice(commaIdx + 1).trim() : ''
-      if (commaIdx > 0 && tail && isAddressLine(tail)) {
-        const head = only.slice(0, commaIdx).trim()
-        if (head.length <= 100 && !isArrivalInstructionLine(head)) {
-          name = head
-          addressParts.push(tail)
-        }
-      } else if (isAddressLine(only)) {
-        addressParts.push(only)
-      } else if (!isArrivalInstructionLine(only)) {
-        name = only.length <= 120 ? only : ''
-      }
-    }
-  } else {
-    const first = remaining[0]
-    const split = splitVenueAndAddress(first)
-    if (split) {
-      name = split.venueName
-      addressParts.push(split.venueAddress)
-      for (let i = 1; i < remaining.length; i++) {
-        const L = remaining[i]
-        if (isAddressLine(L) || (addressParts.length > 0 && isAddressContinuationLine(L))) addressParts.push(L)
-        else instructionLines.push(L)
-      }
-    } else {
-      const head = first
-      if (!isAddressLine(head) && head.length <= 120) name = head
-      const tailLines = remaining.slice(1)
-      const tailJoined = tailLines.join('\n')
-      if (isAddressLine(tailJoined)) {
-        addressParts.push(tailJoined)
-      } else {
-        for (const L of tailLines) {
-          if (isAddressLine(L) || (addressParts.length > 0 && isAddressContinuationLine(L))) addressParts.push(L)
-          else instructionLines.push(L)
-        }
-      }
-    }
-  }
-
-  addressParts = filterAddressLines(addressParts)
-
-  const address = addressParts.join('\n').trim()
-  const instructions = instructionLines.join('\n').trim()
-  return { name: name.trim(), address, instructions }
-}
-
-/** Drop any line that is not a confident address (or valid continuation). */
-function filterAddressLines(parts) {
-  const out = []
-  for (const line of parts) {
-    const L = line.trim()
-    if (!L) continue
-    if (isArrivalInstructionLine(L)) continue
-    if (isAddressLine(L)) {
-      out.push(L)
-      continue
-    }
-    if (out.length > 0 && isAddressContinuationLine(L)) out.push(L)
-  }
-  return out
 }
 
 function normalizeAgendaText(s) {
