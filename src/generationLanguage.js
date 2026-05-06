@@ -399,15 +399,17 @@ export function getMeetupKbygStrings(lang) {
       logisticsHeading: 'Logistics',
       kbygLookingForward: 'Looking forward to seeing you there!',
       kbygSignature: 'Olivia',
-      thanksLeanFull: (eventTitle, eventDate) => `Thanks for joining ${eventTitle} on ${eventDate}.`,
-      thanksLeanTitle: (eventTitle) => `Thanks for joining ${eventTitle}.`,
-      thanksLeanDate: (eventDate) => `Thanks for joining us on ${eventDate}.`,
-      thanksLeanGeneric: 'Thanks for being part of this event.',
+      thanksLeanFull: (eventTitle, eventDate) =>
+        `Thank you for being part of ${eventTitle} on ${eventDate}.`,
+      thanksLeanTitle: (eventTitle) => `Thank you for being part of ${eventTitle}.`,
+      thanksLeanDate: (eventDate) => `Thank you for being part of this meetup on ${eventDate}.`,
+      thanksLeanGeneric: 'Thank you for being part of this event.',
+      /** Lean KBYG opening line — `fallbackTitle` is used when the event title field is blank. */
       kbygIntroLead: (eventTitle, whenLine, fallbackTitle) => {
         const t = (eventTitle && String(eventTitle).trim()) || fallbackTitle
         const w = (whenLine && String(whenLine).trim()) || ''
-        if (w) return `Thanks for joining us for ${t} on ${w}.`
-        return `Thanks for joining us for ${t}.`
+        if (w) return `Thank you for being part of the ${t} on ${w}.`
+        return `Thank you for being part of the ${t}.`
       },
       htmlClosing: 'Please let me know if you have any questions.',
       htmlThanksFull: (eventTitle, eventDate) =>
@@ -486,8 +488,8 @@ export function getMeetupKbygStrings(lang) {
       kbygIntroLead: (eventTitle, whenLine, fallbackTitle) => {
         const t = (eventTitle && String(eventTitle).trim()) || fallbackTitle
         const w = (whenLine && String(whenLine).trim()) || ''
-        if (w) return `Gracias por acompañarnos en ${t} el ${w}.`
-        return `Gracias por acompañarnos en ${t}.`
+        if (w) return `Gracias por ser parte de ${t} el ${w}.`
+        return `Gracias por ser parte de ${t}.`
       },
       htmlClosing: 'Avísame si tienes alguna pregunta.',
       htmlThanksFull: (eventTitle, eventDate) =>
@@ -566,8 +568,8 @@ export function getMeetupKbygStrings(lang) {
       kbygIntroLead: (eventTitle, whenLine, fallbackTitle) => {
         const t = (eventTitle && String(eventTitle).trim()) || fallbackTitle
         const w = (whenLine && String(whenLine).trim()) || ''
-        if (w) return `Obrigado por participar do ${t} em ${w}.`
-        return `Obrigado por participar do ${t}.`
+        if (w) return `Obrigado por fazer parte do ${t} em ${w}.`
+        return `Obrigado por fazer parte do ${t}.`
       },
       htmlClosing: 'Me avise se tiver alguma dúvida.',
       htmlThanksFull: (eventTitle, eventDate) =>
