@@ -63,32 +63,41 @@ function buildKbygAgendaHtmlFromItems(items) {
   return `<ul style="margin:8px 0 0;padding-left:24px;list-style-type:disc;">${lis}</ul>`
 }
 
-/** @param {import('../shared/eventData.js').SharedEventData} data */
-function logisticsHtmlItemsFromEventData(data, S) {
-  const items = []
-  if (data.venue) {
-    items.push(`<strong>${escapeHtml(S.location)}:</strong> ${escapeHtml(data.venue).replace(/\n/g, '<br>')}`)
+/**
+ * Standalone logistics-related blocks (no parent "Logistics" section).
+ * Order: venue → parking → food & beverage → AV.
+ * @param {import('../shared/eventData.js').SharedEventData} data
+ * @param {(s: string) => string} trim
+ * @returns {ReadonlyArray<{ sectionKey: string, title: string, body: string }>}
+ */
+function kbygLogisticsStandaloneBlocks(data, trim, S) {
+  /** @type {{ sectionKey: string, title: string, body: string }[]} */
+  const blocks = []
+  const push = (sectionKey, title, raw) => {
+    const body = trim(raw)
+    if (!body) return
+    blocks.push({ sectionKey, title, body })
   }
-  if (data.parking) {
-    items.push(`<strong>${escapeHtml(S.parking)}:</strong> ${escapeHtml(data.parking).replace(/\n/g, '<br>')}`)
-  }
-  if (data.food) {
-    items.push(`<strong>${escapeHtml(S.foodBeverage)}:</strong> ${escapeHtml(data.food)}`)
-  }
-  if (data.av) {
-    items.push(`<strong>${escapeHtml(S.avSetup)}:</strong> ${escapeHtml(data.av).replace(/\n/g, '<br>')}`)
-  }
-  return items
+  push('location', S.location, data.venue)
+  push('parking', S.parking, data.parking)
+  push('foodDrinks', S.foodBeverage, data.food)
+  push('avPresentation', S.avSetup, data.av)
+  return blocks
 }
 
-/** @param {import('../shared/eventData.js').SharedEventData} data */
-function logisticsPlainLinesFromEventData(data, S) {
-  const lines = []
-  if (data.venue) lines.push(`${S.location}: ${data.venue.replace(/\n/g, ' ')}`)
-  if (data.parking) lines.push(`${S.parking}: ${data.parking}`)
-  if (data.food) lines.push(`${S.foodBeverage}: ${data.food}`)
-  if (data.av) lines.push(`${S.avSetup}: ${data.av}`)
-  return lines
+/** One KBYG section: bold header + body paragraph(s); matches spacing of other sections. */
+function kbygStandaloneSectionHtml(sectionKey, titlePlain, bodyText, emojisEnabled) {
+  const title = formatSectionHeader(sectionKey, titlePlain, emojisEnabled)
+  const inner = `<p style="margin:0;line-height:1.5;">${escapeHtml(bodyText).replace(/\n/g, '<br>')}</p>`
+  return `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(title)}</strong></p>${inner}</div>`
+}
+
+/** Append plain lines for one standalone block (header + body, trailing blank line). */
+function appendKbygStandalonePlainSection(lines, headingFn, sectionKey, titlePlain, bodyText) {
+  lines.push(headingFn(sectionKey, titlePlain))
+  const raw = typeof bodyText === 'string' ? bodyText : ''
+  raw.split('\n').forEach((ln) => lines.push(ln.trimEnd()))
+  lines.push('')
 }
 
 /**
@@ -120,12 +129,8 @@ export function renderKbygEmailHtml(eventData, form, opts = {}) {
     )
   }
 
-  const logisticsItems = logisticsHtmlItemsFromEventData(eventData, S)
-  if (logisticsItems.length > 0) {
-    const logisticsTitle = formatSectionHeader('location', S.logisticsHeading, emojisEnabled)
-    chunks.push(
-      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(logisticsTitle)}</strong></p>${kbygHtmlUl(logisticsItems)}</div>`,
-    )
+  for (const block of kbygLogisticsStandaloneBlocks(eventData, trim, S)) {
+    chunks.push(kbygStandaloneSectionHtml(block.sectionKey, block.title, block.body, emojisEnabled))
   }
 
   if (eventData.agenda.length > 0) {
@@ -286,11 +291,8 @@ export function renderKbygEmailPlain(eventData, form, opts = {}) {
     lines.push('')
   }
 
-  const logisticsPlain = logisticsPlainLinesFromEventData(eventData, S)
-  if (logisticsPlain.length > 0) {
-    lines.push(heading('location', S.logisticsHeading))
-    logisticsPlain.forEach((l) => lines.push(`- ${l}`))
-    lines.push('')
+  for (const block of kbygLogisticsStandaloneBlocks(eventData, trim, S)) {
+    appendKbygStandalonePlainSection(lines, heading, block.sectionKey, block.title, block.body)
   }
 
   if (eventData.agenda.length > 0) {

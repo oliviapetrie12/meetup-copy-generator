@@ -12,6 +12,8 @@ export const SECTION_EMOJIS = {
   foodDrinks: '🍕',
   agenda: '📝',
   speaker: '🎤',
+  /** AV / presentation setup (standalone logistics block; same glyph as Speaker when both appear). */
+  avPresentation: '🎤',
   wifi: '📶',
   swag: '🎁',
   photos: '📸',
