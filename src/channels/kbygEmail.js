@@ -7,6 +7,7 @@ import { getMeetupKbygStrings, normalizeLanguage } from '../generationLanguage.j
 import { getMeetupKbygPhotoLines } from '../generationLanguage.js'
 import { buildKbygTldrBulletsLean } from '../kbygTldr.js'
 import { formatKbygPlainSectionHeading, formatSectionHeader } from '../kbygSectionHeaders.js'
+import { KBYG_EMAIL_BODY_SECTION_IDS } from '../kbygEmailSectionOrder.js'
 
 /** @param {object} form @param {object} opts */
 function kbygEmojisEnabled(form, opts) {
@@ -133,6 +134,258 @@ function appendKbygStandalonePlainSection(lines, headingFn, sectionKey, titlePla
   lines.push('')
 }
 
+function filterKbygContactEntries(form, has, trim) {
+  return (form.contacts || []).filter((c) => has(c.name) || has(c.role) || has(c.contactInfo))
+}
+
+function mapKbygContactLines(contactEntries, trim) {
+  return contactEntries.map((c) => {
+    const name = trim(c.name)
+    const role = trim(c.role)
+    const info = trim(c.contactInfo)
+    let main = ''
+    if (name && info) main = `${name} (${info})`
+    else if (name) main = name
+    else if (info) main = info
+    let line = ''
+    if (main && role) line = `${main} – ${role}`
+    else if (main) line = main
+    else line = role
+    return escapeHtml(line)
+  })
+}
+
+/**
+ * Body after greeting + intro. Section sequence MUST match {@link KBYG_EMAIL_BODY_SECTION_IDS}.
+ * @param {string[]} chunks
+ * @param {object} ctx
+ */
+function appendKbygEmailHtmlBody(chunks, ctx) {
+  const { eventData, form, opts, S, trim, has, emojisEnabled, tldrBullets } = ctx
+
+  const steps = [
+    () => {
+      if (tldrBullets.length === 0) return
+      const tldrItems = tldrBullets.map((i) => escapeHtml(i))
+      const tldrTitle = formatSectionHeader('reminder', S.tldrHeading, emojisEnabled)
+      chunks.push(
+        `<div style="margin:0 0 16px;"><p style="margin:0 0 12px;line-height:1.5;"><span style="background-color:#fff3cd;padding:2px 6px;font-weight:bold;border-radius:3px;">${escapeHtml(tldrTitle)}</span></p>${kbygHtmlUl(tldrItems)}</div>`,
+      )
+    },
+    () => {
+      const eventLinkItems = kbygEventPageLinkItemsHtml(form, trim, has, S)
+      if (eventLinkItems.length === 0) return
+      const eventPageTitle = formatSectionHeader('registration', S.eventPage, emojisEnabled)
+      chunks.push(
+        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(eventPageTitle)}</strong></p>${kbygHtmlUl(eventLinkItems)}</div>`,
+      )
+    },
+    () => {
+      const contactEntries = filterKbygContactEntries(form, has, trim)
+      if (contactEntries.length === 0) return
+      const contactItems = mapKbygContactLines(contactEntries, trim)
+      const contactsTitle = formatSectionHeader('contact', S.htmlHelpfulContactsStrong, emojisEnabled)
+      chunks.push(
+        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(contactsTitle)}</strong></p>${kbygHtmlUl(contactItems)}</div>`,
+      )
+    },
+    () => {
+      if (eventData.agenda.length === 0) return
+      const agendaHtml = buildKbygAgendaHtmlFromItems(eventData.agenda)
+      if (!agendaHtml) return
+      const agendaTitle = formatSectionHeader('agenda', S.htmlAgendaStrong, emojisEnabled)
+      chunks.push(
+        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(agendaTitle)}</strong></p>${agendaHtml}</div>`,
+      )
+    },
+    () => {
+      for (const block of kbygLogisticsStandaloneBlocks(eventData, trim, S)) {
+        chunks.push(kbygStandaloneSectionHtml(block.sectionKey, block.title, block.body, emojisEnabled))
+      }
+    },
+    () => {
+      const speakerItems = []
+      if (has(form.speaker1Name) || has(form.speaker1Title) || has(form.speaker1TalkTitle)) {
+        let t = trim(form.speaker1Name) || S.speaker1Default
+        if (has(form.speaker1Title)) t += `, ${trim(form.speaker1Title)}`
+        if (has(form.speaker1TalkTitle)) t += ` — ${trim(form.speaker1TalkTitle)}`
+        speakerItems.push(escapeHtml(t))
+      }
+      if (has(form.speaker2Name) || has(form.speaker2Title) || has(form.speaker2TalkTitle)) {
+        let t = trim(form.speaker2Name) || S.speaker2Default
+        if (has(form.speaker2Title)) t += `, ${trim(form.speaker2Title)}`
+        if (has(form.speaker2TalkTitle)) t += ` — ${trim(form.speaker2TalkTitle)}`
+        speakerItems.push(escapeHtml(t))
+      }
+      if (!speakerItems.length) return
+      const speakerTitle = formatSectionHeader('speaker', S.htmlSpeakerStrong, emojisEnabled)
+      chunks.push(
+        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(speakerTitle)}</strong></p>${kbygHtmlUl(speakerItems)}</div>`,
+      )
+    },
+    () => {
+      if (!has(form.speakerArrivalNote)) return
+      const arrivalTitle = formatSectionHeader('arrivalInstructions', S.htmlSpeakerArrivalStrong, emojisEnabled)
+      chunks.push(
+        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(arrivalTitle)}</strong></p><p style="margin:0;line-height:1.5;">${escapeHtml(trim(form.speakerArrivalNote)).replace(/\n/g, '<br>')}</p></div>`,
+      )
+    },
+    () => {
+      if (!has(form.setupNotes) && !has(form.swagNotes)) return
+      const su = []
+      if (has(form.setupNotes)) su.push(escapeHtml(trim(form.setupNotes)))
+      if (has(form.swagNotes)) su.push(escapeHtml(trim(form.swagNotes)))
+      const setupTitle = formatSectionHeader('swag', S.htmlSetupStrong, emojisEnabled)
+      chunks.push(
+        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(setupTitle)}</strong></p>${kbygHtmlUl(su)}</div>`,
+      )
+    },
+    () => {
+      if (form.includePhotos === false) return
+      const photoLines = getMeetupKbygPhotoLines(opts.language)
+      const photoItems = photoLines.map((line) => escapeHtml(line))
+      const photosTitle = formatSectionHeader('photos', S.htmlTakePhotosStrong, emojisEnabled)
+      chunks.push(
+        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(photosTitle)}</strong></p>${kbygHtmlUl(photoItems)}</div>`,
+      )
+    },
+    () => {
+      if (!has(form.additionalNotes)) return
+      const noteLines = trim(form.additionalNotes).split(/\n/).map((s) => s.trim()).filter(Boolean)
+      if (noteLines.length === 0) return
+      const notesBlocks = noteLines
+        .map((line) => `<p style="margin:0 0 8px;line-height:1.5;">${escapeHtml(line)}</p>`)
+        .join('')
+      const additionalTitle = formatSectionHeader(null, S.htmlAdditionalStrong, emojisEnabled)
+      chunks.push(
+        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(additionalTitle)}</strong></p>${notesBlocks}</div>`,
+      )
+    },
+  ]
+
+  if (import.meta.env.DEV && steps.length !== KBYG_EMAIL_BODY_SECTION_IDS.length) {
+    throw new Error(
+      `kbygEmail HTML: pipeline has ${steps.length} steps but KBYG_EMAIL_BODY_SECTION_IDS has ${KBYG_EMAIL_BODY_SECTION_IDS.length}`,
+    )
+  }
+
+  steps.forEach((fn) => fn())
+}
+
+/** @param {import('../shared/agendaItems.js').AgendaItem[]} items */
+function agendaPlainLinesFromItems(items) {
+  const lines = []
+  for (const it of items) {
+    if (it.time && (it.title || it.speaker)) {
+      lines.push(`- **${it.time}**${it.title ? ` ${it.title}` : ''}`)
+      if (it.speaker) lines.push(`  ${it.speaker}`)
+    } else if (it.title || it.speaker) {
+      lines.push(`- ${[it.title, it.speaker].filter(Boolean).join(' — ')}`)
+    }
+  }
+  return lines
+}
+
+/**
+ * Plain body after intro — same section order as HTML ({@link KBYG_EMAIL_BODY_SECTION_IDS}).
+ */
+function appendKbygEmailPlainBody(lines, ctx) {
+  const { eventData, form, opts, S, trim, has, heading, tldrBulletsPlain } = ctx
+
+  const steps = [
+    () => {
+      if (tldrBulletsPlain.length === 0) return
+      lines.push(heading('reminder', S.tldrHeading))
+      tldrBulletsPlain.forEach((b) => lines.push(`- ${b}`))
+      lines.push('')
+    },
+    () => appendKbygEventPagePlain(lines, heading, form, S, trim, has),
+    () => {
+      const contactEntries = filterKbygContactEntries(form, has, trim)
+      if (contactEntries.length === 0) return
+      lines.push(heading('contact', S.helpfulContacts))
+      contactEntries.forEach((c) => {
+        const name = trim(c.name)
+        const role = trim(c.role)
+        const info = trim(c.contactInfo)
+        let main = ''
+        if (name && info) main = `${name} (${info})`
+        else if (name) main = name
+        else if (info) main = info
+        if (main && role) lines.push(`- ${main} – ${role}`)
+        else if (main) lines.push(`- ${main}`)
+        else if (role) lines.push(`- ${role}`)
+      })
+      lines.push('')
+    },
+    () => {
+      if (eventData.agenda.length === 0) return
+      lines.push(heading('agenda', S.agenda))
+      agendaPlainLinesFromItems(eventData.agenda).forEach((l) => lines.push(l))
+      lines.push('')
+    },
+    () => {
+      for (const block of kbygLogisticsStandaloneBlocks(eventData, trim, S)) {
+        appendKbygStandalonePlainSection(lines, heading, block.sectionKey, block.title, block.body)
+      }
+    },
+    () => {
+      const sp1 = has(form.speaker1Name) || has(form.speaker1Title) || has(form.speaker1TalkTitle)
+      const sp2 = has(form.speaker2Name) || has(form.speaker2Title) || has(form.speaker2TalkTitle)
+      if (!sp1 && !sp2) return
+      lines.push(heading('speaker', S.speaker))
+      if (sp1) {
+        let t = trim(form.speaker1Name) || S.speaker1Default
+        if (has(form.speaker1Title)) t += `, ${trim(form.speaker1Title)}`
+        if (has(form.speaker1TalkTitle)) t += ` — ${trim(form.speaker1TalkTitle)}`
+        lines.push(`- ${t}`)
+      }
+      if (sp2) {
+        let t = trim(form.speaker2Name) || S.speaker2Default
+        if (has(form.speaker2Title)) t += `, ${trim(form.speaker2Title)}`
+        if (has(form.speaker2TalkTitle)) t += ` — ${trim(form.speaker2TalkTitle)}`
+        lines.push(`- ${t}`)
+      }
+      lines.push('')
+    },
+    () => {
+      if (!has(form.speakerArrivalNote)) return
+      lines.push(heading('arrivalInstructions', S.speakerArrival))
+      lines.push(trim(form.speakerArrivalNote))
+      lines.push('')
+    },
+    () => {
+      if (!has(form.setupNotes) && !has(form.swagNotes)) return
+      lines.push(heading('swag', S.setup))
+      if (has(form.setupNotes)) lines.push(`- ${trim(form.setupNotes)}`)
+      if (has(form.swagNotes)) lines.push(`- ${trim(form.swagNotes)}`)
+      lines.push('')
+    },
+    () => {
+      if (form.includePhotos === false) return
+      lines.push(heading('photos', S.takePhotos))
+      getMeetupKbygPhotoLines(opts.language).forEach((line) => lines.push(`- ${line}`))
+      lines.push('')
+    },
+    () => {
+      if (!has(form.additionalNotes)) return
+      const noteLines = trim(form.additionalNotes).split(/\n/).map((s) => s.trim()).filter(Boolean)
+      if (noteLines.length === 0) return
+      lines.push(heading(null, S.additionalNotes))
+      noteLines.forEach((line) => lines.push(line))
+      lines.push('')
+    },
+  ]
+
+  if (import.meta.env.DEV && steps.length !== KBYG_EMAIL_BODY_SECTION_IDS.length) {
+    throw new Error(
+      `kbygEmail plain: pipeline has ${steps.length} steps but KBYG_EMAIL_BODY_SECTION_IDS has ${KBYG_EMAIL_BODY_SECTION_IDS.length}`,
+    )
+  }
+
+  steps.forEach((fn) => fn())
+}
+
 /**
  * @param {import('../shared/eventData.js').SharedEventData} eventData
  * @param {object} form - full KBYG form (greeting, speakers, links, TL;DR toggles)
@@ -154,116 +407,16 @@ export function renderKbygEmailHtml(eventData, form, opts = {}) {
   )
 
   const tldrBullets = buildKbygTldrBulletsLean(form, opts)
-  if (tldrBullets.length > 0) {
-    const tldrItems = tldrBullets.map((i) => escapeHtml(i))
-    const tldrTitle = formatSectionHeader('reminder', S.tldrHeading, emojisEnabled)
-    chunks.push(
-      `<div style="margin:0 0 16px;"><p style="margin:0 0 12px;line-height:1.5;"><span style="background-color:#fff3cd;padding:2px 6px;font-weight:bold;border-radius:3px;">${escapeHtml(tldrTitle)}</span></p>${kbygHtmlUl(tldrItems)}</div>`,
-    )
-  }
-
-  const eventLinkItems = kbygEventPageLinkItemsHtml(form, trim, has, S)
-  if (eventLinkItems.length > 0) {
-    const eventPageTitle = formatSectionHeader('registration', S.eventPage, emojisEnabled)
-    chunks.push(
-      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(eventPageTitle)}</strong></p>${kbygHtmlUl(eventLinkItems)}</div>`,
-    )
-  }
-
-  const contactEntries = (form.contacts || []).filter((c) => has(c.name) || has(c.role) || has(c.contactInfo))
-  if (contactEntries.length > 0) {
-    const contactItems = contactEntries.map((c) => {
-      const name = trim(c.name)
-      const role = trim(c.role)
-      const info = trim(c.contactInfo)
-      let main = ''
-      if (name && info) main = `${name} (${info})`
-      else if (name) main = name
-      else if (info) main = info
-      let line = ''
-      if (main && role) line = `${main} – ${role}`
-      else if (main) line = main
-      else line = role
-      return escapeHtml(line)
-    })
-    const contactsTitle = formatSectionHeader('contact', S.htmlHelpfulContactsStrong, emojisEnabled)
-    chunks.push(
-      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(contactsTitle)}</strong></p>${kbygHtmlUl(contactItems)}</div>`,
-    )
-  }
-
-  if (eventData.agenda.length > 0) {
-    const agendaHtml = buildKbygAgendaHtmlFromItems(eventData.agenda)
-    if (agendaHtml) {
-      const agendaTitle = formatSectionHeader('agenda', S.htmlAgendaStrong, emojisEnabled)
-      chunks.push(
-        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(agendaTitle)}</strong></p>${agendaHtml}</div>`,
-      )
-    }
-  }
-
-  for (const block of kbygLogisticsStandaloneBlocks(eventData, trim, S)) {
-    chunks.push(kbygStandaloneSectionHtml(block.sectionKey, block.title, block.body, emojisEnabled))
-  }
-
-  const speakerItems = []
-  if (has(form.speaker1Name) || has(form.speaker1Title) || has(form.speaker1TalkTitle)) {
-    let t = trim(form.speaker1Name) || S.speaker1Default
-    if (has(form.speaker1Title)) t += `, ${trim(form.speaker1Title)}`
-    if (has(form.speaker1TalkTitle)) t += ` — ${trim(form.speaker1TalkTitle)}`
-    speakerItems.push(escapeHtml(t))
-  }
-  if (has(form.speaker2Name) || has(form.speaker2Title) || has(form.speaker2TalkTitle)) {
-    let t = trim(form.speaker2Name) || S.speaker2Default
-    if (has(form.speaker2Title)) t += `, ${trim(form.speaker2Title)}`
-    if (has(form.speaker2TalkTitle)) t += ` — ${trim(form.speaker2TalkTitle)}`
-    speakerItems.push(escapeHtml(t))
-  }
-  if (speakerItems.length) {
-    const speakerTitle = formatSectionHeader('speaker', S.htmlSpeakerStrong, emojisEnabled)
-    chunks.push(
-      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(speakerTitle)}</strong></p>${kbygHtmlUl(speakerItems)}</div>`,
-    )
-  }
-
-  if (has(form.speakerArrivalNote)) {
-    const arrivalTitle = formatSectionHeader('arrivalInstructions', S.htmlSpeakerArrivalStrong, emojisEnabled)
-    chunks.push(
-      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(arrivalTitle)}</strong></p><p style="margin:0;line-height:1.5;">${escapeHtml(trim(form.speakerArrivalNote)).replace(/\n/g, '<br>')}</p></div>`,
-    )
-  }
-
-  if (has(form.setupNotes) || has(form.swagNotes)) {
-    const su = []
-    if (has(form.setupNotes)) su.push(escapeHtml(trim(form.setupNotes)))
-    if (has(form.swagNotes)) su.push(escapeHtml(trim(form.swagNotes)))
-    const setupTitle = formatSectionHeader('swag', S.htmlSetupStrong, emojisEnabled)
-    chunks.push(
-      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(setupTitle)}</strong></p>${kbygHtmlUl(su)}</div>`,
-    )
-  }
-
-  if (form.includePhotos !== false) {
-    const photoLines = getMeetupKbygPhotoLines(opts.language)
-    const photoItems = photoLines.map((line) => escapeHtml(line))
-    const photosTitle = formatSectionHeader('photos', S.htmlTakePhotosStrong, emojisEnabled)
-    chunks.push(
-      `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(photosTitle)}</strong></p>${kbygHtmlUl(photoItems)}</div>`,
-    )
-  }
-
-  if (has(form.additionalNotes)) {
-    const noteLines = trim(form.additionalNotes).split(/\n/).map((s) => s.trim()).filter(Boolean)
-    if (noteLines.length > 0) {
-      const notesBlocks = noteLines
-        .map((line) => `<p style="margin:0 0 8px;line-height:1.5;">${escapeHtml(line)}</p>`)
-        .join('')
-      const additionalTitle = formatSectionHeader(null, S.htmlAdditionalStrong, emojisEnabled)
-      chunks.push(
-        `<div style="margin:0 0 16px;"><p style="margin:0 0 8px;line-height:1.5;"><strong>${escapeHtml(additionalTitle)}</strong></p>${notesBlocks}</div>`,
-      )
-    }
-  }
+  appendKbygEmailHtmlBody(chunks, {
+    eventData,
+    form,
+    opts,
+    S,
+    trim,
+    has,
+    emojisEnabled,
+    tldrBullets,
+  })
 
   chunks.push(`<p style="margin:0 0 12px;line-height:1.5;">${escapeHtml(S.closingQuestion)}</p>`)
   chunks.push(`<p style="margin:0 0 12px;line-height:1.5;">${escapeHtml(S.kbygLookingForward)}</p>`)
@@ -271,20 +424,6 @@ export function renderKbygEmailHtml(eventData, form, opts = {}) {
 
   const body = chunks.join('')
   return `<div style="font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.5;color:#202124;">${body}</div>`
-}
-
-/** @param {import('../shared/agendaItems.js').AgendaItem[]} items */
-function agendaPlainLinesFromItems(items) {
-  const lines = []
-  for (const it of items) {
-    if (it.time && (it.title || it.speaker)) {
-      lines.push(`- **${it.time}**${it.title ? ` ${it.title}` : ''}`)
-      if (it.speaker) lines.push(`  ${it.speaker}`)
-    } else if (it.title || it.speaker) {
-      lines.push(`- ${[it.title, it.speaker].filter(Boolean).join(' — ')}`)
-    }
-  }
-  return lines
 }
 
 /**
@@ -306,88 +445,16 @@ export function renderKbygEmailPlain(eventData, form, opts = {}) {
   lines.push('')
 
   const tldrBulletsPlain = buildKbygTldrBulletsLean(form, opts)
-  if (tldrBulletsPlain.length > 0) {
-    lines.push(heading('reminder', S.tldrHeading))
-    tldrBulletsPlain.forEach((b) => lines.push(`- ${b}`))
-    lines.push('')
-  }
-
-  appendKbygEventPagePlain(lines, heading, form, S, trim, has)
-
-  const contactEntries = (form.contacts || []).filter((c) => has(c.name) || has(c.role) || has(c.contactInfo))
-  if (contactEntries.length > 0) {
-    lines.push(heading('contact', S.helpfulContacts))
-    contactEntries.forEach((c) => {
-      const name = trim(c.name)
-      const role = trim(c.role)
-      const info = trim(c.contactInfo)
-      let main = ''
-      if (name && info) main = `${name} (${info})`
-      else if (name) main = name
-      else if (info) main = info
-      if (main && role) lines.push(`- ${main} – ${role}`)
-      else if (main) lines.push(`- ${main}`)
-      else if (role) lines.push(`- ${role}`)
-    })
-    lines.push('')
-  }
-
-  if (eventData.agenda.length > 0) {
-    lines.push(heading('agenda', S.agenda))
-    agendaPlainLinesFromItems(eventData.agenda).forEach((l) => lines.push(l))
-    lines.push('')
-  }
-
-  for (const block of kbygLogisticsStandaloneBlocks(eventData, trim, S)) {
-    appendKbygStandalonePlainSection(lines, heading, block.sectionKey, block.title, block.body)
-  }
-
-  const sp1 = has(form.speaker1Name) || has(form.speaker1Title) || has(form.speaker1TalkTitle)
-  const sp2 = has(form.speaker2Name) || has(form.speaker2Title) || has(form.speaker2TalkTitle)
-  if (sp1 || sp2) {
-    lines.push(heading('speaker', S.speaker))
-    if (sp1) {
-      let t = trim(form.speaker1Name) || S.speaker1Default
-      if (has(form.speaker1Title)) t += `, ${trim(form.speaker1Title)}`
-      if (has(form.speaker1TalkTitle)) t += ` — ${trim(form.speaker1TalkTitle)}`
-      lines.push(`- ${t}`)
-    }
-    if (sp2) {
-      let t = trim(form.speaker2Name) || S.speaker2Default
-      if (has(form.speaker2Title)) t += `, ${trim(form.speaker2Title)}`
-      if (has(form.speaker2TalkTitle)) t += ` — ${trim(form.speaker2TalkTitle)}`
-      lines.push(`- ${t}`)
-    }
-    lines.push('')
-  }
-
-  if (has(form.speakerArrivalNote)) {
-    lines.push(heading('arrivalInstructions', S.speakerArrival))
-    lines.push(trim(form.speakerArrivalNote))
-    lines.push('')
-  }
-
-  if (has(form.setupNotes) || has(form.swagNotes)) {
-    lines.push(heading('swag', S.setup))
-    if (has(form.setupNotes)) lines.push(`- ${trim(form.setupNotes)}`)
-    if (has(form.swagNotes)) lines.push(`- ${trim(form.swagNotes)}`)
-    lines.push('')
-  }
-
-  if (form.includePhotos !== false) {
-    lines.push(heading('photos', S.takePhotos))
-    getMeetupKbygPhotoLines(opts.language).forEach((line) => lines.push(`- ${line}`))
-    lines.push('')
-  }
-
-  if (has(form.additionalNotes)) {
-    const noteLines = trim(form.additionalNotes).split(/\n/).map((s) => s.trim()).filter(Boolean)
-    if (noteLines.length > 0) {
-      lines.push(heading(null, S.additionalNotes))
-      noteLines.forEach((line) => lines.push(line))
-      lines.push('')
-    }
-  }
+  appendKbygEmailPlainBody(lines, {
+    eventData,
+    form,
+    opts,
+    S,
+    trim,
+    has,
+    heading,
+    tldrBulletsPlain,
+  })
 
   lines.push(S.closingQuestion)
   lines.push('')
