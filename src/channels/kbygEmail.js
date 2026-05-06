@@ -418,9 +418,8 @@ export function renderKbygEmailHtml(eventData, form, opts = {}) {
     tldrBullets,
   })
 
-  chunks.push(`<p style="margin:0 0 12px;line-height:1.5;">${escapeHtml(S.closingQuestion)}</p>`)
-  chunks.push(`<p style="margin:0 0 12px;line-height:1.5;">${escapeHtml(S.kbygLookingForward)}</p>`)
-  chunks.push(`<p style="margin:0;line-height:1.5;">${escapeHtml(S.kbygSignature)}</p>`)
+  // Optional custom sign-off can be added later; no default "looking forward" / name block.
+  chunks.push(`<p style="margin:0;line-height:1.5;">${escapeHtml(S.closingQuestion)}</p>`)
 
   const body = chunks.join('')
   return `<div style="font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.5;color:#202124;">${body}</div>`
@@ -457,9 +456,5 @@ export function renderKbygEmailPlain(eventData, form, opts = {}) {
   })
 
   lines.push(S.closingQuestion)
-  lines.push('')
-  lines.push(S.kbygLookingForward)
-  lines.push('')
-  lines.push(S.kbygSignature)
   return lines.join('\n')
 }
