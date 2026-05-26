@@ -1,9 +1,11 @@
 /**
  * Conference / sponsor paste → Conference KBYG
  *
- * Pipeline: CHUNK → NORMALIZE → CLASSIFY (independent; heading / keyword / time) → validation (STEP 9) → DEDUPE → form patch + structured KBYG (+ optional debug).
+ * Pipeline: CHUNK → split mixed setup/teardown blocks → NORMALIZE → CLASSIFY (heading / keyword / time) → validation → DEDUPE → form patch + structured KBYG.
  * Chunks are never reclassified after the classify step.
  */
+
+import { getConferenceStructuredKbygSectionSpec } from './generationLanguage.js'
 
 function trim(s) {
   return typeof s === 'string' ? s.trim() : ''
@@ -392,6 +394,141 @@ export function splitMultiConceptChunks(chunks) {
   return out
 }
 
+/** First line is a combined setup + teardown heading (strip optional markdown # and bullets). */
+const COMBINED_SETUP_TEARDOWN_HEADER =
+  /^(setup\s*&\s*teardown|setup\s+and\s+teardown|setup\s*\/\s*teardown|move[\s-]?in\s*\/\s*move[\s-]?out|move[\s-]?in\s*&\s*move[\s-]?out)\s*:?\s*$/i
+
+/** Strip list markers and bold/italic markers for heading / role detection only (output keeps original lines). */
+function stripForSetupTeardownRole(line) {
+  let s = trim(line).replace(/^#{1,3}\s+/, '').replace(/^[\s•\-–—*]+\s*/, '')
+  s = s.replace(/^\*{1,2}|_{1,2}/, '').replace(/\*{1,2}$|_{1,2}$/, '').trim()
+  return s
+}
+
+function chunkLikelyMixedSetupAndTeardown(chunk) {
+  const low = chunk.toLowerCase()
+  const firstRaw = firstNonEmptyLine(chunk)
+  const firstStripped = stripForSetupTeardownRole(firstRaw)
+  if (COMBINED_SETUP_TEARDOWN_HEADER.test(firstStripped)) return true
+
+  const hasSetup =
+    /\b(setup|set[\s-]?up|move[\s-]?in|installation)\b/i.test(low) ||
+    /\b(exhibitor|booth)\s+check[\s-]?in\b/i.test(low)
+  const hasTeardown =
+    /\b(teardown|move[\s-]?out|strike|dismantle|load[\s-]?out|pack[\s-]?out)\b/i.test(low)
+  return hasSetup && hasTeardown
+}
+
+/**
+ * Classify a single line as setup-oriented, teardown-oriented, combined heading, or unknown.
+ * @returns {'setup' | 'teardown' | 'header' | null}
+ */
+function lineSetupTeardownRole(line) {
+  const s = stripForSetupTeardownRole(line)
+  if (!s) return null
+  if (COMBINED_SETUP_TEARDOWN_HEADER.test(s)) return 'header'
+  // Teardown before setup so phrases like "teardown setup window" resolve to teardown when line starts accordingly
+  if (/^(teardown|move[\s-]?out|strike|dismantle|load[\s-]?out|pack[\s-]?out)\b/i.test(s)) return 'teardown'
+  if (/^(setup|move[\s-]?in|set[\s-]?up|installation)\b/i.test(s)) return 'setup'
+  return null
+}
+
+/**
+ * Split a chunk that mixes setup + teardown into separate texts for Booth Setup vs Booth Cleanup.
+ * Does not infer missing sides — only splits when labeled lines or a combined heading structure supports it.
+ * @returns {string[]} one or two formatted chunks
+ */
+export function splitCombinedSetupTeardownChunk(chunk) {
+  const cleaned = formatChunkCleanly(chunk)
+  if (!cleaned) return []
+
+  if (!chunkLikelyMixedSetupAndTeardown(cleaned)) return [cleaned]
+
+  const lines = cleaned.split('\n')
+  /** @type {string[]} */
+  const setupLines = []
+  /** @type {string[]} */
+  const teardownLines = []
+  /** @type {string[]} */
+  const orphanLead = []
+  /** @type {'setup' | 'teardown' | null} */
+  let current = null
+
+  const flushOrphansTo = (target) => {
+    if (!orphanLead.length) return
+    const joined = orphanLead.join('\n')
+    orphanLead.length = 0
+    const j = trim(joined)
+    if (!j) return
+    const dest = target === 'setup' ? setupLines : teardownLines
+    if (dest.length) dest.push('')
+    dest.push(joined.trimEnd())
+  }
+
+  for (const line of lines) {
+    const trimmed = trim(line)
+    if (!trimmed) {
+      if (current === 'setup') setupLines.push('')
+      else if (current === 'teardown') teardownLines.push('')
+      continue
+    }
+
+    const role = lineSetupTeardownRole(trimmed)
+
+    if (role === 'header') {
+      current = null
+      continue
+    }
+
+    if (role === 'setup') {
+      flushOrphansTo('setup')
+      current = 'setup'
+      setupLines.push(trimmed)
+      continue
+    }
+
+    if (role === 'teardown') {
+      flushOrphansTo('teardown')
+      current = 'teardown'
+      teardownLines.push(trimmed)
+      continue
+    }
+
+    if (current === 'setup') setupLines.push(trimmed)
+    else if (current === 'teardown') teardownLines.push(trimmed)
+    else orphanLead.push(trimmed)
+  }
+
+  if (orphanLead.length) {
+    if (current === 'setup') {
+      flushOrphansTo('setup')
+    } else if (current === 'teardown') {
+      flushOrphansTo('teardown')
+    } else if (teardownLines.length) {
+      flushOrphansTo('teardown')
+    } else if (setupLines.length) {
+      flushOrphansTo('setup')
+    }
+  }
+
+  const setupText = formatChunkCleanly(setupLines.join('\n'))
+  const teardownText = formatChunkCleanly(teardownLines.join('\n'))
+
+  if (setupText && teardownText) return [setupText, teardownText]
+  if (setupText) return [setupText]
+  if (teardownText) return [teardownText]
+  return [cleaned]
+}
+
+/** @param {string[]} chunks */
+export function splitCombinedSetupTeardownChunks(chunks) {
+  const out = []
+  for (const c of chunks) {
+    out.push(...splitCombinedSetupTeardownChunk(c))
+  }
+  return out
+}
+
 function normalizeForDedupe(s) {
   return s
     .toLowerCase()
@@ -602,20 +739,6 @@ function dedupeClassifiedRowsPreferComplete(rows) {
  * @typedef {{ chunk: string, category: OrganizerCategory, reason: string, weakMatch: boolean, ambiguous: boolean, validationMoved?: boolean, originalCategory?: OrganizerCategory }} ClassifiedRow
  */
 
-/** STEP 11: section order and emojis (📋 = Logistics — 10 sections, 9 emojis in brief; Logistics uses 📋). */
-const KBYG_SECTION_SPEC = [
-  { cats: ['keyContacts'], emoji: '🔑', title: 'Key Contacts' },
-  { cats: ['eventVenue', 'foodBeverage'], emoji: '📍', title: 'Event & Venue' },
-  { cats: ['boothHours'], emoji: '🕒', title: 'Booth Hours' },
-  { cats: ['setupMoveIn'], emoji: '🛠️', title: 'Setup & Move-in' },
-  { cats: ['teardownMoveOut'], emoji: '📦', title: 'Teardown / Move-out' },
-  { cats: ['parkingTransportation'], emoji: '🚗', title: 'Parking & Transportation' },
-  { cats: ['logisticsBoothInfo'], emoji: '📋', title: 'Logistics / Booth Info' },
-  { cats: ['tickets'], emoji: '🎟️', title: 'Tickets' },
-  { cats: ['leadCapture'], emoji: '📱', title: 'Lead Capture' },
-  { cats: ['additionalNotes'], emoji: '📎', title: 'Additional Notes' },
-]
-
 function chunkLinesToBullets(text) {
   const lines = text.split(/\n/).map((l) => trim(l)).filter(Boolean)
   if (lines.length === 0) return []
@@ -633,8 +756,9 @@ function formatChunkForStructuredKbyg(row) {
 /**
  * Structured Know Before You Go plain text (STEP 11).
  * @param {ClassifiedRow[]} rows
+ * @param {string} [language] en | es | pt — section titles follow UI language
  */
-export function buildStructuredKbygPlain(rows) {
+export function buildStructuredKbygPlain(rows, language = 'en') {
   const byCat = {}
   for (const row of rows) {
     const cat = row.category === 'foodBeverage' ? 'eventVenue' : row.category
@@ -646,7 +770,7 @@ export function buildStructuredKbygPlain(rows) {
   }
 
   const parts = []
-  for (const spec of KBYG_SECTION_SPEC) {
+  for (const spec of getConferenceStructuredKbygSectionSpec(language)) {
     const texts = spec.cats.flatMap((c) => byCat[c] || [])
     if (texts.length === 0) continue
     const block = [`${spec.emoji} ${spec.title}`, '']
@@ -659,28 +783,13 @@ export function buildStructuredKbygPlain(rows) {
   return parts.join('\n\n').trim()
 }
 
-/** STEP 12 */
-export function buildParsingDebugPlain(rows) {
-  const lines = ['Parsing Debug Info', '']
-  rows.forEach((r, i) => {
-    const oneLine = r.chunk.replace(/\n/g, ' ↵ ')
-    lines.push(`--- Chunk ${i + 1} ---`)
-    lines.push(`Original: ${oneLine}`)
-    lines.push(
-      `Assigned section: ${r.category}${r.originalCategory ? ` (validation moved from ${r.originalCategory})` : ''}`,
-    )
-    lines.push(`Reason: ${r.reason}`)
-    lines.push('')
-  })
-  return lines.join('\n').trim()
-}
-
 function runPipelineClassifiedRows(raw) {
   const pass1 = splitIntoLogicalChunks(raw)
   const pass2 = splitMultiConceptChunks(pass1)
+  const pass3 = splitCombinedSetupTeardownChunks(pass2)
   /** @type {ClassifiedRow[]} */
   const classified = []
-  for (const chunk of pass2) {
+  for (const chunk of pass3) {
     const clean = formatChunkCleanly(chunk)
     const meta = classifyChunkWithConfidence(clean)
     classified.push({
@@ -696,33 +805,367 @@ function runPipelineClassifiedRows(raw) {
 }
 
 /**
- * Form patch + structured KBYG + optional debug (STEP 11–12).
- * @param {{ debug?: boolean }} [options]
+ * Form patch + structured KBYG (STEP 11).
+ * @param {string} [language] en | es | pt
  */
-export function processOrganizerImport(raw, options = {}) {
+export function processOrganizerImport(raw, language = 'en') {
   const rows = runPipelineClassifiedRows(raw)
   const simple = rows.map((r) => ({ chunk: r.chunk, category: r.category }))
   const deduped = buildFormBucketsFromClassified(simple)
   const formPatch = bucketsToFormPatch(deduped)
-  const structuredKbygPlain = buildStructuredKbygPlain(rows)
-  const out = { ...formPatch, structuredKbygPlain }
-  if (options.debug) {
-    out.parsingDebugPlain = buildParsingDebugPlain(rows)
-  }
-  return out
+  const structuredKbygPlain = buildStructuredKbygPlain(rows, language)
+  return { ...formPatch, structuredKbygPlain }
 }
 
 /**
  * Chunk → classify → validate → dedupe → form field patch (empty fields only via merge helper).
  */
 export function parseOrganizerDetails(raw) {
-  const r = processOrganizerImport(raw)
-  const { structuredKbygPlain: _sk, parsingDebugPlain: _pd, ...formPatch } = r
+  const r = processOrganizerImport(raw, 'en')
+  const { structuredKbygPlain: _sk, ...formPatch } = r
   return formPatch
 }
 
 const ADDITIONAL_NOTES_TITLE = 'Additional Notes'
 const KEY_CONTACTS_TITLE = 'Key Contacts'
+
+const EMAIL_RE_ONE =
+  /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?(?:\.[a-zA-Z]{2,})+/
+
+/** Map organizer labels to Conference KBYG contact group keys (matches CONTACT_GROUP_OPTIONS). */
+function labelToContactGroup(label) {
+  const l = trim(label)
+    .toLowerCase()
+    .replace(/:\s*$/, '')
+    .trim()
+  if (!l) return ''
+  if (
+    /\b(onsite|on-site|floor|day-of|booth\s+lead|show\s+floor|exhibitor\s+desk)\b/.test(l) ||
+    /^onsite\b/.test(l)
+  ) {
+    return 'devrel_onsite'
+  }
+  if (/\b(remote|virtual|slack)\b/.test(l)) return 'devrel_remote'
+  if (
+    /\b(organizer|program|show\s+manager|exhibitor\s+services|event\s+staff|registration\s+desk)\b/.test(l) ||
+    /^organizer\b/.test(l)
+  ) {
+    return 'conference_organizer'
+  }
+  return ''
+}
+
+function normalizePhoneDigits(phone) {
+  const d = trim(phone).replace(/\D/g, '')
+  return d.length >= 7 ? d : ''
+}
+
+function extractEmailFromLine(line) {
+  const m = trim(line).match(EMAIL_RE_ONE)
+  return m ? m[0] : ''
+}
+
+function extractPhoneFromLine(line) {
+  const t = trim(line)
+  if (!t) return ''
+  const patterns = [
+    /\+\d{1,3}[\s.-]?\d[\d\s().-]{8,}\d/,
+    /\(?\d{3}\)?[\s.-]*\d{3}[\s.-]*\d{4}\b/,
+    /\b\d{3}[\s.-]\d{3}[\s.-]\d{4}\b/,
+    /\b\d{10,11}\b/,
+  ]
+  for (const re of patterns) {
+    const m = t.match(re)
+    if (m) return trim(m[0])
+  }
+  return ''
+}
+
+function looksLikePersonName(line) {
+  const t = trim(line)
+  if (t.length < 2) return false
+  if (extractEmailFromLine(t) === t.replace(/\s/g, '')) return false
+  if (/^[\w.-]+@[\w.-]+\.\w+$/.test(t)) return false
+  const digitsOnly = t.replace(/\D/g, '')
+  if (digitsOnly.length >= 10 && /^[\d\s().+–—-]+$/.test(t)) return false
+  if (/^.{0,6}:\s*$/.test(t)) return false
+  const words = t.split(/\s+/).filter(Boolean)
+  if (words.length >= 2) {
+    const ok = (w) =>
+      /^[A-Z][a-z]{0,35}$/.test(w) ||
+      /^[A-Z]\.$/.test(w) ||
+      /^[A-Z][a-z]+-[A-Z][a-z]+$/.test(w)
+    if (words.every(ok)) return true
+  }
+  if (words.length === 2 && /^[A-Z]/.test(words[0]) && /^[A-Z]/.test(words[1])) return true
+  return false
+}
+
+function isContactSectionHeading(line) {
+  const t = trim(line).replace(/^[\s•\-–—*]+\s*/, '').replace(/^#{1,3}\s+/, '')
+  return /^(key\s+)?contacts?\s*:?\s*$/i.test(t)
+}
+
+/**
+ * Split a paragraph into line groups that each end with an email line (multi-contact blocks).
+ * @param {string[]} lines non-empty trimmed lines
+ * @returns {string[][]}
+ */
+function splitParagraphIntoContactLineGroups(lines) {
+  const blocks = []
+  let buf = []
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    buf.push(line)
+    if (extractEmailFromLine(line)) {
+      while (
+        i + 1 < lines.length &&
+        !extractEmailFromLine(lines[i + 1]) &&
+        extractPhoneFromLine(lines[i + 1]) &&
+        !looksLikePersonName(lines[i + 1])
+      ) {
+        i += 1
+        buf.push(lines[i])
+      }
+      blocks.push(buf)
+      buf = []
+    }
+  }
+  if (buf.length) blocks.push(buf)
+  return blocks.length ? blocks : [lines]
+}
+
+/**
+ * @typedef {{ name: string, email: string, phone: string, role: string, group: string }} ParsedOrganizerContact
+ */
+
+/**
+ * Parse lines from one contact block into structured fields.
+ * @param {string[]} rawLines
+ * @returns {ParsedOrganizerContact | null}
+ */
+function parseContactLines(rawLines) {
+  const lines = rawLines.map((l) => trim(l.replace(/^[\s•\-–—*]+\s*/, ''))).filter((l) => l !== '')
+  while (lines.length && isContactSectionHeading(lines[0])) lines.shift()
+  if (!lines.length) return null
+
+  let group = ''
+  let role = ''
+  let name = ''
+  let email = ''
+  let phone = ''
+
+  const first = lines[0]
+  const colonIdx = first.indexOf(':')
+  if (colonIdx > 1 && colonIdx < 52) {
+    const beforeColon = trim(first.slice(0, colonIdx))
+    const afterColon = trim(first.slice(colonIdx + 1))
+    if (/^[\w\s/&,'-]{2,55}$/.test(beforeColon) && !extractEmailFromLine(beforeColon)) {
+      const g = labelToContactGroup(beforeColon)
+      if (g) group = g
+      else role = beforeColon
+      lines.shift()
+      if (afterColon) lines.unshift(afterColon)
+    }
+  }
+
+  for (let idx = 0; idx < lines.length; idx++) {
+    const line = lines[idx]
+    const em = extractEmailFromLine(line)
+    const ph = extractPhoneFromLine(line)
+    if (em && !email) email = em
+    if (ph && !phone) phone = ph
+
+    if (em) {
+      let sans = trim(line.replace(em, ''))
+      const phIn = extractPhoneFromLine(sans)
+      if (phIn) sans = trim(sans.replace(phIn, ''))
+      if (sans && looksLikePersonName(sans) && !name) name = sans
+      continue
+    }
+
+    if (ph && !extractEmailFromLine(line)) {
+      const sans = trim(line.replace(ph, ''))
+      if (sans && looksLikePersonName(sans) && !name) name = sans
+      continue
+    }
+
+    if (looksLikePersonName(line) && !name) name = line
+  }
+
+  if (!name) {
+    for (const line of lines) {
+      let r = trim(line)
+      const em = extractEmailFromLine(r)
+      const ph = extractPhoneFromLine(r)
+      if (em) r = trim(r.replace(em, ''))
+      if (ph) r = trim(r.replace(ph, ''))
+      if (r && looksLikePersonName(r)) {
+        name = r
+        break
+      }
+    }
+  }
+
+  return {
+    name: trim(name),
+    email: trim(email),
+    phone: trim(phone),
+    role: trim(role),
+    group: trim(group),
+  }
+}
+
+function isMeaningfulParsedContact(c) {
+  const n = trim(c.name)
+  const e = trim(c.email)
+  const p = trim(c.phone)
+  if (n) return true
+  if (e && p) return true
+  return false
+}
+
+/**
+ * Extract structured contacts from pasted Key Contacts / organizer text.
+ * @param {string} text
+ * @returns {ParsedOrganizerContact[]}
+ */
+export function parseContactsFromKeyContactsText(text) {
+  const raw = trim(String(text).replace(/\r\n/g, '\n'))
+  if (!raw) return []
+
+  const paragraphs = raw.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean)
+  /** @type {ParsedOrganizerContact[]} */
+  const out = []
+
+  for (const para of paragraphs) {
+    let lines = para.split('\n').map((l) => trim(l)).filter(Boolean)
+    if (!lines.length) continue
+
+    const groups = splitParagraphIntoContactLineGroups(lines)
+    for (const g of groups) {
+      const c = parseContactLines(g)
+      if (c && isMeaningfulParsedContact(c)) out.push(c)
+    }
+  }
+
+  const deduped = []
+  for (const c of out) {
+    if (!deduped.some((x) => parsedContactsLookDuplicate(x, c))) deduped.push(c)
+  }
+  return deduped
+}
+
+function parsedContactsLookDuplicate(a, b) {
+  const ae = trim(a.email).toLowerCase()
+  const be = trim(b.email).toLowerCase()
+  if (ae && be && ae === be) return true
+  const an = trim(a.name).toLowerCase()
+  const bn = trim(b.name).toLowerCase()
+  if (!an || !bn || an !== bn) return false
+  const ap = normalizePhoneDigits(a.phone)
+  const bp = normalizePhoneDigits(b.phone)
+  if (ap && bp && ap === bp) return true
+  if (!ap && !bp) return true
+  return false
+}
+
+function contactsAreDuplicateFormRow(a, b) {
+  const ae = trim(a.email).toLowerCase()
+  const be = trim(b.email).toLowerCase()
+  if (ae && be && ae === be) return true
+
+  const an = trim(a.name).toLowerCase()
+  const bn = trim(b.name).toLowerCase()
+  if (!an || !bn || an !== bn) return false
+
+  const ap = normalizePhoneDigits(a.phone)
+  const bp = normalizePhoneDigits(b.phone)
+  if (ap && bp && ap === bp) return true
+  if (ae || be) return false
+  if (!ap && !bp) return true
+  return false
+}
+
+const EMPTY_CONTACT_ROW = { name: '', role: '', email: '', phone: '', group: '' }
+
+function contactRowIsBlank(c) {
+  return (
+    !trim(c.name) &&
+    !trim(c.email) &&
+    !trim(c.phone) &&
+    !trim(c.role) &&
+    !trim(c.group || '')
+  )
+}
+
+/**
+ * Merge parsed contacts into `form.contacts`; fills blank rows first, appends new rows.
+ * Skips duplicates vs existing rows.
+ */
+function mergeParsedContactsIntoForm(prev, incoming) {
+  let contacts = [...(prev.contacts || [])]
+  if (!contacts.length) contacts = [{ ...EMPTY_CONTACT_ROW }]
+
+  for (const inc of incoming) {
+    const merged = {
+      name: trim(inc.name),
+      role: trim(inc.role),
+      email: trim(inc.email),
+      phone: trim(inc.phone),
+      group: trim(inc.group || ''),
+    }
+    if (contacts.some((c) => contactsAreDuplicateFormRow(c, merged))) continue
+
+    const emptyIdx = contacts.findIndex(contactRowIsBlank)
+    if (emptyIdx >= 0) {
+      contacts[emptyIdx] = { ...contacts[emptyIdx], ...merged }
+    } else {
+      contacts.push({ ...EMPTY_CONTACT_ROW, ...merged })
+    }
+  }
+
+  return { ...prev, contacts }
+}
+
+function paragraphLooksLikeContactSnippet(p) {
+  const t = trim(p)
+  if (t.length > 900) return false
+  if (!EMAIL_RE_ONE.test(t) && !extractPhoneFromLine(t)) return false
+  const lineCount = t.split('\n').map((l) => trim(l)).filter(Boolean).length
+  if (lineCount > 16) return false
+  if (
+    /\b(however|therefore|please note that|due to|registration opens|badge pickup|travel and|we recommend|parking is|wi-?fi is)\b/i.test(
+      t,
+    )
+  ) {
+    return false
+  }
+  return true
+}
+
+/**
+ * Pull structured contacts out of Additional Notes paragraphs so they populate Contacts instead.
+ */
+function partitionNotesAndExtractContacts(notesText) {
+  const raw = trim(String(notesText).replace(/\r\n/g, '\n'))
+  if (!raw) return { contacts: [], remainder: '' }
+  const paras = raw.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean)
+  /** @type {ParsedOrganizerContact[]} */
+  const contacts = []
+  const rest = []
+  for (const p of paras) {
+    const fromP = parseContactsFromKeyContactsText(p)
+    if (fromP.length > 0 && paragraphLooksLikeContactSnippet(p)) {
+      for (const c of fromP) {
+        if (!contacts.some((x) => parsedContactsLookDuplicate(x, c))) contacts.push(c)
+      }
+    } else {
+      rest.push(p)
+    }
+  }
+  return { contacts, remainder: rest.join('\n\n').trim() }
+}
 
 function mergeIntoNamedSection(prev, title, content) {
   const incoming = trim(String(content))
@@ -746,8 +1189,7 @@ export function mergeOrganizerParsedIntoForm(prev, parsed) {
     if (
       key === 'additionalOrganizerNotes' ||
       key === 'keyContactsSection' ||
-      key === 'structuredKbygPlain' ||
-      key === 'parsingDebugPlain'
+      key === 'structuredKbygPlain'
     ) {
       continue
     }
@@ -757,13 +1199,26 @@ export function mergeOrganizerParsedIntoForm(prev, parsed) {
     next[key] = String(val).trim()
   }
 
-  if (parsed.keyContactsSection != null && trim(String(parsed.keyContactsSection)) !== '') {
-    next = mergeIntoNamedSection(next, KEY_CONTACTS_TITLE, parsed.keyContactsSection)
+  const kcRaw = parsed.keyContactsSection != null ? trim(String(parsed.keyContactsSection)) : ''
+  if (kcRaw) {
+    const parsedContacts = parseContactsFromKeyContactsText(kcRaw)
+    if (parsedContacts.length > 0) {
+      next = mergeParsedContactsIntoForm(next, parsedContacts)
+    } else {
+      next = mergeIntoNamedSection(next, KEY_CONTACTS_TITLE, kcRaw)
+    }
   }
 
   const notes = parsed.additionalOrganizerNotes
   if (notes != null && trim(String(notes)) !== '') {
-    next = mergeIntoNamedSection(next, ADDITIONAL_NOTES_TITLE, notes)
+    const notesRaw = trim(String(notes))
+    const { contacts: notesContacts, remainder } = partitionNotesAndExtractContacts(notesRaw)
+    if (notesContacts.length > 0) {
+      next = mergeParsedContactsIntoForm(next, notesContacts)
+    }
+    if (remainder) {
+      next = mergeIntoNamedSection(next, ADDITIONAL_NOTES_TITLE, remainder)
+    }
   }
 
   return next

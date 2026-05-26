@@ -87,3 +87,61 @@ export function rebuildKbygPlainFromSections(sections) {
 export function replaceKbygSectionBody(sections, sectionKey, newBody) {
   return sections.map((s) => (s.key === sectionKey ? { ...s, body: newBody } : s))
 }
+
+const NOISY_STYLE_PROPS = new Set([
+  'font-family',
+  'font-size',
+  'font-variant',
+  '-webkit-font-smoothing',
+])
+
+/**
+ * Strip noisy inline styles (font stacks, sizes) and wrap major blocks in &lt;p&gt;
+ * so clipboard consumers (Gmail, Docs) get structured HTML instead of raw tags.
+ * @param {string} fullHtml Full HTML from buildConferenceEmailHtml (wrapped &lt;div&gt;…)
+ * @returns {{ html: string }}
+ */
+export function prepareConferenceEmailClipboardHtml(fullHtml) {
+  if (!fullHtml || typeof fullHtml !== 'string') return { html: '' }
+
+  const doc = new DOMParser().parseFromString(fullHtml, 'text/html')
+  const wrapper = doc.body.querySelector('div')
+  if (!wrapper) {
+    return { html: fullHtml }
+  }
+
+  wrapper.querySelectorAll('[style]').forEach((el) => {
+    const raw = el.getAttribute('style')
+    if (!raw) return
+    const kept = []
+    for (const part of raw.split(';')) {
+      const idx = part.indexOf(':')
+      if (idx === -1) continue
+      const key = part.slice(0, idx).trim().toLowerCase()
+      const val = part.slice(idx + 1).trim()
+      if (!key || !val) continue
+      if (NOISY_STYLE_PROPS.has(key)) continue
+      if (key.startsWith('-webkit-')) continue
+      kept.push(`${key}: ${val}`)
+    }
+    if (kept.length) el.setAttribute('style', kept.join('; '))
+    else el.removeAttribute('style')
+  })
+
+  wrapper.setAttribute('style', 'line-height:1.5;color:#202124;')
+
+  let inner = wrapper.innerHTML
+  const segments = inner
+    .split(/(?:<br\s*\/?>(?:\s|&nbsp;|\u00A0)*){2,}/gi)
+    .map((s) => s.trim())
+    .filter(Boolean)
+
+  if (segments.length === 0) {
+    return { html: wrapper.outerHTML }
+  }
+
+  const body = segments.map((seg) => `<p style="margin:0 0 14px 0;">${seg}</p>`).join('')
+  wrapper.innerHTML = body
+
+  return { html: wrapper.outerHTML }
+}

@@ -418,6 +418,38 @@ body {
   margin-top: 0.25rem;
 }
 
+.kbyg-internal-agenda-field .kbyg-internal-agenda-hint {
+  margin-top: 0.35rem;
+  margin-bottom: 0.45rem;
+  max-width: 42rem;
+  line-height: 1.45;
+  color: #8b9099;
+}
+
+/* Primary editing surface for pasted Meetup/Luma agendas — tall default, user-resizable */
+.form textarea.kbyg-internal-agenda-textarea {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-height: clamp(12rem, 32vh, 22rem);
+  line-height: 1.45;
+}
+
+/* Update / format KBYG: lead description + subtle merge hint */
+.form-fieldset-kbyg-enhance .form-hint-kbyg-enhance-lead {
+  margin-top: 0;
+  margin-bottom: 0.15rem;
+  line-height: 1.45;
+  max-width: 42rem;
+  color: #4b5563;
+}
+
+.form-fieldset-kbyg-enhance .form-hint-kbyg-enhance-sub {
+  margin-top: -0.25rem;
+  font-size: 0.78rem;
+  color: #8b9099;
+}
+
 .form input,
 .form textarea,
 .form select {
@@ -633,6 +665,62 @@ body {
 
 .quick-draft-stack .form-hint {
   margin-top: 0;
+}
+
+.form-language-row {
+  margin: 0.75rem 0 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.form-language-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.form-language-row select {
+  min-width: 10rem;
+  padding: 0.35rem 0.5rem;
+  font: inherit;
+}
+
+.form-language-row .checkbox-label.kbyg-emoji-headers-toggle {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/** Meetup KBYG: emoji + language on the left, reset on the right; wraps on narrow viewports. */
+.form-kbyg-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+}
+
+.form-kbyg-toolbar .form-language-row.form-kbyg-toolbar-settings {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: min(100%, 18rem);
+}
+
+.translate-output-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.5rem 0 1rem;
+}
+
+.translate-api-hint {
+  margin: 0 0 0.75rem;
+  color: #b45309;
 }
 
 .event-page-section-toggles {
@@ -956,6 +1044,33 @@ body {
   border-radius: 10px;
   max-height: 28rem;
   overflow-y: auto;
+}
+
+/* KBYG HTML: typography via CSS only so copied markup stays free of font-size/font-family (Gmail “Normal” / Sans Serif). */
+.meetup-page-preview.kbyg-email-html-preview {
+  font-size: 15px;
+  line-height: 1.5;
+  color: #202124;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.meetup-page-preview.kbyg-email-html-preview p {
+  margin: 0 0 1em;
+}
+
+.meetup-page-preview.kbyg-email-html-preview ul {
+  margin: 0.35em 0 1em;
+  padding-left: 1.5rem;
+  list-style-type: disc;
+}
+
+.meetup-page-preview.kbyg-email-html-preview li {
+  margin: 0 0 0.35em;
+}
+
+.meetup-page-preview.kbyg-email-html-preview a {
+  color: #1d4ed8;
 }
 
 .output-placeholder {
