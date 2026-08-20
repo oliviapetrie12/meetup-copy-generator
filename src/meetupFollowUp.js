@@ -30,9 +30,9 @@ export function createEmptyTalk() {
 export function getInitialMeetupFollowUpForm() {
   return {
     meetupCity: '',
+    meetupName: '',
     registrationPlatform: 'luma',
     advocateName: '',
-    emailSubject: '',
     talks: [createEmptyTalk(), createEmptyTalk()],
   }
 }
@@ -58,12 +58,12 @@ export function loadMeetupFollowUpForm() {
     return {
       ...base,
       meetupCity: typeof parsed.meetupCity === 'string' ? parsed.meetupCity : '',
+      meetupName: typeof parsed.meetupName === 'string' ? parsed.meetupName : '',
       registrationPlatform:
         parsed.registrationPlatform === 'meetup' || parsed.registrationPlatform === 'luma'
           ? parsed.registrationPlatform
           : 'luma',
       advocateName: typeof parsed.advocateName === 'string' ? parsed.advocateName : '',
-      emailSubject: typeof parsed.emailSubject === 'string' ? parsed.emailSubject : '',
       talks: talks.length >= 1 ? talks : base.talks,
     }
   } catch {
@@ -159,6 +159,9 @@ export function validateMeetupFollowUpForm(form) {
   if (!String(form.meetupCity || '').trim()) {
     fieldErrors.meetupCity = 'Meetup city is required.'
   }
+  if (!String(form.meetupName || '').trim()) {
+    fieldErrors.meetupName = 'Meetup name is required.'
+  }
   if (form.registrationPlatform !== 'luma' && form.registrationPlatform !== 'meetup') {
     fieldErrors.registrationPlatform = 'Select Luma or Meetup.'
   }
@@ -187,21 +190,19 @@ export function validateMeetupFollowUpForm(form) {
 }
 
 /**
- * Default subject when the optional field is blank.
- * @param {string} city
+ * Subject line from meetup name: “[Meetup Name] Follow-Up”.
+ * @param {string} meetupName
  */
-export function defaultFollowUpSubject(city) {
-  const c = String(city || '').trim() || 'City'
-  return `Slides from the ${c} Elastic Meetup`
+export function defaultFollowUpSubject(meetupName) {
+  const name = String(meetupName || '').trim() || 'Meetup'
+  return `${name} Follow-Up`
 }
 
 /**
  * @param {ReturnType<typeof getInitialMeetupFollowUpForm>} form
  */
 export function resolveFollowUpSubject(form) {
-  const custom = String(form.emailSubject || '').trim()
-  if (custom) return custom
-  return defaultFollowUpSubject(form.meetupCity)
+  return defaultFollowUpSubject(form.meetupName)
 }
 
 /**

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   INTERNAL_CHECKLIST_ITEMS,
   createEmptyTalk,
-  defaultFollowUpSubject,
   generateMeetupFollowUpEmail,
   getInitialMeetupFollowUpForm,
   loadMeetupFollowUpForm,
@@ -29,8 +28,6 @@ export default function MeetupFollowUp() {
 
   const validation = useMemo(() => validateMeetupFollowUpForm(form), [form])
   const canGenerate = validation.ok
-
-  const subjectPlaceholder = defaultFollowUpSubject(form.meetupCity || 'City')
 
   const updateField = (key) => (e) => {
     const value = e.target.value
@@ -166,6 +163,24 @@ export default function MeetupFollowUp() {
               ) : null}
             </label>
 
+            <label>
+              Meetup name <span className="form-hint">(required)</span>
+              <input
+                type="text"
+                value={form.meetupName}
+                onChange={updateField('meetupName')}
+                placeholder="e.g. Elastic NYC User Group"
+                required
+                aria-invalid={showErrors && !!fieldErrors.meetupName}
+                aria-describedby={showErrors && fieldErrors.meetupName ? 'mfu-err-name' : undefined}
+              />
+              {showErrors && fieldErrors.meetupName ? (
+                <span id="mfu-err-name" className="form-error" role="alert">
+                  {fieldErrors.meetupName}
+                </span>
+              ) : null}
+            </label>
+
             <div className="channel-selector" role="radiogroup" aria-label="Registration platform">
               <span className="form-hint" style={{ display: 'block', marginBottom: '0.35rem' }}>
                 Registration platform (required)
@@ -212,16 +227,6 @@ export default function MeetupFollowUp() {
                   {fieldErrors.advocateName}
                 </span>
               ) : null}
-            </label>
-
-            <label>
-              Email subject <span className="form-hint">(optional)</span>
-              <input
-                type="text"
-                value={form.emailSubject}
-                onChange={updateField('emailSubject')}
-                placeholder={subjectPlaceholder}
-              />
             </label>
           </fieldset>
 
