@@ -6,6 +6,9 @@ import { escapeHtml, escapeHtmlAttr } from './htmlEscape.js'
 
 export const MEETUP_FOLLOWUP_STORAGE_KEY = 'meetup-followup-form-v1'
 
+/** Device-local only: remembered advocate name across form resets and sessions. */
+export const ADVOCATE_NAME_STORAGE_KEY = 'elastic-devrel-advocate-name'
+
 export const FOLLOWUP_DESTINATIONS = {
   training: 'https://www.elastic.co/training',
   newsletter: 'https://www.elastic.co/community/newsletter',
@@ -27,25 +30,70 @@ export function createEmptyTalk() {
   }
 }
 
+/**
+ * Read the remembered advocate name from this browser only.
+ * @returns {string}
+ */
+export function loadSavedAdvocateName() {
+  try {
+    if (typeof localStorage === 'undefined') return ''
+    const raw = localStorage.getItem(ADVOCATE_NAME_STORAGE_KEY)
+    return typeof raw === 'string' ? raw : ''
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * Persist advocate name for this device. Empty/whitespace clears the saved value.
+ * @param {string} name
+ */
+export function saveSavedAdvocateName(name) {
+  try {
+    if (typeof localStorage === 'undefined') return
+    const trimmed = String(name || '').trim()
+    if (!trimmed) {
+      localStorage.removeItem(ADVOCATE_NAME_STORAGE_KEY)
+      return
+    }
+    localStorage.setItem(ADVOCATE_NAME_STORAGE_KEY, trimmed)
+  } catch {
+    // ignore quota / private mode / blocked storage
+  }
+}
+
 export function getInitialMeetupFollowUpForm() {
   return {
     meetupCity: '',
     meetupName: '',
     registrationPlatform: 'luma',
-    advocateName: '',
+    advocateName: loadSavedAdvocateName(),
     talks: [createEmptyTalk(), createEmptyTalk()],
   }
 }
 
 /**
- * True when form matches a blank initial state (no entered content).
+ * Cleared event fields after Reset — keeps the saved advocate name populated.
+ * @returns {ReturnType<typeof getInitialMeetupFollowUpForm>}
+ */
+export function getResetMeetupFollowUpForm() {
+  return {
+    meetupCity: '',
+    meetupName: '',
+    registrationPlatform: 'luma',
+    advocateName: loadSavedAdvocateName(),
+    talks: [createEmptyTalk(), createEmptyTalk()],
+  }
+}
+
+/**
+ * True when form has no event content (advocate name alone does not count).
  * @param {ReturnType<typeof getInitialMeetupFollowUpForm>} form
  */
 export function isMeetupFollowUpFormEmpty(form) {
   if (!form) return true
   if (String(form.meetupCity || '').trim()) return false
   if (String(form.meetupName || '').trim()) return false
-  if (String(form.advocateName || '').trim()) return false
   if (form.registrationPlatform !== 'luma') return false
   const talks = Array.isArray(form.talks) ? form.talks : []
   if (talks.length !== 2) return false
@@ -58,13 +106,18 @@ export function isMeetupFollowUpFormEmpty(form) {
 }
 
 export function loadMeetupFollowUpForm() {
-  if (typeof localStorage === 'undefined') return getInitialMeetupFollowUpForm()
+  const savedAdvocate = loadSavedAdvocateName()
+  if (typeof localStorage === 'undefined') {
+    return { ...getInitialMeetupFollowUpForm(), advocateName: savedAdvocate }
+  }
   try {
     const raw = localStorage.getItem(MEETUP_FOLLOWUP_STORAGE_KEY)
-    if (!raw) return getInitialMeetupFollowUpForm()
+    if (!raw) {
+      return { ...getInitialMeetupFollowUpForm(), advocateName: savedAdvocate }
+    }
     const parsed = JSON.parse(raw)
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return getInitialMeetupFollowUpForm()
+      return { ...getInitialMeetupFollowUpForm(), advocateName: savedAdvocate }
     }
     const base = getInitialMeetupFollowUpForm()
     const talks = Array.isArray(parsed.talks)
@@ -75,6 +128,7 @@ export function loadMeetupFollowUpForm() {
           slidesUrl: typeof t?.slidesUrl === 'string' ? t.slidesUrl : '',
         }))
       : base.talks
+    const fromDraft = typeof parsed.advocateName === 'string' ? parsed.advocateName.trim() : ''
     return {
       ...base,
       meetupCity: typeof parsed.meetupCity === 'string' ? parsed.meetupCity : '',
@@ -83,19 +137,24 @@ export function loadMeetupFollowUpForm() {
         parsed.registrationPlatform === 'meetup' || parsed.registrationPlatform === 'luma'
           ? parsed.registrationPlatform
           : 'luma',
-      advocateName: typeof parsed.advocateName === 'string' ? parsed.advocateName : '',
+      advocateName: fromDraft || savedAdvocate,
       talks: talks.length >= 1 ? talks : base.talks,
     }
   } catch {
-    return getInitialMeetupFollowUpForm()
+    return { ...getInitialMeetupFollowUpForm(), advocateName: savedAdvocate }
   }
 }
 
 export function saveMeetupFollowUpForm(form) {
   try {
-    localStorage.setItem(MEETUP_FOLLOWUP_STORAGE_KEY, JSON.stringify(form))
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(MEETUP_FOLLOWUP_STORAGE_KEY, JSON.stringify(form))
+    }
   } catch {
     // ignore quota / private mode
+  }
+  if (form && Object.prototype.hasOwnProperty.call(form, 'advocateName')) {
+    saveSavedAdvocateName(form.advocateName)
   }
 }
 
@@ -296,6 +355,76 @@ export function generateMeetupFollowUpEmail(form) {
 
   void city
   return { subject, plain, html }
+}
+
+/**
+ * Attendee-only clipboard HTML: semantic tags only, no checklist / UI chrome.
+ * @param {string} html From generateMeetupFollowUpEmail().html
+ * @returns {string}
+ */
+export function buildMeetupFollowUpClipboardHtml(html) {
+  const body = String(html || '').trim()
+  if (!body) return ''
+  // Reject accidental inclusion of internal checklist copy
+  if (/internal checklist/i.test(body)) {
+    return body.replace(/[\s\S]*?(?=<p>Hi there,)/i, '').trim() || body
+  }
+  return body
+}
+
+/**
+ * Assert clipboard HTML is attendee-facing semantic markup (for tests / QA helpers).
+ * @param {string} html
+ */
+export function assertMeetupFollowUpClipboardHtmlShape(html) {
+  const s = String(html || '')
+  return {
+    hasAnchors: /<a\s+href="/i.test(s),
+    hasOrderedList: /<ol[\s>]/i.test(s) && /<\/ol>/i.test(s),
+    hasUnorderedList: /<ul[\s>]/i.test(s) && /<\/ul>/i.test(s),
+    hasParagraphs: /<p[\s>]/i.test(s),
+    hasSignatureBreak: /<br\s*\/?>/i.test(s),
+    excludesChecklist: !/internal checklist/i.test(s),
+    excludesClassAttr: !/\sclass\s*=/i.test(s),
+    excludesScript: !/<script[\s>]/i.test(s),
+  }
+}
+
+/**
+ * Copy attendee email as text/html + text/plain when supported.
+ * @param {{ html?: string, plain?: string }} payload
+ * @param {{ clipboard?: Clipboard, ClipboardItem?: typeof ClipboardItem }} [deps]
+ * @returns {Promise<'html' | 'plain'>}
+ */
+export async function copyMeetupFollowUpEmailToClipboard(payload, deps = {}) {
+  const plain = String(payload?.plain || '')
+  const clipHtml = buildMeetupFollowUpClipboardHtml(payload?.html || '')
+  const clipboard = deps.clipboard || (typeof navigator !== 'undefined' ? navigator.clipboard : null)
+  const ClipboardItemCtor =
+    deps.ClipboardItem || (typeof ClipboardItem !== 'undefined' ? ClipboardItem : undefined)
+
+  if (!clipboard) {
+    throw new Error('Clipboard unavailable')
+  }
+
+  if (ClipboardItemCtor && clipHtml && typeof clipboard.write === 'function') {
+    try {
+      const htmlBlob = new Blob([clipHtml], { type: 'text/html' })
+      const textBlob = new Blob([plain], { type: 'text/plain' })
+      await clipboard.write([
+        new ClipboardItemCtor({
+          'text/html': htmlBlob,
+          'text/plain': textBlob,
+        }),
+      ])
+      return 'html'
+    } catch {
+      // fall through to plain text
+    }
+  }
+
+  await clipboard.writeText(plain)
+  return 'plain'
 }
 
 export const INTERNAL_CHECKLIST_ITEMS = [

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   INTERNAL_CHECKLIST_ITEMS,
+  copyMeetupFollowUpEmailToClipboard,
   createEmptyTalk,
   generateMeetupFollowUpEmail,
-  getInitialMeetupFollowUpForm,
+  getResetMeetupFollowUpForm,
   isMeetupFollowUpFormEmpty,
   loadMeetupFollowUpForm,
   saveMeetupFollowUpForm,
@@ -27,7 +28,7 @@ export default function MeetupFollowUp() {
   const [fieldErrors, setFieldErrors] = useState({})
   const [talkErrors, setTalkErrors] = useState({})
   const [subjectCopied, setSubjectCopied] = useState(false)
-  const [emailCopied, setEmailCopied] = useState(false)
+  const [emailCopyMode, setEmailCopyMode] = useState(/** @type {null | 'html' | 'plain'} */ (null))
   const [showErrors, setShowErrors] = useState(false)
   const [confirmResetOpen, setConfirmResetOpen] = useState(false)
 
@@ -38,7 +39,8 @@ export default function MeetupFollowUp() {
   const validation = useMemo(() => validateMeetupFollowUpForm(form), [form])
   const canGenerate = validation.ok
   const formEmpty = useMemo(() => isMeetupFollowUpFormEmpty(form), [form])
-  const canReset = !formEmpty || Boolean(generated) || showErrors || subjectCopied || emailCopied
+  const canReset =
+    !formEmpty || Boolean(generated) || showErrors || subjectCopied || emailCopyMode != null
 
   const updateField = (key) => (e) => {
     const value = e.target.value
@@ -92,7 +94,7 @@ export default function MeetupFollowUp() {
     }
     setGenerated(generateMeetupFollowUpEmail(form))
     setSubjectCopied(false)
-    setEmailCopied(false)
+    setEmailCopyMode(null)
   }
 
   useEffect(() => {
@@ -104,13 +106,13 @@ export default function MeetupFollowUp() {
   }, [form])
 
   const applyReset = () => {
-    setForm(getInitialMeetupFollowUpForm())
+    setForm(getResetMeetupFollowUpForm())
     setGenerated(null)
     setFieldErrors({})
     setTalkErrors({})
     setShowErrors(false)
     setSubjectCopied(false)
-    setEmailCopied(false)
+    setEmailCopyMode(null)
     setConfirmResetOpen(false)
   }
 
@@ -137,25 +139,14 @@ export default function MeetupFollowUp() {
   const copyEmail = async () => {
     if (!generated) return
     try {
-      if (typeof ClipboardItem !== 'undefined' && generated.html) {
-        const htmlBlob = new Blob([generated.html], { type: 'text/html' })
-        const textBlob = new Blob([generated.plain], { type: 'text/plain' })
-        await navigator.clipboard.write([
-          new ClipboardItem({ 'text/html': htmlBlob, 'text/plain': textBlob }),
-        ])
-      } else {
-        await navigator.clipboard.writeText(generated.plain)
-      }
-      setEmailCopied(true)
-      setTimeout(() => setEmailCopied(false), 2000)
+      const mode = await copyMeetupFollowUpEmailToClipboard({
+        html: generated.html,
+        plain: generated.plain,
+      })
+      setEmailCopyMode(mode)
+      window.setTimeout(() => setEmailCopyMode(null), 2500)
     } catch {
-      try {
-        await navigator.clipboard.writeText(generated.plain)
-        setEmailCopied(true)
-        setTimeout(() => setEmailCopied(false), 2000)
-      } catch {
-        /* ignore */
-      }
+      /* ignore */
     }
   }
 
@@ -256,8 +247,18 @@ export default function MeetupFollowUp() {
                   placeholder="e.g. Olivia"
                   required
                   aria-invalid={showErrors && !!fieldErrors.advocateName}
-                  aria-describedby={showErrors && fieldErrors.advocateName ? 'mfu-err-advocate' : undefined}
+                  aria-describedby={
+                    [
+                      'mfu-advocate-saved-hint',
+                      showErrors && fieldErrors.advocateName ? 'mfu-err-advocate' : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' ') || undefined
+                  }
                 />
+                <span id="mfu-advocate-saved-hint" className="form-hint mfu-advocate-saved-hint">
+                  Saved on this device
+                </span>
                 {showErrors && fieldErrors.advocateName ? (
                   <span id="mfu-err-advocate" className="form-error" role="alert">
                     {fieldErrors.advocateName}
@@ -405,11 +406,23 @@ export default function MeetupFollowUp() {
                 className="meetup-page-preview kbyg-email-html-preview mfu-email-preview"
                 dangerouslySetInnerHTML={{ __html: generated.html }}
               />
-              <div className="output-actions output-actions-inline">
-                <button type="button" onClick={copyEmail} className="btn-copy" aria-pressed={emailCopied}>
-                  {emailCopied ? 'Copied!' : 'Copy email'}
+              <div className="output-actions output-actions-inline mfu-copy-email-row">
+                <button
+                  type="button"
+                  onClick={copyEmail}
+                  className="btn-copy"
+                  aria-pressed={emailCopyMode != null}
+                >
+                  {emailCopyMode === 'html'
+                    ? 'Copied with formatting'
+                    : emailCopyMode === 'plain'
+                      ? 'Copied as plain text'
+                      : 'Copy email'}
                 </button>
               </div>
+              <p className="form-hint mfu-copy-email-hint">
+                Copies with links and formatting for Luma and Meetup.
+              </p>
 
               <details className="mfu-plain-details">
                 <summary>Plain-text / copy-ready version</summary>
@@ -466,7 +479,8 @@ export default function MeetupFollowUp() {
             onClick={(e) => e.stopPropagation()}
           >
             <p id="mfu-confirm-title" className="mfu-confirm-message">
-              Reset this form? All entered information will be cleared.
+              Reset this form? Event details will be cleared. Your saved advocate name will be kept on
+              this device.
             </p>
             <div className="mfu-confirm-actions">
               <button type="button" className="btn-reset mfu-confirm-cancel" onClick={cancelReset}>

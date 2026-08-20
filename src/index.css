@@ -995,6 +995,22 @@ body {
   font-style: normal;
 }
 
+.mfu-advocate-saved-hint {
+  margin-top: 0.2rem;
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.mfu-copy-email-row {
+  margin-bottom: 0.35rem;
+}
+
+.mfu-copy-email-hint {
+  margin: 0 0 1rem;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
 .mfu-plain-details {
   margin: 1.25rem 0;
 }
