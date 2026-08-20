@@ -437,7 +437,7 @@ const GENERATOR_CARDS = [
   },
   {
     value: 'meetupFollowUp',
-    title: '📨 Meetup Follow-Up',
+    title: '📤 Meetup Follow-Up',
     description: 'Generate a post-event email with slide links, standard resources, and UTM tracking.',
   },
   {
