@@ -2,6 +2,8 @@
  * Shared generator UI primitives for consistent form/output chrome across the toolkit.
  */
 
+import { useState } from 'react'
+
 export function FieldLabel({ children, required = false, optional = false, htmlFor }) {
   const inner = (
     <span className="gen-label-row">
@@ -73,6 +75,70 @@ export function FormSection({ title, hint, children, id }) {
       </h3>
       {hint ? <p className="gen-section-hint">{hint}</p> : null}
       {children}
+    </section>
+  )
+}
+
+/**
+ * Collapsible optional section — collapsed by default, keyboard accessible.
+ * @param {{
+ *   title: string
+ *   hint?: string
+ *   id?: string
+ *   defaultOpen?: boolean
+ *   completed?: boolean
+ *   summary?: string | null
+ *   children: import('react').ReactNode
+ * }} props
+ */
+export function CollapsibleFormSection({
+  title,
+  hint,
+  id,
+  defaultOpen = false,
+  completed = false,
+  summary = null,
+  children,
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  const headingId = id ? `${id}-trigger` : undefined
+  const panelId = id ? `${id}-panel` : undefined
+
+  return (
+    <section
+      className={`gen-section gen-section-collapsible${completed ? ' gen-section-collapsible--complete' : ''}`}
+    >
+      <button
+        type="button"
+        id={headingId}
+        className="gen-collapse-trigger"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className="gen-collapse-main">
+          <span className="gen-section-title gen-collapse-title">{title}</span>
+          {completed ? (
+            <span className="gen-collapse-check" aria-label="Completed">
+              ✓
+            </span>
+          ) : null}
+        </span>
+        {!open && summary ? <span className="gen-collapse-summary">{summary}</span> : null}
+        <span className="gen-collapse-chevron" aria-hidden="true">
+          {open ? '▾' : '▸'}
+        </span>
+      </button>
+      <div
+        id={panelId}
+        role="region"
+        aria-labelledby={headingId}
+        className="gen-collapse-panel"
+        hidden={!open}
+      >
+        {hint ? <p className="gen-section-hint">{hint}</p> : null}
+        {children}
+      </div>
     </section>
   )
 }

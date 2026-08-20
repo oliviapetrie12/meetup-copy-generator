@@ -4,6 +4,7 @@ import {
   copyMeetupFollowUpEmailToClipboard,
   createEmptyTalk,
   generateMeetupFollowUpEmail,
+  getNextMeetupState,
   getResetMeetupFollowUpForm,
   isMeetupFollowUpFormEmpty,
   loadMeetupFollowUpForm,
@@ -14,6 +15,7 @@ import {
   FieldLabel,
   GeneratorHeader,
   FormSection,
+  CollapsibleFormSection,
   GeneratorActions,
   EmptyState,
 } from './components/generatorUi.jsx'
@@ -38,6 +40,7 @@ export default function MeetupFollowUp() {
 
   const validation = useMemo(() => validateMeetupFollowUpForm(form), [form])
   const canGenerate = validation.ok
+  const nextMeetup = useMemo(() => getNextMeetupState(form), [form])
   const formEmpty = useMemo(() => isMeetupFollowUpFormEmpty(form), [form])
   const canReset =
     !formEmpty || Boolean(generated) || showErrors || subjectCopied || emailCopyMode != null
@@ -374,6 +377,69 @@ export default function MeetupFollowUp() {
               + Add another talk
             </button>
           </FormSection>
+
+          <CollapsibleFormSection
+            id="mfu-next-meetup"
+            title="Next Meetup (optional)"
+            hint="Promote an upcoming meetup in the attendee follow-up."
+            defaultOpen={false}
+            completed={nextMeetup.complete}
+            summary={nextMeetup.complete ? nextMeetup.name : null}
+          >
+            <label className="mfu-field">
+              <FieldLabel optional>Event name</FieldLabel>
+              <input
+                type="text"
+                value={form.nextMeetupName || ''}
+                onChange={updateField('nextMeetupName')}
+                placeholder="e.g. Building AI Agents with Elasticsearch"
+                autoComplete="off"
+                aria-invalid={Boolean(nextMeetup.incompletePair && nextMeetup.hasName === false)}
+              />
+            </label>
+            <label className="mfu-field">
+              <FieldLabel optional>Event page URL</FieldLabel>
+              <input
+                type="url"
+                inputMode="url"
+                value={form.nextMeetupUrl || ''}
+                onChange={updateField('nextMeetupUrl')}
+                placeholder="https://lu.ma/..."
+                autoComplete="off"
+                aria-invalid={
+                  Boolean(validation.fieldErrors.nextMeetupUrl) ||
+                  Boolean(nextMeetup.incompletePair && !nextMeetup.hasUrl)
+                }
+                aria-describedby={
+                  [
+                    nextMeetup.incompletePair ? 'mfu-next-meetup-pair-msg' : null,
+                    validation.fieldErrors.nextMeetupUrl ? 'mfu-err-next-url' : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' ') || undefined
+                }
+              />
+              {validation.fieldErrors.nextMeetupUrl ? (
+                <span id="mfu-err-next-url" className="form-error" role="alert">
+                  {validation.fieldErrors.nextMeetupUrl}
+                </span>
+              ) : null}
+            </label>
+            <label className="mfu-field">
+              <FieldLabel optional>Event date</FieldLabel>
+              <input
+                type="date"
+                value={form.nextMeetupDate || ''}
+                onChange={updateField('nextMeetupDate')}
+                autoComplete="off"
+              />
+            </label>
+            {nextMeetup.incompletePair ? (
+              <p id="mfu-next-meetup-pair-msg" className="form-hint mfu-next-meetup-pair-msg" role="status">
+                {nextMeetup.pairMessage}
+              </p>
+            ) : null}
+          </CollapsibleFormSection>
 
           <GeneratorActions label="Generate follow-up" disabled={!canGenerate} />
         </form>

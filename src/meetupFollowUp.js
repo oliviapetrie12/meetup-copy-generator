@@ -69,6 +69,9 @@ export function getInitialMeetupFollowUpForm() {
     registrationPlatform: 'luma',
     advocateName: loadSavedAdvocateName(),
     talks: [createEmptyTalk(), createEmptyTalk()],
+    nextMeetupName: '',
+    nextMeetupUrl: '',
+    nextMeetupDate: '',
   }
 }
 
@@ -83,6 +86,9 @@ export function getResetMeetupFollowUpForm() {
     registrationPlatform: 'luma',
     advocateName: loadSavedAdvocateName(),
     talks: [createEmptyTalk(), createEmptyTalk()],
+    nextMeetupName: '',
+    nextMeetupUrl: '',
+    nextMeetupDate: '',
   }
 }
 
@@ -95,6 +101,9 @@ export function isMeetupFollowUpFormEmpty(form) {
   if (String(form.meetupCity || '').trim()) return false
   if (String(form.meetupName || '').trim()) return false
   if (form.registrationPlatform !== 'luma') return false
+  if (String(form.nextMeetupName || '').trim()) return false
+  if (String(form.nextMeetupUrl || '').trim()) return false
+  if (String(form.nextMeetupDate || '').trim()) return false
   const talks = Array.isArray(form.talks) ? form.talks : []
   if (talks.length !== 2) return false
   return talks.every(
@@ -139,6 +148,9 @@ export function loadMeetupFollowUpForm() {
           : 'luma',
       advocateName: fromDraft || savedAdvocate,
       talks: talks.length >= 1 ? talks : base.talks,
+      nextMeetupName: typeof parsed.nextMeetupName === 'string' ? parsed.nextMeetupName : '',
+      nextMeetupUrl: typeof parsed.nextMeetupUrl === 'string' ? parsed.nextMeetupUrl : '',
+      nextMeetupDate: typeof parsed.nextMeetupDate === 'string' ? parsed.nextMeetupDate : '',
     }
   } catch {
     return { ...getInitialMeetupFollowUpForm(), advocateName: savedAdvocate }
@@ -226,6 +238,119 @@ export function isValidHttpUrl(value) {
 }
 
 /**
+ * True for elastic.co and subdomains (www.elastic.co, etc.).
+ * @param {string} url
+ */
+export function isElasticCoHost(url) {
+  try {
+    const host = new URL(String(url || '').trim()).hostname.toLowerCase()
+    return host === 'elastic.co' || host.endsWith('.elastic.co')
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Format next-meetup date as “September 24, 2026”.
+ * Prefers YYYY-MM-DD from <input type="date"> (UTC calendar day).
+ * @param {string} value
+ * @returns {string}
+ */
+export function formatNextMeetupDate(value) {
+  const s = String(value || '').trim()
+  if (!s) return ''
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
+  if (iso) {
+    const year = Number(iso[1])
+    const month = Number(iso[2])
+    const day = Number(iso[3])
+    const d = new Date(Date.UTC(year, month - 1, day))
+    if (
+      d.getUTCFullYear() !== year ||
+      d.getUTCMonth() !== month - 1 ||
+      d.getUTCDate() !== day
+    ) {
+      return s
+    }
+    return new Intl.DateTimeFormat('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+      timeZone: 'UTC',
+    }).format(d)
+  }
+  const d = new Date(s)
+  if (Number.isNaN(d.getTime())) return s
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(d)
+}
+
+/**
+ * Inspect optional Next Meetup fields.
+ * @param {ReturnType<typeof getInitialMeetupFollowUpForm>} form
+ */
+export function getNextMeetupState(form) {
+  const name = String(form?.nextMeetupName || '').trim()
+  const url = String(form?.nextMeetupUrl || '').trim()
+  const date = String(form?.nextMeetupDate || '').trim()
+  const hasName = Boolean(name)
+  const hasUrl = Boolean(url)
+  const urlValid = hasUrl && isValidHttpUrl(url)
+  const incompletePair = (hasName && !hasUrl) || (!hasName && hasUrl)
+  const complete = hasName && urlValid
+  return {
+    name,
+    url,
+    date,
+    hasName,
+    hasUrl,
+    urlValid,
+    incompletePair,
+    complete,
+    pairMessage: incompletePair
+      ? 'Both event name and event page URL are required to include the next meetup.'
+      : '',
+  }
+}
+
+/**
+ * Append follow-up UTMs only for elastic.co hosts; leave other URLs unchanged.
+ * Existing query params are preserved (URLSearchParams.set merges UTMs).
+ * @param {string} url
+ * @param {Record<string, string>} utm
+ */
+export function resolveNextMeetupEventUrl(url, utm) {
+  const raw = String(url || '').trim()
+  if (!isValidHttpUrl(raw)) return raw
+  if (!isElasticCoHost(raw)) return raw
+  return appendUtmParams(raw, utm)
+}
+
+/**
+ * Build plain + HTML next-meetup paragraph pieces when complete.
+ * @param {ReturnType<typeof getInitialMeetupFollowUpForm>} form
+ * @param {Record<string, string>} utm
+ * @returns {{ plain: string, html: string } | null}
+ */
+export function buildNextMeetupParagraph(form, utm) {
+  const state = getNextMeetupState(form)
+  if (!state.complete) return null
+  const href = resolveNextMeetupEventUrl(state.url, utm)
+  const formattedDate = formatNextMeetupDate(state.date)
+  const plain = formattedDate
+    ? `Join us at our next meetup on ${formattedDate}: ${state.name} (${href}).`
+    : `Join us at our next meetup: ${state.name} (${href}).`
+  const linked = `<a href="${escapeHtmlAttr(href)}">${escapeHtml(state.name)}</a>`
+  const html = formattedDate
+    ? `<p>Join us at our next meetup on ${escapeHtml(formattedDate)}: ${linked}.</p>`
+    : `<p>Join us at our next meetup: ${linked}.</p>`
+  return { plain, html }
+}
+
+/**
  * @param {ReturnType<typeof getInitialMeetupFollowUpForm>} form
  * @returns {{ ok: boolean, fieldErrors: Record<string, string>, talkErrors: Record<string, Record<string, string>> }}
  */
@@ -263,6 +388,11 @@ export function validateMeetupFollowUpForm(form) {
     else if (!isValidHttpUrl(url)) err.slidesUrl = 'Enter a valid http(s) URL.'
     if (Object.keys(err).length) talkErrors[talk.id] = err
   })
+
+  const next = getNextMeetupState(form)
+  if (next.hasName && next.hasUrl && !next.urlValid) {
+    fieldErrors.nextMeetupUrl = 'Enter a valid http(s) URL.'
+  }
 
   const ok = Object.keys(fieldErrors).length === 0 && Object.keys(talkErrors).length === 0
   return { ok, fieldErrors, talkErrors }
@@ -311,7 +441,7 @@ export function generateMeetupFollowUpEmail(form) {
     return `${i + 1}. ${title} (${url}), ${speaker}`
   })
 
-  const plain = [
+  const plainParts = [
     'Hi there,',
     '',
     'Here are the slides from the meetup:',
@@ -326,9 +456,15 @@ export function generateMeetupFollowUpEmail(form) {
     `- Ask technical questions on Slack (${slackUrl}) or Discuss (${discussUrl})`,
     `- Submit a session to speak at a future meetup: ${sessionizeUrl}`,
     '',
-    'See you soon at the next meetup,',
-    advocate,
-  ].join('\n')
+  ]
+
+  const nextMeetup = buildNextMeetupParagraph(form, utm)
+  if (nextMeetup) {
+    plainParts.push(nextMeetup.plain, '')
+  }
+
+  plainParts.push('See you soon at the next meetup,', advocate)
+  const plain = plainParts.join('\n')
 
   const talkLis = talks
     .map((t) => {
@@ -339,7 +475,7 @@ export function generateMeetupFollowUpEmail(form) {
     })
     .join('')
 
-  const html = [
+  const htmlParts = [
     '<p>Hi there,</p>',
     '<p>Here are the slides from the meetup:</p>',
     `<ol>${talkLis}</ol>`,
@@ -350,8 +486,12 @@ export function generateMeetupFollowUpEmail(form) {
     `<li>Ask technical questions on <a href="${escapeHtmlAttr(slackUrl)}">Slack</a> or <a href="${escapeHtmlAttr(discussUrl)}">Discuss</a></li>`,
     `<li><a href="${escapeHtmlAttr(sessionizeUrl)}">Submit a session to speak at a future meetup</a></li>`,
     '</ul>',
-    `<p>See you soon at the next meetup,<br>${escapeHtml(advocate)}</p>`,
-  ].join('')
+  ]
+  if (nextMeetup) {
+    htmlParts.push(nextMeetup.html)
+  }
+  htmlParts.push(`<p>See you soon at the next meetup,<br>${escapeHtml(advocate)}</p>`)
+  const html = htmlParts.join('')
 
   void city
   return { subject, plain, html }
