@@ -4,6 +4,7 @@ import {
   createEmptyTalk,
   generateMeetupFollowUpEmail,
   getInitialMeetupFollowUpForm,
+  isMeetupFollowUpFormEmpty,
   loadMeetupFollowUpForm,
   saveMeetupFollowUpForm,
   validateMeetupFollowUpForm,
@@ -21,6 +22,7 @@ export default function MeetupFollowUp() {
   const [subjectCopied, setSubjectCopied] = useState(false)
   const [emailCopied, setEmailCopied] = useState(false)
   const [showErrors, setShowErrors] = useState(false)
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false)
 
   useEffect(() => {
     saveMeetupFollowUpForm(form)
@@ -28,6 +30,8 @@ export default function MeetupFollowUp() {
 
   const validation = useMemo(() => validateMeetupFollowUpForm(form), [form])
   const canGenerate = validation.ok
+  const formEmpty = useMemo(() => isMeetupFollowUpFormEmpty(form), [form])
+  const canReset = !formEmpty || Boolean(generated) || showErrors || subjectCopied || emailCopied
 
   const updateField = (key) => (e) => {
     const value = e.target.value
@@ -93,7 +97,7 @@ export default function MeetupFollowUp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only refresh content when form fields change after generate
   }, [form])
 
-  const handleReset = () => {
+  const applyReset = () => {
     setForm(getInitialMeetupFollowUpForm())
     setGenerated(null)
     setFieldErrors({})
@@ -101,6 +105,16 @@ export default function MeetupFollowUp() {
     setShowErrors(false)
     setSubjectCopied(false)
     setEmailCopied(false)
+    setConfirmResetOpen(false)
+  }
+
+  const requestReset = () => {
+    if (!canReset) return
+    setConfirmResetOpen(true)
+  }
+
+  const cancelReset = () => {
+    setConfirmResetOpen(false)
   }
 
   const copySubject = async () => {
@@ -142,6 +156,17 @@ export default function MeetupFollowUp() {
   return (
     <>
       <aside className="form-panel">
+        <div className="mfu-form-toolbar">
+          <button
+            type="button"
+            className="btn-reset mfu-reset-btn"
+            onClick={requestReset}
+            disabled={!canReset}
+            aria-disabled={!canReset}
+          >
+            <span aria-hidden="true">🔄</span> Reset form
+          </button>
+        </div>
         <form onSubmit={handleGenerate} className="form" noValidate>
           <fieldset className="form-fieldset">
             <legend>Event Details</legend>
@@ -339,9 +364,6 @@ export default function MeetupFollowUp() {
           <button type="submit" className="btn-generate" disabled={!canGenerate} aria-disabled={!canGenerate}>
             Generate
           </button>
-          <button type="button" onClick={handleReset} className="btn-reset">
-            🔄 Reset Form
-          </button>
         </form>
       </aside>
 
@@ -414,6 +436,37 @@ export default function MeetupFollowUp() {
           )}
         </div>
       </main>
+
+      {confirmResetOpen ? (
+        <div
+          className="mfu-confirm-backdrop"
+          role="presentation"
+          onClick={cancelReset}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') cancelReset()
+          }}
+        >
+          <div
+            className="mfu-confirm-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="mfu-confirm-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p id="mfu-confirm-title" className="mfu-confirm-message">
+              Reset this form? All entered information will be cleared.
+            </p>
+            <div className="mfu-confirm-actions">
+              <button type="button" className="btn-reset mfu-confirm-cancel" onClick={cancelReset}>
+                Cancel
+              </button>
+              <button type="button" className="btn-generate mfu-confirm-reset" onClick={applyReset}>
+                Reset form
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   )
 }

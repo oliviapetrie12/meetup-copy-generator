@@ -37,6 +37,26 @@ export function getInitialMeetupFollowUpForm() {
   }
 }
 
+/**
+ * True when form matches a blank initial state (no entered content).
+ * @param {ReturnType<typeof getInitialMeetupFollowUpForm>} form
+ */
+export function isMeetupFollowUpFormEmpty(form) {
+  if (!form) return true
+  if (String(form.meetupCity || '').trim()) return false
+  if (String(form.meetupName || '').trim()) return false
+  if (String(form.advocateName || '').trim()) return false
+  if (form.registrationPlatform !== 'luma') return false
+  const talks = Array.isArray(form.talks) ? form.talks : []
+  if (talks.length !== 2) return false
+  return talks.every(
+    (t) =>
+      !String(t.talkTitle || '').trim() &&
+      !String(t.speakerName || '').trim() &&
+      !String(t.slidesUrl || '').trim(),
+  )
+}
+
 export function loadMeetupFollowUpForm() {
   if (typeof localStorage === 'undefined') return getInitialMeetupFollowUpForm()
   try {
