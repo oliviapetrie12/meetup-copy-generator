@@ -181,34 +181,44 @@ export default function MeetupFollowUp() {
               ) : null}
             </label>
 
-            <div className="channel-selector" role="radiogroup" aria-label="Registration platform">
-              <span className="form-hint" style={{ display: 'block', marginBottom: '0.35rem' }}>
-                Registration platform (required)
+            <div className="mfu-platform-field">
+              <span className="mfu-platform-label" id="mfu-platform-label">
+                Registration platform
               </span>
-              <label
-                className={`channel-option ${form.registrationPlatform === 'luma' ? 'channel-option-active' : ''}`}
+              <span className="form-hint mfu-platform-required" id="mfu-platform-hint">
+                (required)
+              </span>
+              <div
+                className="channel-selector mfu-platform-selector"
+                role="radiogroup"
+                aria-labelledby="mfu-platform-label"
+                aria-describedby="mfu-platform-hint"
               >
-                <input
-                  type="radio"
-                  name="mfuPlatform"
-                  value="luma"
-                  checked={form.registrationPlatform === 'luma'}
-                  onChange={() => setPlatform('luma')}
-                />
-                <span>Luma</span>
-              </label>
-              <label
-                className={`channel-option ${form.registrationPlatform === 'meetup' ? 'channel-option-active' : ''}`}
-              >
-                <input
-                  type="radio"
-                  name="mfuPlatform"
-                  value="meetup"
-                  checked={form.registrationPlatform === 'meetup'}
-                  onChange={() => setPlatform('meetup')}
-                />
-                <span>Meetup</span>
-              </label>
+                <label
+                  className={`channel-option ${form.registrationPlatform === 'luma' ? 'channel-option-active' : ''}`}
+                >
+                  <input
+                    type="radio"
+                    name="mfuPlatform"
+                    value="luma"
+                    checked={form.registrationPlatform === 'luma'}
+                    onChange={() => setPlatform('luma')}
+                  />
+                  <span>Luma</span>
+                </label>
+                <label
+                  className={`channel-option ${form.registrationPlatform === 'meetup' ? 'channel-option-active' : ''}`}
+                >
+                  <input
+                    type="radio"
+                    name="mfuPlatform"
+                    value="meetup"
+                    checked={form.registrationPlatform === 'meetup'}
+                    onChange={() => setPlatform('meetup')}
+                  />
+                  <span>Meetup</span>
+                </label>
+              </div>
             </div>
 
             <label>
