@@ -10,6 +10,16 @@ import {
   validateMeetupFollowUpForm,
 } from './meetupFollowUp.js'
 
+function FieldLabel({ children, required = false, optional = false }) {
+  return (
+    <span className="mfu-label-row">
+      <span className="mfu-label-text">{children}</span>
+      {required ? <span className="mfu-badge mfu-badge-required">Required</span> : null}
+      {optional ? <span className="mfu-badge mfu-badge-optional">Optional</span> : null}
+    </span>
+  )
+}
+
 /**
  * Meetup Follow-Up generator — form + attendee email output + internal checklist.
  * State persists in localStorage so switching toolkit generators does not wipe the form.
@@ -88,13 +98,12 @@ export default function MeetupFollowUp() {
     setEmailCopied(false)
   }
 
-  // Keep preview in sync when city/platform/talks change after a successful generate
   useEffect(() => {
     if (!generated) return
     const v = validateMeetupFollowUpForm(form)
     if (!v.ok) return
     setGenerated(generateMeetupFollowUpEmail(form))
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only refresh content when form fields change after generate
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form])
 
   const applyReset = () => {
@@ -155,8 +164,14 @@ export default function MeetupFollowUp() {
 
   return (
     <>
-      <aside className="form-panel">
-        <div className="mfu-form-toolbar">
+      <aside className="form-panel mfu-form-panel">
+        <header className="mfu-form-header">
+          <div className="mfu-form-header-copy">
+            <h2 className="mfu-form-title">Create Meetup Follow-Up</h2>
+            <p className="mfu-form-desc">
+              Generate a ready-to-send attendee email with slides, resources, and automatic UTM tracking.
+            </p>
+          </div>
           <button
             type="button"
             className="btn-reset mfu-reset-btn"
@@ -166,12 +181,16 @@ export default function MeetupFollowUp() {
           >
             <span aria-hidden="true">🔄</span> Reset form
           </button>
-        </div>
-        <form onSubmit={handleGenerate} className="form" noValidate>
-          <fieldset className="form-fieldset">
-            <legend>Event Details</legend>
-            <label>
-              Meetup city <span className="form-hint">(required)</span>
+        </header>
+
+        <form onSubmit={handleGenerate} className="form mfu-form" noValidate>
+          <section className="mfu-section" aria-labelledby="mfu-event-details-heading">
+            <h3 id="mfu-event-details-heading" className="mfu-section-title">
+              Event Details
+            </h3>
+
+            <label className="mfu-field">
+              <FieldLabel required>Meetup city</FieldLabel>
               <input
                 type="text"
                 value={form.meetupCity}
@@ -188,8 +207,8 @@ export default function MeetupFollowUp() {
               ) : null}
             </label>
 
-            <label>
-              Meetup name <span className="form-hint">(required)</span>
+            <label className="mfu-field">
+              <FieldLabel required>Meetup name</FieldLabel>
               <input
                 type="text"
                 value={form.meetupName}
@@ -206,172 +225,192 @@ export default function MeetupFollowUp() {
               ) : null}
             </label>
 
-            <div className="mfu-platform-field">
-              <span className="mfu-platform-label" id="mfu-platform-label">
-                Registration platform
-              </span>
-              <span className="form-hint mfu-platform-required" id="mfu-platform-hint">
-                (required)
-              </span>
-              <div
-                className="channel-selector mfu-platform-selector"
-                role="radiogroup"
-                aria-labelledby="mfu-platform-label"
-                aria-describedby="mfu-platform-hint"
-              >
-                <label
-                  className={`channel-option ${form.registrationPlatform === 'luma' ? 'channel-option-active' : ''}`}
+            <div className="mfu-two-col">
+              <div className="mfu-field mfu-platform-field">
+                <FieldLabel required>
+                  <span id="mfu-platform-label">Registration platform</span>
+                </FieldLabel>
+                <div
+                  className="channel-selector mfu-platform-selector"
+                  role="radiogroup"
+                  aria-labelledby="mfu-platform-label"
                 >
-                  <input
-                    type="radio"
-                    name="mfuPlatform"
-                    value="luma"
-                    checked={form.registrationPlatform === 'luma'}
-                    onChange={() => setPlatform('luma')}
-                  />
-                  <span>Luma</span>
-                </label>
-                <label
-                  className={`channel-option ${form.registrationPlatform === 'meetup' ? 'channel-option-active' : ''}`}
-                >
-                  <input
-                    type="radio"
-                    name="mfuPlatform"
-                    value="meetup"
-                    checked={form.registrationPlatform === 'meetup'}
-                    onChange={() => setPlatform('meetup')}
-                  />
-                  <span>Meetup</span>
-                </label>
-              </div>
-            </div>
-
-            <label>
-              Advocate name <span className="form-hint">(required)</span>
-              <input
-                type="text"
-                value={form.advocateName}
-                onChange={updateField('advocateName')}
-                placeholder="e.g. Olivia"
-                required
-                aria-invalid={showErrors && !!fieldErrors.advocateName}
-                aria-describedby={showErrors && fieldErrors.advocateName ? 'mfu-err-advocate' : undefined}
-              />
-              {showErrors && fieldErrors.advocateName ? (
-                <span id="mfu-err-advocate" className="form-error" role="alert">
-                  {fieldErrors.advocateName}
-                </span>
-              ) : null}
-            </label>
-          </fieldset>
-
-          <fieldset className="form-fieldset">
-            <legend>Meetup Talks</legend>
-            <p className="form-hint">Add, remove, or reorder talks. Slide URLs must be valid http(s) links.</p>
-            {form.talks.map((talk, index) => {
-              const errs = talkErrors[talk.id] || {}
-              return (
-                <div key={talk.id} className="mfu-talk-card">
-                  <div className="mfu-talk-card-header">
-                    <strong>Talk {index + 1}</strong>
-                    <div className="mfu-talk-card-actions" role="group" aria-label={`Reorder talk ${index + 1}`}>
-                      <button
-                        type="button"
-                        className="btn-section-action"
-                        onClick={() => moveTalk(talk.id, -1)}
-                        disabled={index === 0}
-                        aria-label={`Move talk ${index + 1} up`}
-                      >
-                        ↑
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-section-action"
-                        onClick={() => moveTalk(talk.id, 1)}
-                        disabled={index === form.talks.length - 1}
-                        aria-label={`Move talk ${index + 1} down`}
-                      >
-                        ↓
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-section-action"
-                        onClick={() => removeTalk(talk.id)}
-                        disabled={form.talks.length <= 1}
-                        aria-label={`Remove talk ${index + 1}`}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                  <label>
-                    Talk title <span className="form-hint">(required)</span>
+                  <label
+                    className={`channel-option ${form.registrationPlatform === 'luma' ? 'channel-option-active' : ''}`}
+                  >
                     <input
-                      type="text"
-                      value={talk.talkTitle}
-                      onChange={(e) => updateTalk(talk.id, 'talkTitle', e.target.value)}
-                      placeholder="e.g. Getting started with Elasticsearch"
-                      required
-                      aria-invalid={showErrors && !!errs.talkTitle}
+                      type="radio"
+                      name="mfuPlatform"
+                      value="luma"
+                      checked={form.registrationPlatform === 'luma'}
+                      onChange={() => setPlatform('luma')}
                     />
-                    {showErrors && errs.talkTitle ? (
-                      <span className="form-error" role="alert">
-                        {errs.talkTitle}
-                      </span>
-                    ) : null}
+                    <span>Luma</span>
                   </label>
-                  <label>
-                    Speaker name <span className="form-hint">(required)</span>
+                  <label
+                    className={`channel-option ${
+                      form.registrationPlatform === 'meetup' ? 'channel-option-active' : ''
+                    }`}
+                  >
                     <input
-                      type="text"
-                      value={talk.speakerName}
-                      onChange={(e) => updateTalk(talk.id, 'speakerName', e.target.value)}
-                      placeholder="e.g. Jane Smith"
-                      required
-                      aria-invalid={showErrors && !!errs.speakerName}
+                      type="radio"
+                      name="mfuPlatform"
+                      value="meetup"
+                      checked={form.registrationPlatform === 'meetup'}
+                      onChange={() => setPlatform('meetup')}
                     />
-                    {showErrors && errs.speakerName ? (
-                      <span className="form-error" role="alert">
-                        {errs.speakerName}
-                      </span>
-                    ) : null}
-                  </label>
-                  <label>
-                    Slides URL <span className="form-hint">(required)</span>
-                    <input
-                      type="url"
-                      inputMode="url"
-                      value={talk.slidesUrl}
-                      onChange={(e) => updateTalk(talk.id, 'slidesUrl', e.target.value)}
-                      placeholder="https://…"
-                      required
-                      aria-invalid={showErrors && !!errs.slidesUrl}
-                    />
-                    {showErrors && errs.slidesUrl ? (
-                      <span className="form-error" role="alert">
-                        {errs.slidesUrl}
-                      </span>
-                    ) : null}
+                    <span>Meetup</span>
                   </label>
                 </div>
-              )
-            })}
-            <button type="button" className="btn-add-speaker" onClick={addTalk}>
+              </div>
+
+              <label className="mfu-field">
+                <FieldLabel required>Advocate name</FieldLabel>
+                <input
+                  type="text"
+                  value={form.advocateName}
+                  onChange={updateField('advocateName')}
+                  placeholder="e.g. Olivia"
+                  required
+                  aria-invalid={showErrors && !!fieldErrors.advocateName}
+                  aria-describedby={showErrors && fieldErrors.advocateName ? 'mfu-err-advocate' : undefined}
+                />
+                {showErrors && fieldErrors.advocateName ? (
+                  <span id="mfu-err-advocate" className="form-error" role="alert">
+                    {fieldErrors.advocateName}
+                  </span>
+                ) : null}
+              </label>
+            </div>
+          </section>
+
+          <section className="mfu-section" aria-labelledby="mfu-talks-heading">
+            <h3 id="mfu-talks-heading" className="mfu-section-title">
+              Meetup Talks
+            </h3>
+            <p className="mfu-section-hint">Add, remove, or reorder talks. Slide URLs must be valid http(s) links.</p>
+
+            <div className="mfu-talk-list">
+              {form.talks.map((talk, index) => {
+                const errs = talkErrors[talk.id] || {}
+                return (
+                  <div key={talk.id} className="mfu-talk-card">
+                    <div className="mfu-talk-card-header">
+                      <span className="mfu-talk-card-title">Talk {index + 1}</span>
+                      <div
+                        className="mfu-talk-card-actions"
+                        role="group"
+                        aria-label={`Controls for talk ${index + 1}`}
+                      >
+                        <button
+                          type="button"
+                          className="mfu-icon-btn"
+                          onClick={() => moveTalk(talk.id, -1)}
+                          disabled={index === 0}
+                          aria-label={`Move talk ${index + 1} up`}
+                          title="Move up"
+                        >
+                          <span aria-hidden="true">↑</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="mfu-icon-btn"
+                          onClick={() => moveTalk(talk.id, 1)}
+                          disabled={index === form.talks.length - 1}
+                          aria-label={`Move talk ${index + 1} down`}
+                          title="Move down"
+                        >
+                          <span aria-hidden="true">↓</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="mfu-icon-btn mfu-icon-btn-danger"
+                          onClick={() => removeTalk(talk.id)}
+                          disabled={form.talks.length <= 1}
+                          aria-label={`Remove talk ${index + 1}`}
+                          title="Remove talk"
+                        >
+                          <span aria-hidden="true">🗑</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div className="mfu-talk-card-body">
+                      <label className="mfu-field">
+                        <FieldLabel required>Talk title</FieldLabel>
+                        <input
+                          type="text"
+                          value={talk.talkTitle}
+                          onChange={(e) => updateTalk(talk.id, 'talkTitle', e.target.value)}
+                          placeholder="e.g. Getting started with Elasticsearch"
+                          required
+                          aria-invalid={showErrors && !!errs.talkTitle}
+                        />
+                        {showErrors && errs.talkTitle ? (
+                          <span className="form-error" role="alert">
+                            {errs.talkTitle}
+                          </span>
+                        ) : null}
+                      </label>
+                      <label className="mfu-field">
+                        <FieldLabel required>Speaker name</FieldLabel>
+                        <input
+                          type="text"
+                          value={talk.speakerName}
+                          onChange={(e) => updateTalk(talk.id, 'speakerName', e.target.value)}
+                          placeholder="e.g. Jane Smith"
+                          required
+                          aria-invalid={showErrors && !!errs.speakerName}
+                        />
+                        {showErrors && errs.speakerName ? (
+                          <span className="form-error" role="alert">
+                            {errs.speakerName}
+                          </span>
+                        ) : null}
+                      </label>
+                      <label className="mfu-field">
+                        <FieldLabel required>Slides URL</FieldLabel>
+                        <input
+                          type="url"
+                          inputMode="url"
+                          value={talk.slidesUrl}
+                          onChange={(e) => updateTalk(talk.id, 'slidesUrl', e.target.value)}
+                          placeholder="https://…"
+                          required
+                          aria-invalid={showErrors && !!errs.slidesUrl}
+                        />
+                        {showErrors && errs.slidesUrl ? (
+                          <span className="form-error" role="alert">
+                            {errs.slidesUrl}
+                          </span>
+                        ) : null}
+                      </label>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            <button type="button" className="mfu-add-talk-btn" onClick={addTalk}>
               + Add another talk
             </button>
-          </fieldset>
+          </section>
 
-          <button type="submit" className="btn-generate" disabled={!canGenerate} aria-disabled={!canGenerate}>
-            Generate
+          <button
+            type="submit"
+            className="btn-generate mfu-generate-btn"
+            disabled={!canGenerate}
+            aria-disabled={!canGenerate}
+          >
+            <span aria-hidden="true">✨</span> Generate follow-up
           </button>
         </form>
       </aside>
 
-      <main className="output-panel">
-        <div className="output-header">
+      <main className="output-panel mfu-output-panel">
+        <div className="output-header mfu-output-header">
           <h2>Meetup Follow-Up</h2>
         </div>
-        <div className="output-content">
+        <div className={`output-content mfu-output-content${generated ? '' : ' mfu-output-content--empty'}`}>
           {generated ? (
             <>
               <div className="subject-line-section">
@@ -429,10 +468,15 @@ export default function MeetupFollowUp() {
               </section>
             </>
           ) : (
-            <p className="output-placeholder">
-              Fill in the event details and talks, then click Generate to create the follow-up email with UTM
-              tracking.
-            </p>
+            <div className="mfu-empty-state">
+              <div className="mfu-empty-icon" aria-hidden="true">
+                📤
+              </div>
+              <h3 className="mfu-empty-title">Your follow-up will appear here</h3>
+              <p className="mfu-empty-desc">
+                Complete the event details and talks, then generate a ready-to-send email.
+              </p>
+            </div>
           )}
         </div>
       </main>

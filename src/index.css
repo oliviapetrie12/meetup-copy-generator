@@ -584,26 +584,175 @@ body {
   font-weight: 600;
 }
 
-/* Meetup Follow-Up: Registration platform field */
+/* Meetup Follow-Up generator (scoped) */
+.mfu-form-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 1.15rem 1.25rem 1.35rem;
+  border-color: #e5e0d8;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+.mfu-form-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem;
+  margin: 0 0 1rem;
+  padding: 0 0 0.95rem;
+  border-bottom: 1px solid #efeae3;
+}
+
+.mfu-form-header-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.mfu-form-title {
+  margin: 0 0 0.3rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: #0f172a;
+  line-height: 1.3;
+}
+
+.mfu-form-desc {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 400;
+  line-height: 1.45;
+  color: #6b7280;
+  max-width: 36rem;
+}
+
+.mfu-form-header .mfu-reset-btn {
+  margin-top: 0;
+  flex-shrink: 0;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #374151;
+  background: #fff;
+  border: 1px solid #d6cfc6;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  box-shadow: none;
+}
+
+.mfu-form-header .mfu-reset-btn:hover:not(:disabled) {
+  background: #faf8f5;
+  border-color: #bfb8ae;
+  color: #1e293b;
+}
+
+.mfu-form {
+  gap: 0.9rem;
+}
+
+.mfu-form .mfu-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.mfu-label-row {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.mfu-label-text {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.mfu-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.08rem 0.4rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  line-height: 1.3;
+}
+
+.mfu-badge-required {
+  color: #64748b;
+  background: #f1f5f9;
+}
+
+.mfu-badge-optional {
+  color: #78716c;
+  background: #f5f5f4;
+}
+
+.mfu-form .mfu-field input {
+  padding: 0.5rem 0.7rem;
+  font-size: 0.9rem;
+  border-radius: 9px;
+}
+
+.mfu-form .mfu-field input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.mfu-section {
+  margin: 0;
+  padding: 0.95rem 1rem;
+  border: 1px solid #ebe6df;
+  border-radius: 12px;
+  background: #faf9f7;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.mfu-section-title {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #475569;
+}
+
+.mfu-section-hint {
+  margin: -0.25rem 0 0;
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.mfu-two-col {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+@media (min-width: 720px) {
+  .mfu-two-col {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
 .mfu-platform-field {
   display: flex;
   flex-direction: column;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #1e293b;
-}
-
-.mfu-platform-label {
-  display: block;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #1e293b;
-}
-
-.mfu-platform-field .mfu-platform-required {
-  margin-top: 0.2rem;
-  margin-bottom: 0.45rem;
-  line-height: 1.3;
+  gap: 0.3rem;
 }
 
 .mfu-platform-field .mfu-platform-selector {
@@ -611,7 +760,7 @@ body {
   width: 100%;
   box-sizing: border-box;
   border: 1.5px solid #b8b0a4;
-  border-radius: 10px;
+  border-radius: 9px;
   background: #fff;
   overflow: hidden;
 }
@@ -620,8 +769,8 @@ body {
   flex: 1 1 0;
   min-width: 0;
   box-sizing: border-box;
-  padding: 0.55rem 0.75rem;
-  font-size: 0.9rem;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.875rem;
   font-weight: 500;
   color: #1e293b;
   background: #fff;
@@ -643,6 +792,252 @@ body {
   color: #1d4ed8;
   font-weight: 600;
   box-shadow: inset 0 0 0 1.5px #2563eb;
+}
+
+.mfu-talk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.mfu-talk-card {
+  margin: 0;
+  padding: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+}
+
+.mfu-talk-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.45rem 0.7rem;
+  background: #eff6ff;
+  border-bottom: 1px solid #dbeafe;
+}
+
+.mfu-talk-card-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #1e40af;
+  letter-spacing: 0.01em;
+}
+
+.mfu-talk-card-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.25rem;
+}
+
+.mfu-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  padding: 0;
+  border: 1px solid #bfdbfe;
+  border-radius: 7px;
+  background: #fff;
+  color: #1e40af;
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, opacity 0.12s;
+}
+
+.mfu-icon-btn:hover:not(:disabled) {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
+.mfu-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.mfu-icon-btn-danger {
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.mfu-icon-btn-danger:hover:not(:disabled) {
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+
+.mfu-talk-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.75rem 0.85rem 0.9rem;
+}
+
+.mfu-add-talk-btn {
+  align-self: flex-start;
+  margin: 0.15rem 0 0;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: #1e40af;
+  background: #fff;
+  border: 1px dashed #93c5fd;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.mfu-add-talk-btn:hover {
+  background: #eff6ff;
+  border-color: #60a5fa;
+  border-style: solid;
+}
+
+.mfu-generate-btn {
+  width: 100%;
+  margin-top: 0.15rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.75rem 1.25rem;
+  font-size: 0.95rem;
+}
+
+.mfu-generate-btn:disabled,
+.mfu-generate-btn[aria-disabled='true'] {
+  color: #64748b;
+  background: #e2e8f0;
+  box-shadow: none;
+  opacity: 1;
+  cursor: not-allowed;
+}
+
+.mfu-generate-btn:disabled:hover,
+.mfu-generate-btn[aria-disabled='true']:hover {
+  background: #e2e8f0;
+  box-shadow: none;
+}
+
+.mfu-output-panel {
+  position: sticky;
+  top: 1.25rem;
+  align-self: start;
+  max-height: calc(100vh - 5.5rem);
+  min-height: 0;
+  border-color: #e5e0d8;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+}
+
+.mfu-output-header {
+  background: #faf9f7;
+  border-bottom-color: #efeae3;
+}
+
+.mfu-output-content {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.mfu-output-content--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.75rem 1.25rem;
+  min-height: 14rem;
+  max-height: 22rem;
+}
+
+.mfu-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 18rem;
+  margin: 0 auto;
+}
+
+.mfu-empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  margin-bottom: 0.85rem;
+  border-radius: 999px;
+  background: #eff6ff;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.mfu-empty-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.98rem;
+  font-weight: 650;
+  color: #1e293b;
+}
+
+.mfu-empty-desc {
+  margin: 0;
+  font-size: 0.84rem;
+  font-weight: 400;
+  line-height: 1.45;
+  color: #6b7280;
+  font-style: normal;
+}
+
+.mfu-plain-details {
+  margin: 1.25rem 0;
+}
+
+.mfu-plain-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.mfu-checklist {
+  margin-top: 1.5rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid #e5e0d8;
+}
+
+.mfu-checklist-list {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.mfu-checklist-list li {
+  margin: 0.35rem 0;
+}
+
+.mfu-checklist-list a {
+  color: #1d4ed8;
+}
+
+@media (max-width: 600px) {
+  .mfu-output-panel {
+    position: static;
+    max-height: none;
+  }
+
+  .mfu-form-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .mfu-form-header .mfu-reset-btn {
+    align-self: flex-end;
+  }
 }
 
 .outreach-output-card {
@@ -702,6 +1097,21 @@ body {
   box-shadow: none;
 }
 
+.btn-generate.mfu-generate-btn:disabled,
+.btn-generate.mfu-generate-btn[aria-disabled='true'] {
+  color: #64748b;
+  background: #e2e8f0;
+  box-shadow: none;
+  opacity: 1;
+  cursor: not-allowed;
+}
+
+.btn-generate.mfu-generate-btn:disabled:hover,
+.btn-generate.mfu-generate-btn[aria-disabled='true']:hover {
+  background: #e2e8f0;
+  box-shadow: none;
+}
+
 .btn-reset {
   margin-top: 0.5rem;
   padding: 0.7rem 1.5rem;
@@ -740,33 +1150,6 @@ body {
   color: #6b7280;
 }
 
-.mfu-form-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  align-items: flex-start;
-  margin: 0 0 0.75rem;
-}
-
-.mfu-form-toolbar .mfu-reset-btn {
-  margin-top: 0;
-  padding: 0.4rem 0.75rem;
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: #374151;
-  background: #fff;
-  border: 1px solid #d6cfc6;
-  border-radius: 8px;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  box-shadow: none;
-}
-
-.mfu-form-toolbar .mfu-reset-btn:hover:not(:disabled) {
-  background: #faf8f5;
-  border-color: #bfb8ae;
-  color: #1e293b;
-}
 
 .mfu-confirm-backdrop {
   position: fixed;
@@ -1249,57 +1632,6 @@ body {
   margin-top: 0.25rem;
   font-size: 0.8rem;
   color: #b91c1c;
-}
-
-.mfu-talk-card {
-  margin: 0.75rem 0 1rem;
-  padding: 0.75rem 0.85rem;
-  border: 1px solid #e5e0d8;
-  border-radius: 10px;
-  background: #fcfbf9;
-}
-
-.mfu-talk-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.mfu-talk-card-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-}
-
-.mfu-plain-details {
-  margin: 1.25rem 0;
-}
-
-.mfu-plain-details summary {
-  cursor: pointer;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-}
-
-.mfu-checklist {
-  margin-top: 2rem;
-  padding-top: 1.25rem;
-  border-top: 2px solid #e5e0d8;
-}
-
-.mfu-checklist-list {
-  margin: 0.5rem 0 0;
-  padding-left: 1.25rem;
-}
-
-.mfu-checklist-list li {
-  margin: 0.35rem 0;
-}
-
-.mfu-checklist-list a {
-  color: #1d4ed8;
 }
 
 .output-placeholder {
