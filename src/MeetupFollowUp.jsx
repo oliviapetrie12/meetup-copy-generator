@@ -9,16 +9,13 @@ import {
   saveMeetupFollowUpForm,
   validateMeetupFollowUpForm,
 } from './meetupFollowUp.js'
-
-function FieldLabel({ children, required = false, optional = false }) {
-  return (
-    <span className="mfu-label-row">
-      <span className="mfu-label-text">{children}</span>
-      {required ? <span className="mfu-badge mfu-badge-required">Required</span> : null}
-      {optional ? <span className="mfu-badge mfu-badge-optional">Optional</span> : null}
-    </span>
-  )
-}
+import {
+  FieldLabel,
+  GeneratorHeader,
+  FormSection,
+  GeneratorActions,
+  EmptyState,
+} from './components/generatorUi.jsx'
 
 /**
  * Meetup Follow-Up generator — form + attendee email output + internal checklist.
@@ -164,30 +161,16 @@ export default function MeetupFollowUp() {
 
   return (
     <>
-      <aside className="form-panel mfu-form-panel">
-        <header className="mfu-form-header">
-          <div className="mfu-form-header-copy">
-            <h2 className="mfu-form-title">Create Meetup Follow-Up</h2>
-            <p className="mfu-form-desc">
-              Generate a ready-to-send attendee email with slides, resources, and automatic UTM tracking.
-            </p>
-          </div>
-          <button
-            type="button"
-            className="btn-reset mfu-reset-btn"
-            onClick={requestReset}
-            disabled={!canReset}
-            aria-disabled={!canReset}
-          >
-            <span aria-hidden="true">🔄</span> Reset form
-          </button>
-        </header>
+      <aside className="form-panel gen-form-panel mfu-form-panel">
+        <form onSubmit={handleGenerate} className="form gen-form mfu-form" noValidate>
+          <GeneratorHeader
+            title="Meetup Follow-Up"
+            description="Generate a ready-to-send attendee email with slides, resources, and automatic UTM tracking."
+            onReset={requestReset}
+            resetDisabled={!canReset}
+          />
 
-        <form onSubmit={handleGenerate} className="form mfu-form" noValidate>
-          <section className="mfu-section" aria-labelledby="mfu-event-details-heading">
-            <h3 id="mfu-event-details-heading" className="mfu-section-title">
-              Event Details
-            </h3>
+          <FormSection title="Event Details" id="mfu-event-details-heading">
 
             <label className="mfu-field">
               <FieldLabel required>Meetup city</FieldLabel>
@@ -225,7 +208,7 @@ export default function MeetupFollowUp() {
               ) : null}
             </label>
 
-            <div className="mfu-two-col">
+            <div className="gen-two-col mfu-two-col">
               <div className="mfu-field mfu-platform-field">
                 <FieldLabel required>
                   <span id="mfu-platform-label">Registration platform</span>
@@ -282,13 +265,9 @@ export default function MeetupFollowUp() {
                 ) : null}
               </label>
             </div>
-          </section>
+          </FormSection>
 
-          <section className="mfu-section" aria-labelledby="mfu-talks-heading">
-            <h3 id="mfu-talks-heading" className="mfu-section-title">
-              Meetup Talks
-            </h3>
-            <p className="mfu-section-hint">Add, remove, or reorder talks. Slide URLs must be valid http(s) links.</p>
+          <FormSection title="Meetup Talks" id="mfu-talks-heading" hint="Add, remove, or reorder talks. Slide URLs must be valid http(s) links.">
 
             <div className="mfu-talk-list">
               {form.talks.map((talk, index) => {
@@ -393,24 +372,17 @@ export default function MeetupFollowUp() {
             <button type="button" className="mfu-add-talk-btn" onClick={addTalk}>
               + Add another talk
             </button>
-          </section>
+          </FormSection>
 
-          <button
-            type="submit"
-            className="btn-generate mfu-generate-btn"
-            disabled={!canGenerate}
-            aria-disabled={!canGenerate}
-          >
-            <span aria-hidden="true">✨</span> Generate follow-up
-          </button>
+          <GeneratorActions label="Generate follow-up" disabled={!canGenerate} />
         </form>
       </aside>
 
-      <main className="output-panel mfu-output-panel">
-        <div className="output-header mfu-output-header">
-          <h2>Meetup Follow-Up</h2>
+      <main className="output-panel gen-output-panel mfu-output-panel">
+        <div className="output-header">
+          <h2>Generated email</h2>
         </div>
-        <div className={`output-content mfu-output-content${generated ? '' : ' mfu-output-content--empty'}`}>
+        <div className={`output-content${generated ? '' : ' gen-output-content--empty'}`}>
           {generated ? (
             <>
               <div className="subject-line-section">
@@ -444,12 +416,12 @@ export default function MeetupFollowUp() {
                 <pre className="output-text">{generated.plain}</pre>
               </details>
 
-              <section className="mfu-checklist" aria-labelledby="mfu-checklist-heading">
-                <h3 id="mfu-checklist-heading" className="subject-line-heading">
+              <section className="gen-notes-card mfu-checklist" aria-labelledby="mfu-checklist-heading">
+                <h3 id="mfu-checklist-heading" className="gen-notes-heading">
                   Internal Checklist
                 </h3>
                 <p className="form-hint">For advocates only — not included when you copy the attendee email.</p>
-                <ul className="mfu-checklist-list">
+                <ul className="gen-notes-list mfu-checklist-list">
                   {INTERNAL_CHECKLIST_ITEMS.map((item, i) => {
                     if (typeof item === 'string') {
                       return <li key={i}>{item}</li>
@@ -468,15 +440,11 @@ export default function MeetupFollowUp() {
               </section>
             </>
           ) : (
-            <div className="mfu-empty-state">
-              <div className="mfu-empty-icon" aria-hidden="true">
-                📤
-              </div>
-              <h3 className="mfu-empty-title">Your follow-up will appear here</h3>
-              <p className="mfu-empty-desc">
-                Complete the event details and talks, then generate a ready-to-send email.
-              </p>
-            </div>
+            <EmptyState
+              emoji="📤"
+              title="No follow-up yet"
+              description="Complete the event details and talks, then generate a ready-to-send email."
+            />
           )}
         </div>
       </main>

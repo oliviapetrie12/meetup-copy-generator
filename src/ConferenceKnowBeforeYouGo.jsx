@@ -10,6 +10,12 @@ import {
   LANGUAGE_OPTIONS,
 } from './generationLanguage.js'
 import { tryRemoteGenerate, applyRemoteKbygResult, tryRemoteTranslate } from './generateApi.js'
+import {
+  FieldLabel,
+  GeneratorHeader,
+  GeneratorActions,
+  EmptyState,
+} from './components/generatorUi.jsx'
 
 function escapeHtml(s) {
   if (s == null) return ''
@@ -1034,12 +1040,18 @@ export default function ConferenceKnowBeforeYouGo() {
 
   return (
     <>
-      <aside className="form-panel conference-kbyg-form-panel">
-        <form onSubmit={handleGenerate} className="form">
+      <aside className="form-panel conference-kbyg-form-panel gen-form-panel">
+        <form onSubmit={handleGenerate} className="form gen-form">
+          <GeneratorHeader
+            title="Conference Know Before You Go"
+            description="Create the booth logistics email for conference staff and volunteers."
+            onReset={handleReset}
+            resetLabel={t.conf_btnReset}
+          />
           <fieldset className="form-fieldset">
             <legend>{t.conf_email}</legend>
             <label>
-              {t.conf_subjectLine}
+              <FieldLabel required>{t.conf_subjectLine}</FieldLabel>
               <input
                 type="text"
                 value={subjectLine}
@@ -1053,7 +1065,7 @@ export default function ConferenceKnowBeforeYouGo() {
             </label>
             <span className="form-hint">{t.conf_subjectHint}</span>
             <label>
-              {t.conf_eventName}
+              <FieldLabel required>{t.conf_eventName}</FieldLabel>
               <input
                 type="text"
                 value={form.conferenceName}
@@ -1062,7 +1074,7 @@ export default function ConferenceKnowBeforeYouGo() {
               />
             </label>
             <label>
-              {t.conf_kbygDeckUrl}
+              <FieldLabel optional>{t.conf_kbygDeckUrl}</FieldLabel>
               <input
                 type="url"
                 value={form.knowBeforeYouGoDeckUrl}
@@ -1080,7 +1092,7 @@ export default function ConferenceKnowBeforeYouGo() {
               {t.conf_importLead}
             </p>
             <label>
-              {t.conf_organizerText}
+              <FieldLabel optional>{t.conf_organizerText}</FieldLabel>
               <textarea
                 value={organizerImportText}
                 onChange={(e) => setOrganizerImportText(e.target.value)}
@@ -1100,7 +1112,7 @@ export default function ConferenceKnowBeforeYouGo() {
             {structuredKbygPreview ? (
               <div className="structured-kbyg-preview">
                 <label>
-                  {t.conf_structuredLabel}
+                  <FieldLabel optional>{t.conf_structuredLabel}</FieldLabel>
                   <textarea
                     readOnly
                     value={structuredKbygPreview}
@@ -1124,7 +1136,7 @@ export default function ConferenceKnowBeforeYouGo() {
               {t.conf_enhanceLead}
             </p>
             <label>
-              {t.conf_currentKbyg}
+              <FieldLabel optional>{t.conf_currentKbyg}</FieldLabel>
               <textarea
                 value={kbygEnhanceExisting}
                 onChange={(e) => setKbygEnhanceExisting(e.target.value)}
@@ -1139,7 +1151,7 @@ export default function ConferenceKnowBeforeYouGo() {
               </button>
             ) : null}
             <label>
-              {t.conf_pasteUpdates}
+              <FieldLabel optional>{t.conf_pasteUpdates}</FieldLabel>
               <textarea
                 value={kbygEnhanceUpdates}
                 onChange={(e) => setKbygEnhanceUpdates(e.target.value)}
@@ -1152,7 +1164,7 @@ export default function ConferenceKnowBeforeYouGo() {
               {t.conf_enhanceSub}
             </span>
             <label>
-              {t.conf_outputMode}
+              <FieldLabel optional>{t.conf_outputMode}</FieldLabel>
               <select value={kbygEnhanceMode} onChange={(e) => setKbygEnhanceMode(e.target.value)}>
                 <option value="slack">Slack — compact, scannable</option>
                 <option value="email">Email — intro + spacing</option>
@@ -1167,7 +1179,7 @@ export default function ConferenceKnowBeforeYouGo() {
             {kbygEnhanceOutput ? (
               <div className="structured-kbyg-preview">
                 <label>
-                  {t.conf_enhancedOutput}
+                  <FieldLabel optional>{t.conf_enhancedOutput}</FieldLabel>
                   <textarea
                     readOnly
                     value={kbygEnhanceOutput}
@@ -1206,7 +1218,7 @@ export default function ConferenceKnowBeforeYouGo() {
               </div>
             </div>
             <label>
-              {t.conf_leadCapture}
+              <FieldLabel optional>{t.conf_leadCapture}</FieldLabel>
               <input
                 type="text"
                 value={form.leadCaptureText}
@@ -1216,7 +1228,7 @@ export default function ConferenceKnowBeforeYouGo() {
               />
             </label>
             <label>
-              {t.conf_customTldr}
+              <FieldLabel optional>{t.conf_customTldr}</FieldLabel>
               <textarea
                 value={form.customTldrNotes}
                 onChange={update('customTldrNotes')}
@@ -1229,7 +1241,7 @@ export default function ConferenceKnowBeforeYouGo() {
           <fieldset className="form-fieldset">
             <legend>{t.conf_eventDatesHours}</legend>
             <label>
-              {t.conf_boothSetup}
+              <FieldLabel optional>{t.conf_boothSetup}</FieldLabel>
               <textarea
                 value={form.eventDatesBoothSetup}
                 onChange={update('eventDatesBoothSetup')}
@@ -1238,7 +1250,7 @@ export default function ConferenceKnowBeforeYouGo() {
               />
             </label>
             <label>
-              {t.conf_boothHours}
+              <FieldLabel optional>{t.conf_boothHours}</FieldLabel>
               <textarea
                 value={form.eventDatesBoothHours}
                 onChange={update('eventDatesBoothHours')}
@@ -1247,7 +1259,7 @@ export default function ConferenceKnowBeforeYouGo() {
               />
             </label>
             <label>
-              {t.conf_boothCleanup}
+              <FieldLabel optional>{t.conf_boothCleanup}</FieldLabel>
               <textarea
                 value={form.eventDatesBoothCleanup}
                 onChange={update('eventDatesBoothCleanup')}
@@ -1256,11 +1268,11 @@ export default function ConferenceKnowBeforeYouGo() {
               />
             </label>
             <label>
-              {t.conf_notes}
+              <FieldLabel optional>{t.conf_notes}</FieldLabel>
               <textarea value={form.eventDatesNotes} onChange={update('eventDatesNotes')} placeholder="Anything else for dates &amp; hours…" rows={3} />
             </label>
             <label>
-              {t.conf_staffingLink}
+              <FieldLabel optional>{t.conf_staffingLink}</FieldLabel>
               <input
                 type="text"
                 inputMode="url"
@@ -1271,7 +1283,7 @@ export default function ConferenceKnowBeforeYouGo() {
               />
             </label>
             <label>
-              {t.conf_staffingNotes}
+              <FieldLabel optional>{t.conf_staffingNotes}</FieldLabel>
               <textarea
                 value={form.staffingScheduleNotes}
                 onChange={update('staffingScheduleNotes')}
@@ -1284,21 +1296,23 @@ export default function ConferenceKnowBeforeYouGo() {
           <fieldset className="form-fieldset">
             <legend>{t.conf_tickets}</legend>
             <label>
-              {t.conf_tickets}
+              <FieldLabel optional>{t.conf_tickets}</FieldLabel>
               <textarea value={form.ticketsText} onChange={update('ticketsText')} placeholder="Badge pickup, exhibitor passes, guest list…" rows={3} />
             </label>
           </fieldset>
 
           <fieldset className="form-fieldset">
             <legend>{t.conf_location}</legend>
+            <div className="gen-two-col">
             <label>
-              {t.conf_venue}
+              <FieldLabel optional>{t.conf_venue}</FieldLabel>
               <input type="text" value={form.locationVenue} onChange={update('locationVenue')} placeholder="e.g. Moscone South" />
             </label>
             <label>
-              {t.conf_address}
+              <FieldLabel optional>{t.conf_address}</FieldLabel>
               <input type="text" value={form.locationAddress} onChange={update('locationAddress')} placeholder="Street, city, region" />
             </label>
+            </div>
           </fieldset>
 
           <fieldset className="form-fieldset">
@@ -1307,7 +1321,7 @@ export default function ConferenceKnowBeforeYouGo() {
             {(form.contacts || []).map((contact, index) => (
               <div key={index} className="contact-row">
                 <label>
-                  {t.conf_nameReq} <span className="form-hint">({t.conf_required})</span>
+                  <FieldLabel required>{t.conf_nameReq}</FieldLabel>
                   <input
                     type="text"
                     value={contact.name}
@@ -1317,7 +1331,7 @@ export default function ConferenceKnowBeforeYouGo() {
                   />
                 </label>
                 <label>
-                  {t.conf_group}
+                  <FieldLabel optional>{t.conf_group}</FieldLabel>
                   <select value={contact.group || ''} onChange={updateContact(index, 'group')} aria-label="Contact group">
                     {CONTACT_GROUP_OPTIONS.map((opt) => (
                       <option key={opt.value || 'none'} value={opt.value}>
@@ -1327,15 +1341,15 @@ export default function ConferenceKnowBeforeYouGo() {
                   </select>
                 </label>
                 <label>
-                  {t.conf_role}
+                  <FieldLabel optional>{t.conf_role}</FieldLabel>
                   <input type="text" value={contact.role} onChange={updateContact(index, 'role')} placeholder="e.g. booth lead" />
                 </label>
                 <label>
-                  {t.conf_emailLabel}
+                  <FieldLabel optional>{t.conf_emailLabel}</FieldLabel>
                   <input type="email" value={contact.email} onChange={updateContact(index, 'email')} placeholder="e.g. jane@example.com" autoComplete="off" />
                 </label>
                 <label>
-                  {t.conf_phone}
+                  <FieldLabel optional>{t.conf_phone}</FieldLabel>
                   <input type="text" value={contact.phone} onChange={updateContact(index, 'phone')} placeholder="e.g. +1 …" autoComplete="off" />
                 </label>
                 {(form.contacts || []).length > 1 && (
@@ -1353,7 +1367,7 @@ export default function ConferenceKnowBeforeYouGo() {
           <fieldset className="form-fieldset">
             <legend>{t.conf_boothLogistics}</legend>
             <label>
-              {t.conf_boothDelivery}
+              <FieldLabel optional>{t.conf_boothDelivery}</FieldLabel>
               <select value={normalizeBoothDeliveryMethodKey(form.boothMaterialsDeliveryMethod)} onChange={updateBoothDeliveryMethod}>
                 {BOOTH_DELIVERY_METHOD_ORDER.map((value) => (
                   <option key={value} value={value}>
@@ -1364,7 +1378,7 @@ export default function ConferenceKnowBeforeYouGo() {
             </label>
             {normalizeBoothDeliveryMethodKey(form.boothMaterialsDeliveryMethod) === 'shipped_to_individual' && (
               <label>
-                {t.conf_shippedTo}
+                <FieldLabel optional>{t.conf_shippedTo}</FieldLabel>
                 <input
                   type="text"
                   value={form.boothMaterialsShippedToName}
@@ -1382,7 +1396,7 @@ export default function ConferenceKnowBeforeYouGo() {
           <fieldset className="form-fieldset">
             <legend>{t.conf_avLegend}</legend>
             <label>
-              {t.conf_avLegend}
+              <FieldLabel optional>{t.conf_avLegend}</FieldLabel>
               <textarea
                 value={form.avSetupRequirements}
                 onChange={update('avSetupRequirements')}
@@ -1395,7 +1409,7 @@ export default function ConferenceKnowBeforeYouGo() {
           <fieldset className="form-fieldset">
             <legend>{t.conf_swagLegend}</legend>
             <label>
-              {t.conf_swagLegend}
+              <FieldLabel optional>{t.conf_swagLegend}</FieldLabel>
               <textarea value={form.swagText} onChange={update('swagText')} placeholder="What to bring, inventory, giveaways…" rows={3} />
             </label>
           </fieldset>
@@ -1403,7 +1417,7 @@ export default function ConferenceKnowBeforeYouGo() {
           <fieldset className="form-fieldset">
             <legend>{t.conf_parkingLegend}</legend>
             <label>
-              {t.conf_parkingLegend} <span className="form-hint">{t.conf_optionalMark}</span>
+              <FieldLabel optional>{t.conf_parkingLegend}</FieldLabel>
               <textarea value={form.parkingText} onChange={update('parkingText')} rows={3} />
               <span className="form-hint">{t.conf_parkingOptionalNote}</span>
             </label>
@@ -1412,7 +1426,7 @@ export default function ConferenceKnowBeforeYouGo() {
           <fieldset className="form-fieldset">
             <legend>{t.conf_foodBev}</legend>
             <label>
-              {t.conf_foodBev} <span className="form-hint">{t.conf_optionalMark}</span>
+              <FieldLabel optional>{t.conf_foodBev}</FieldLabel>
               <textarea value={form.foodBeverageText} onChange={update('foodBeverageText')} rows={3} />
               <span className="form-hint">{t.conf_foodOptionalNote}</span>
             </label>
@@ -1421,7 +1435,7 @@ export default function ConferenceKnowBeforeYouGo() {
           <fieldset className="form-fieldset">
             <legend>{t.conf_engagement}</legend>
             <label>
-              {t.conf_type}
+              <FieldLabel optional>{t.conf_type}</FieldLabel>
               <select value={form.engagementType || 'none'} onChange={update('engagementType')} aria-label="Engagement type">
                 <option value="none">{t.conf_engNone}</option>
                 <option value="kahoot">{t.conf_engKahoot}</option>
@@ -1431,7 +1445,7 @@ export default function ConferenceKnowBeforeYouGo() {
             {(form.engagementType === 'kahoot' || form.engagementType === 'raffle') && (
               <>
                 <label>
-                  {t.conf_details}
+                  <FieldLabel optional>{t.conf_details}</FieldLabel>
                   <textarea
                     value={form.engagementDetails}
                     onChange={update('engagementDetails')}
@@ -1441,7 +1455,7 @@ export default function ConferenceKnowBeforeYouGo() {
                   />
                 </label>
                 <label>
-                  {t.conf_prize}
+                  <FieldLabel optional>{t.conf_prize}</FieldLabel>
                   <input
                     type="text"
                     value={form.engagementPrize}
@@ -1463,7 +1477,7 @@ export default function ConferenceKnowBeforeYouGo() {
             {(form.additionalSections || []).map((sec, index) => (
               <div key={index} className="contact-row conference-additional-section">
                 <label>
-                  {t.conf_sectionTitle}
+                  <FieldLabel optional>{t.conf_sectionTitle}</FieldLabel>
                   <input
                     type="text"
                     value={sec.title}
@@ -1472,7 +1486,7 @@ export default function ConferenceKnowBeforeYouGo() {
                   />
                 </label>
                 <label>
-                  {t.conf_content}
+                  <FieldLabel optional>{t.conf_content}</FieldLabel>
                   <textarea value={sec.content} onChange={updateAdditionalSection(index, 'content')} placeholder="Details…" rows={3} />
                 </label>
                 <button type="button" className="btn-reset" onClick={() => removeAdditionalSection(index)}>
@@ -1487,7 +1501,7 @@ export default function ConferenceKnowBeforeYouGo() {
 
           <div className="form-language-row" role="group" aria-label={t.languageLabel}>
             <label>
-              {t.languageLabel}
+              <FieldLabel optional>{t.languageLabel}</FieldLabel>
               <select value={conferenceLanguage} onChange={(e) => setConferenceLanguage(e.target.value)}>
                 {LANGUAGE_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -1497,20 +1511,15 @@ export default function ConferenceKnowBeforeYouGo() {
               </select>
             </label>
           </div>
-          <button type="submit" className="btn-generate">
-            {t.conf_btnGenerate}
-          </button>
-          <button type="button" onClick={handleReset} className="btn-reset">
-            🔄 {t.conf_btnReset}
-          </button>
+          <GeneratorActions label="Generate conference logistics" />
         </form>
       </aside>
 
-      <main className="output-panel conference-kbyg-output-panel">
+      <main className="output-panel conference-kbyg-output-panel gen-output-panel">
         <div className="output-header">
           <h2>{t.conf_outputTitle}</h2>
         </div>
-        <div className="output-content">
+        <div className={`output-content${!plain ? ' gen-output-content--empty' : ''}`}>
           {subjectLine.trim() ? (
             <div className="subject-line-section">
               <h3 className="subject-line-heading">{t.conf_outputSubject}</h3>
@@ -1567,9 +1576,11 @@ export default function ConferenceKnowBeforeYouGo() {
               </div>
             </>
           ) : (
-            <p className="output-placeholder">
-              Fill in the form and click &quot;Generate email&quot; to create the conference booth logistics email.
-            </p>
+            <EmptyState
+              emoji="🧳"
+              title="No conference email yet"
+              description="Fill in booth and logistics details, then generate your Know Before You Go email."
+            />
           )}
         </div>
       </main>

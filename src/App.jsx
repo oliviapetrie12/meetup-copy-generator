@@ -4,6 +4,12 @@ import elasticLogo from './logo.png'
 import ConferenceKnowBeforeYouGo from './ConferenceKnowBeforeYouGo.jsx'
 import MeetupFollowUp from './MeetupFollowUp.jsx'
 import {
+  FieldLabel,
+  GeneratorHeader,
+  GeneratorActions,
+  EmptyState,
+} from './components/generatorUi.jsx'
+import {
   makeMoreConcise,
   parseKbygPlainSections,
   rebuildKbygPlainFromSections,
@@ -1429,6 +1435,41 @@ function buildUrlWithUtm(form) {
   return `${baseUrl}?${params.toString()}`
 }
 
+const GENERATOR_UI_META = {
+  eventPromotion: {
+    title: 'Event Promotion',
+    description: 'Generate Meetup and Luma event page copy from speakers, agenda, and venue details.',
+    emptyTitle: 'No event copy yet',
+    emptyDescription: 'Fill in the form and generate to see Meetup and Luma descriptions here.',
+    cta: 'Generate event promotion',
+    emoji: '📣',
+  },
+  knowBeforeYouGo: {
+    title: 'Meetup Know Before You Go',
+    description: 'Create the logistics email for attendees before your meetup.',
+    emptyTitle: 'No email yet',
+    emptyDescription: 'Fill in venue, agenda, and logistics details, then generate your Know Before You Go email.',
+    cta: 'Generate meetup logistics',
+    emoji: '✉️',
+  },
+  urlQrGenerator: {
+    title: 'UTM URL Builder',
+    description: 'Add campaign tracking parameters to any Elastic URL.',
+    emptyTitle: 'No URL yet',
+    emptyDescription: 'Enter a destination URL and UTM fields, then build your tracking link.',
+    cta: 'Build UTM URL',
+    emoji: '🔗',
+  },
+  qrCodeGenerator: {
+    title: 'QR Code Generator',
+    description: 'Create a branded Elastic QR code from any link.',
+    emptyTitle: 'No QR code yet',
+    emptyDescription: 'Enter a link and colours, then generate your QR code.',
+    cta: 'Generate QR code',
+    emoji: '◉',
+  },
+}
+
 export default function App() {
   const [generatorType, setGeneratorType] = useState('eventPromotion')
   const [form, setForm] = useState(INITIAL_STATE)
@@ -2138,7 +2179,7 @@ export default function App() {
           <MeetupFollowUp />
         ) : (
         <>
-        <aside className="form-panel">
+        <aside className="form-panel gen-form-panel">
 
           {generatorType === 'eventPromotion' && (
           <form
@@ -2146,10 +2187,16 @@ export default function App() {
               e.preventDefault()
               handleGenerate()
             }}
-            className="form"
+            className="form gen-form"
           >
+            <GeneratorHeader
+              title={GENERATOR_UI_META.eventPromotion.title}
+              description={GENERATOR_UI_META.eventPromotion.description}
+              onReset={handleReset}
+              resetLabel={tEvent.btnResetForm}
+            />
             <label>
-              User Group (optional)
+              <FieldLabel optional>User Group</FieldLabel>
               <div className="combobox" ref={comboboxRef}>
                 <input
                   type="text"
@@ -2187,10 +2234,10 @@ export default function App() {
                   </ul>
                 )}
               </div>
-              <span className="form-hint">Optional: select a user group to auto-fill details.</span>
+              <span className="form-hint">Select a user group to auto-fill details.</span>
             </label>
             <label>
-              Event title
+              <FieldLabel required>Event title</FieldLabel>
               <input
                 type="text"
                 value={form.eventTitle}
@@ -2198,8 +2245,9 @@ export default function App() {
                 placeholder="e.g. March Meetup: State Management"
               />
             </label>
+            <div className="gen-two-col">
             <label>
-              Date
+              <FieldLabel required>Date</FieldLabel>
               <input
                 type="text"
                 value={form.date}
@@ -2208,7 +2256,7 @@ export default function App() {
               />
             </label>
             <label>
-              Event start time
+              <FieldLabel optional>Event start time</FieldLabel>
               <input
                 type="text"
                 value={form.eventStartTime}
@@ -2216,8 +2264,9 @@ export default function App() {
                 placeholder="e.g. 6:00 PM"
               />
             </label>
+            </div>
             <label>
-              Timezone
+              <FieldLabel optional>Timezone</FieldLabel>
               <select
                 value={form.timezone}
                 onChange={update('timezone')}
@@ -2231,7 +2280,7 @@ export default function App() {
               </select>
             </label>
             <label>
-              Venue name
+              <FieldLabel optional>Venue name</FieldLabel>
               <input
                 type="text"
                 value={form.venueName}
@@ -2240,7 +2289,7 @@ export default function App() {
               />
             </label>
             <label>
-              Venue address
+              <FieldLabel optional>Venue address</FieldLabel>
               <input
                 type="text"
                 value={form.venueAddress}
@@ -2273,7 +2322,7 @@ export default function App() {
             <fieldset className="form-fieldset">
               <legend>Speaker 1</legend>
               <label>
-                Speaker 1 name
+                <FieldLabel optional>Speaker 1 name</FieldLabel>
                 <input
                   type="text"
                   value={form.speaker1Name}
@@ -2282,7 +2331,7 @@ export default function App() {
                 />
               </label>
               <label>
-                Speaker 1 title
+                <FieldLabel optional>Speaker 1 title</FieldLabel>
                 <input
                   type="text"
                   value={form.speaker1Title}
@@ -2291,7 +2340,7 @@ export default function App() {
                 />
               </label>
               <label>
-                Speaker 1 company
+                <FieldLabel optional>Speaker 1 company</FieldLabel>
                 <input
                   type="text"
                   value={form.speaker1Company}
@@ -2300,7 +2349,7 @@ export default function App() {
                 />
               </label>
               <label>
-                Speaker 1 talk title
+                <FieldLabel optional>Speaker 1 talk title</FieldLabel>
                 <input
                   type="text"
                   value={form.speaker1TalkTitle}
@@ -2309,7 +2358,7 @@ export default function App() {
                 />
               </label>
               <label>
-                Speaker 1 talk abstract
+                <FieldLabel optional>Speaker 1 talk abstract</FieldLabel>
                 <textarea
                   value={form.speaker1TalkAbstract}
                   onChange={update('speaker1TalkAbstract')}
@@ -2359,7 +2408,7 @@ export default function App() {
             <fieldset className="form-fieldset">
               <legend>Speaker 2</legend>
               <label>
-                Speaker 2 name
+                <FieldLabel optional>Speaker 2 name</FieldLabel>
                 <input
                   type="text"
                   value={form.speaker2Name}
@@ -2368,7 +2417,7 @@ export default function App() {
                 />
               </label>
               <label>
-                Speaker 2 title
+                <FieldLabel optional>Speaker 2 title</FieldLabel>
                 <input
                   type="text"
                   value={form.speaker2Title}
@@ -2377,7 +2426,7 @@ export default function App() {
                 />
               </label>
               <label>
-                Speaker 2 company
+                <FieldLabel optional>Speaker 2 company</FieldLabel>
                 <input
                   type="text"
                   value={form.speaker2Company}
@@ -2386,7 +2435,7 @@ export default function App() {
                 />
               </label>
               <label>
-                Speaker 2 talk title
+                <FieldLabel optional>Speaker 2 talk title</FieldLabel>
                 <input
                   type="text"
                   value={form.speaker2TalkTitle}
@@ -2395,7 +2444,7 @@ export default function App() {
                 />
               </label>
               <label>
-                Speaker 2 talk abstract
+                <FieldLabel optional>Speaker 2 talk abstract</FieldLabel>
                 <textarea
                   value={form.speaker2TalkAbstract}
                   onChange={update('speaker2TalkAbstract')}
@@ -2442,7 +2491,7 @@ export default function App() {
             <fieldset className="form-fieldset">
               <legend>Speaker 3</legend>
               <label>
-                Speaker 3 name
+                <FieldLabel optional>Speaker 3 name</FieldLabel>
                 <input
                   type="text"
                   value={form.speaker3Name}
@@ -2451,7 +2500,7 @@ export default function App() {
                 />
               </label>
               <label>
-                Speaker 3 title
+                <FieldLabel optional>Speaker 3 title</FieldLabel>
                 <input
                   type="text"
                   value={form.speaker3Title}
@@ -2460,7 +2509,7 @@ export default function App() {
                 />
               </label>
               <label>
-                Speaker 3 company
+                <FieldLabel optional>Speaker 3 company</FieldLabel>
                 <input
                   type="text"
                   value={form.speaker3Company}
@@ -2469,7 +2518,7 @@ export default function App() {
                 />
               </label>
               <label>
-                Speaker 3 talk title
+                <FieldLabel optional>Speaker 3 talk title</FieldLabel>
                 <input
                   type="text"
                   value={form.speaker3TalkTitle}
@@ -2478,7 +2527,7 @@ export default function App() {
                 />
               </label>
               <label>
-                Speaker 3 talk abstract
+                <FieldLabel optional>Speaker 3 talk abstract</FieldLabel>
                 <textarea
                   value={form.speaker3TalkAbstract}
                   onChange={update('speaker3TalkAbstract')}
@@ -2490,7 +2539,7 @@ export default function App() {
             )}
 
             <label>
-              {tEvent.hostOrSponsor}
+              <FieldLabel optional>{tEvent.hostOrSponsor}</FieldLabel>
               <input
                 type="text"
                 value={form.hostOrSponsor}
@@ -2499,7 +2548,7 @@ export default function App() {
               />
             </label>
             <label>
-              {tEvent.rsvpInstructions}
+              <FieldLabel optional>{tEvent.rsvpInstructions}</FieldLabel>
               <input
                 type="text"
                 value={form.rsvpInstructions}
@@ -2508,7 +2557,7 @@ export default function App() {
               />
             </label>
             <label>
-              {tEvent.arrivalInstructions}
+              <FieldLabel optional>{tEvent.arrivalInstructions}</FieldLabel>
               <input
                 type="text"
                 value={form.arrivalInstructions}
@@ -2517,7 +2566,7 @@ export default function App() {
               />
             </label>
             <label>
-              {tEvent.parkingNotes}
+              <FieldLabel optional>{tEvent.parkingNotes}</FieldLabel>
               <input
                 type="text"
                 value={form.parkingNotes}
@@ -2566,7 +2615,7 @@ export default function App() {
                 </div>
               </div>
               <label>
-                {tEvent.labelWhyAttend}
+                <FieldLabel optional>{tEvent.labelWhyAttend}</FieldLabel>
                 <textarea
                   value={form.meetupPageWhyAttend}
                   onChange={update('meetupPageWhyAttend')}
@@ -2575,7 +2624,7 @@ export default function App() {
                 />
               </label>
               <label>
-                {tEvent.labelWhatToExpect}
+                <FieldLabel optional>{tEvent.labelWhatToExpect}</FieldLabel>
                 <textarea
                   value={form.meetupPageWhatToExpect}
                   onChange={update('meetupPageWhatToExpect')}
@@ -2584,7 +2633,7 @@ export default function App() {
                 />
               </label>
               <label>
-                {tEvent.labelAgenda}
+                <FieldLabel optional>{tEvent.labelAgenda}</FieldLabel>
                 <textarea
                   value={form.meetupPageAgenda}
                   onChange={update('meetupPageAgenda')}
@@ -2593,7 +2642,7 @@ export default function App() {
                 />
               </label>
               <label>
-                {tEvent.labelClosing}
+                <FieldLabel optional>{tEvent.labelClosing}</FieldLabel>
                 <textarea
                   value={form.meetupPageClosing}
                   onChange={update('meetupPageClosing')}
@@ -2604,13 +2653,13 @@ export default function App() {
             </fieldset>
             <fieldset className="form-fieldset">
               <legend>{tEvent.intuitionLegend}</legend>
-              <label>{tEvent.audienceLabel} <input type="text" value={form.intuitionAudience} onChange={update('intuitionAudience')} placeholder={tEvent.phAudience} /></label>
-              <label>{tEvent.intuitionWhyLabel} <input type="text" value={form.intuitionWhyAttend} onChange={update('intuitionWhyAttend')} placeholder={tEvent.phIntuitionWhy} /></label>
-              <label>{tEvent.intuitionKeyLabel} <input type="text" value={form.intuitionKeyTakeaway} onChange={update('intuitionKeyTakeaway')} placeholder={tEvent.phIntuitionKey} /></label>
+              <label><FieldLabel optional>{tEvent.audienceLabel}</FieldLabel> <input type="text" value={form.intuitionAudience} onChange={update('intuitionAudience')} placeholder={tEvent.phAudience} /></label>
+              <label><FieldLabel optional>{tEvent.intuitionWhyLabel}</FieldLabel> <input type="text" value={form.intuitionWhyAttend} onChange={update('intuitionWhyAttend')} placeholder={tEvent.phIntuitionWhy} /></label>
+              <label><FieldLabel optional>{tEvent.intuitionKeyLabel}</FieldLabel> <input type="text" value={form.intuitionKeyTakeaway} onChange={update('intuitionKeyTakeaway')} placeholder={tEvent.phIntuitionKey} /></label>
             </fieldset>
             <div className="form-language-row" role="group" aria-label={tEvent.languageLabel}>
               <label>
-                {tEvent.languageLabel}
+                <FieldLabel optional>{tEvent.languageLabel}</FieldLabel>
                 <select
                   value={eventPageLanguage}
                   onChange={(e) => setEventPageLanguage(e.target.value)}
@@ -2623,21 +2672,21 @@ export default function App() {
                 </select>
               </label>
             </div>
-            <button type="submit" className="btn-generate">
-              {tEvent.btnGenerateMeetupCopy}
-            </button>
-            <button type="button" onClick={handleReset} className="btn-reset">
-              🔄 {tEvent.btnResetForm}
-            </button>
+            <GeneratorActions label={GENERATOR_UI_META.eventPromotion.cta} />
           </form>
           )}
 
           {generatorType === 'knowBeforeYouGo' && (
           <form
             onSubmit={(e) => { e.preventDefault(); handleGenerate() }}
-            className="form"
+            className="form gen-form"
           >
-            <div className="form-kbyg-toolbar" role="toolbar" aria-label="Form quick actions">
+            <GeneratorHeader
+              title={GENERATOR_UI_META.knowBeforeYouGo.title}
+              description={GENERATOR_UI_META.knowBeforeYouGo.description}
+              onReset={handleReset}
+              resetLabel={tKbyg.kbyg_btnReset}
+            >
               <div
                 className="form-language-row form-kbyg-toolbar-settings"
                 role="group"
@@ -2655,7 +2704,7 @@ export default function App() {
                   <span>{tKbyg.kbyg_enableEmojis}</span>
                 </label>
                 <label>
-                  {tKbyg.languageLabel}
+                  <FieldLabel optional>{tKbyg.languageLabel}</FieldLabel>
                   <select
                     value={meetupKbygLanguage}
                     onChange={(e) => setMeetupKbygLanguage(e.target.value)}
@@ -2668,15 +2717,12 @@ export default function App() {
                   </select>
                 </label>
               </div>
-              <button type="button" onClick={handleReset} className="btn-reset">
-                🔄 {tKbyg.kbyg_btnReset}
-              </button>
-            </div>
+            </GeneratorHeader>
             <fieldset className="form-fieldset">
               <legend>{tKbyg.kbyg_quickImport}</legend>
               <p className="form-hint">{tKbyg.kbyg_quickImportHint}</p>
               <label>
-                {tKbyg.kbyg_quickImportPasteLabel}
+                <FieldLabel optional>{tKbyg.kbyg_quickImportPasteLabel}</FieldLabel>
                 <textarea
                   value={kbygQuickImportPaste}
                   onChange={(e) => setKbygQuickImportPaste(e.target.value)}
@@ -2702,27 +2748,30 @@ export default function App() {
             </fieldset>
             <fieldset className="form-fieldset">
               <legend>{tKbyg.kbyg_emailDetails}</legend>
-              <label>{tKbyg.kbyg_recipients} <input type="text" value={kbygForm.recipients} onChange={updateKbyg('recipients')} placeholder={tKbyg.kbyg_ph_recipients} /></label>
-              <label>{tKbyg.kbyg_greetingNames} <input type="text" value={kbygForm.greetingNames} onChange={updateKbyg('greetingNames')} placeholder={tKbyg.kbyg_ph_greeting} /></label>
+              <div className="gen-two-col">
+              <label><FieldLabel optional>{tKbyg.kbyg_recipients}</FieldLabel> <input type="text" value={kbygForm.recipients} onChange={updateKbyg('recipients')} placeholder={tKbyg.kbyg_ph_recipients} /></label>
+              <label><FieldLabel optional>{tKbyg.kbyg_greetingNames}</FieldLabel> <input type="text" value={kbygForm.greetingNames} onChange={updateKbyg('greetingNames')} placeholder={tKbyg.kbyg_ph_greeting} /></label>
+              </div>
             </fieldset>
             <fieldset className="form-fieldset">
               <legend>{tKbyg.kbyg_eventDetails}</legend>
-              <label>{tKbyg.kbyg_eventTitle} <input type="text" value={kbygForm.eventTitle} onChange={updateKbyg('eventTitle')} placeholder={tKbyg.kbyg_ph_eventTitle} /></label>
-              <label>{tKbyg.kbyg_eventDate} <input type="text" value={kbygForm.eventDate} onChange={updateKbyg('eventDate')} placeholder={tKbyg.kbyg_ph_eventDate} /></label>
-              <label>{tKbyg.kbyg_eventTime} <input type="text" value={kbygForm.eventTime} onChange={updateKbyg('eventTime')} placeholder={tKbyg.kbyg_ph_eventTime} /></label>
-              <label>{tKbyg.kbyg_arrivalTime} <input type="text" value={kbygForm.arrivalTime} onChange={updateKbyg('arrivalTime')} placeholder={tKbyg.kbyg_ph_arrivalTime} /></label>
+              <label><FieldLabel required>{tKbyg.kbyg_eventTitle}</FieldLabel> <input type="text" value={kbygForm.eventTitle} onChange={updateKbyg('eventTitle')} placeholder={tKbyg.kbyg_ph_eventTitle} /></label>
+              <div className="gen-two-col">
+              <label><FieldLabel required>{tKbyg.kbyg_eventDate}</FieldLabel> <input type="text" value={kbygForm.eventDate} onChange={updateKbyg('eventDate')} placeholder={tKbyg.kbyg_ph_eventDate} /></label>
+              <label><FieldLabel optional>{tKbyg.kbyg_eventTime}</FieldLabel> <input type="text" value={kbygForm.eventTime} onChange={updateKbyg('eventTime')} placeholder={tKbyg.kbyg_ph_eventTime} /></label>
+              </div>
+              <label><FieldLabel optional>{tKbyg.kbyg_arrivalTime}</FieldLabel> <input type="text" value={kbygForm.arrivalTime} onChange={updateKbyg('arrivalTime')} placeholder={tKbyg.kbyg_ph_arrivalTime} /></label>
             </fieldset>
             <fieldset className="form-fieldset">
               <legend>{tKbyg.kbyg_location}</legend>
-              <label>{tKbyg.kbyg_venueName} <input type="text" value={kbygForm.venueName} onChange={updateKbyg('venueName')} placeholder={tKbyg.kbyg_ph_venueName} /></label>
-              <label>{tKbyg.kbyg_venueAddress} <input type="text" value={kbygForm.venueAddress} onChange={updateKbyg('venueAddress')} placeholder={tKbyg.kbyg_ph_venueAddress} /></label>
+              <label><FieldLabel required>{tKbyg.kbyg_venueName}</FieldLabel> <input type="text" value={kbygForm.venueName} onChange={updateKbyg('venueName')} placeholder={tKbyg.kbyg_ph_venueName} /></label>
+              <label><FieldLabel optional>{tKbyg.kbyg_venueAddress}</FieldLabel> <input type="text" value={kbygForm.venueAddress} onChange={updateKbyg('venueAddress')} placeholder={tKbyg.kbyg_ph_venueAddress} /></label>
               <label>
-                {tKbyg.kbyg_parkingLabel} <span className="form-hint">({tKbyg.kbyg_optional})</span>
+                <FieldLabel optional>{tKbyg.kbyg_parkingLabel}</FieldLabel>
                 <input type="text" value={kbygForm.parkingNotes} onChange={updateKbyg('parkingNotes')} />
               </label>
               <label>
-                {tKbyg.kbyg_parkingBookingUrl}{' '}
-                <span className="form-hint">({tKbyg.kbyg_optional})</span>
+                <FieldLabel optional>{tKbyg.kbyg_parkingBookingUrl}</FieldLabel>
                 <input
                   type="url"
                   inputMode="url"
@@ -2733,8 +2782,7 @@ export default function App() {
                 />
               </label>
               <label>
-                {tKbyg.kbyg_parkingBookingLabel}{' '}
-                <span className="form-hint">({tKbyg.kbyg_optional})</span>
+                <FieldLabel optional>{tKbyg.kbyg_parkingBookingLabel}</FieldLabel>
                 <input
                   type="text"
                   value={kbygForm.parkingBookingLabel}
@@ -2745,16 +2793,18 @@ export default function App() {
             </fieldset>
             <fieldset className="form-fieldset">
               <legend>{tKbyg.kbyg_eventLinks}</legend>
-              <label>{tKbyg.kbyg_meetupLink} <input type="text" value={kbygForm.meetupLink} onChange={updateKbyg('meetupLink')} placeholder="https://..." /></label>
-              <label>{tKbyg.kbyg_lumaLink} <input type="text" value={kbygForm.lumaLink} onChange={updateKbyg('lumaLink')} placeholder="https://..." /></label>
+              <div className="gen-two-col">
+              <label><FieldLabel optional>{tKbyg.kbyg_meetupLink}</FieldLabel> <input type="text" value={kbygForm.meetupLink} onChange={updateKbyg('meetupLink')} placeholder="https://..." /></label>
+              <label><FieldLabel optional>{tKbyg.kbyg_lumaLink}</FieldLabel> <input type="text" value={kbygForm.lumaLink} onChange={updateKbyg('lumaLink')} placeholder="https://..." /></label>
+              </div>
             </fieldset>
             <fieldset className="form-fieldset">
               <legend>{tKbyg.kbyg_helpfulContacts}</legend>
               {(kbygForm.contacts || []).map((contact, index) => (
                 <div key={index} className="contact-row">
-                  <label>{tKbyg.kbyg_contactName} <input type="text" value={contact.name} onChange={updateKbygContact(index, 'name')} placeholder={tKbyg.kbyg_ph_contactName} /></label>
-                  <label>{tKbyg.kbyg_contactRole} <input type="text" value={contact.role} onChange={updateKbygContact(index, 'role')} placeholder={tKbyg.kbyg_ph_contactRole} /></label>
-                  <label>{tKbyg.kbyg_contactInfo} <input type="text" value={contact.contactInfo} onChange={updateKbygContact(index, 'contactInfo')} placeholder={tKbyg.kbyg_ph_contactInfo} /></label>
+                  <label><FieldLabel optional>{tKbyg.kbyg_contactName}</FieldLabel> <input type="text" value={contact.name} onChange={updateKbygContact(index, 'name')} placeholder={tKbyg.kbyg_ph_contactName} /></label>
+                  <label><FieldLabel optional>{tKbyg.kbyg_contactRole}</FieldLabel> <input type="text" value={contact.role} onChange={updateKbygContact(index, 'role')} placeholder={tKbyg.kbyg_ph_contactRole} /></label>
+                  <label><FieldLabel optional>{tKbyg.kbyg_contactInfo}</FieldLabel> <input type="text" value={contact.contactInfo} onChange={updateKbygContact(index, 'contactInfo')} placeholder={tKbyg.kbyg_ph_contactInfo} /></label>
                 </div>
               ))}
               <button type="button" onClick={addKbygContact} className="btn-add-speaker">{tKbyg.kbyg_addContact}</button>
@@ -2776,17 +2826,17 @@ export default function App() {
                   ))}
                 </div>
                 <label>
-                  {tKbyg.kbyg_speakerArrival} <span className="form-hint">({tKbyg.kbyg_optional})</span>
+                  <FieldLabel optional>{tKbyg.kbyg_speakerArrival}</FieldLabel>
                   <input type="text" value={kbygForm.speakerArrivalNote} onChange={updateKbyg('speakerArrivalNote')} />
                 </label>
               </div>
             </fieldset>
             <fieldset className="form-fieldset">
               <legend>{tKbyg.kbyg_logistics}</legend>
-              <label>{tKbyg.kbyg_food} <input type="text" value={kbygForm.foodDetails} onChange={updateKbyg('foodDetails')} placeholder={tKbyg.kbyg_ph_food} /></label>
-              <label>{tKbyg.kbyg_drink} <input type="text" value={kbygForm.drinkDetails} onChange={updateKbyg('drinkDetails')} placeholder={tKbyg.kbyg_ph_drink} /></label>
-              <label>{tKbyg.kbyg_swag} <input type="text" value={kbygForm.swagNotes} onChange={updateKbyg('swagNotes')} placeholder={tKbyg.kbyg_ph_swag} /></label>
-              <label>{tKbyg.kbyg_setup} <input type="text" value={kbygForm.setupNotes} onChange={updateKbyg('setupNotes')} placeholder={tKbyg.kbyg_ph_setup} /></label>
+              <label><FieldLabel optional>{tKbyg.kbyg_food}</FieldLabel> <input type="text" value={kbygForm.foodDetails} onChange={updateKbyg('foodDetails')} placeholder={tKbyg.kbyg_ph_food} /></label>
+              <label><FieldLabel optional>{tKbyg.kbyg_drink}</FieldLabel> <input type="text" value={kbygForm.drinkDetails} onChange={updateKbyg('drinkDetails')} placeholder={tKbyg.kbyg_ph_drink} /></label>
+              <label><FieldLabel optional>{tKbyg.kbyg_swag}</FieldLabel> <input type="text" value={kbygForm.swagNotes} onChange={updateKbyg('swagNotes')} placeholder={tKbyg.kbyg_ph_swag} /></label>
+              <label><FieldLabel optional>{tKbyg.kbyg_setup}</FieldLabel> <input type="text" value={kbygForm.setupNotes} onChange={updateKbyg('setupNotes')} placeholder={tKbyg.kbyg_ph_setup} /></label>
               <div className="kbyg-quick-fill-wrap">
                 <span className="form-hint kbyg-quick-fill-hint">{tKbyg.kbyg_quickFill}</span>
                 <div className="quick-fill-chips" role="group" aria-label={tKbyg.kbyg_av}>
@@ -2802,7 +2852,7 @@ export default function App() {
                   ))}
                 </div>
                 <label>
-                  {tKbyg.kbyg_av}
+                  <FieldLabel optional>{tKbyg.kbyg_av}</FieldLabel>
                   <input type="text" value={kbygForm.avNotes} onChange={updateKbyg('avNotes')} placeholder={tKbyg.kbyg_ph_av} />
                 </label>
               </div>
@@ -2838,7 +2888,7 @@ export default function App() {
             <fieldset className="form-fieldset">
               <legend>{tKbyg.kbyg_agenda}</legend>
               <div className="kbyg-internal-agenda-field">
-                <label htmlFor="kbyg-internal-agenda">{tKbyg.kbyg_internalAgenda}</label>
+                <FieldLabel htmlFor="kbyg-internal-agenda" optional>{tKbyg.kbyg_internalAgenda}</FieldLabel>
                 <p id="kbyg-internal-agenda-desc" className="form-hint kbyg-internal-agenda-hint">
                   {tKbyg.kbyg_internalAgendaHint}
                 </p>
@@ -2883,22 +2933,26 @@ export default function App() {
             </fieldset>
             <fieldset className="form-fieldset">
               <legend>{tKbyg.kbyg_additional}</legend>
-              <label>{tKbyg.kbyg_additionalNotes} <textarea value={kbygForm.additionalNotes} onChange={updateKbyg('additionalNotes')} placeholder={tKbyg.kbyg_ph_additionalNotes} rows={3} /></label>
+              <label><FieldLabel optional>{tKbyg.kbyg_additionalNotes}</FieldLabel> <textarea value={kbygForm.additionalNotes} onChange={updateKbyg('additionalNotes')} placeholder={tKbyg.kbyg_ph_additionalNotes} rows={3} /></label>
             </fieldset>
-            <button type="submit" className="btn-generate">{tKbyg.kbyg_btnGenerate}</button>
-            <button type="button" onClick={handleReset} className="btn-reset">🔄 {tKbyg.kbyg_btnReset}</button>
+            <GeneratorActions label={GENERATOR_UI_META.knowBeforeYouGo.cta} />
           </form>
           )}
 
           {generatorType === 'urlQrGenerator' && (
             <form
               onSubmit={(e) => { e.preventDefault(); handleGenerate() }}
-              className="form"
+              className="form gen-form"
             >
+              <GeneratorHeader
+                title={GENERATOR_UI_META.urlQrGenerator.title}
+                description={GENERATOR_UI_META.urlQrGenerator.description}
+                onReset={handleReset}
+              />
               <fieldset className="form-fieldset">
                 <legend>Destination</legend>
                 <label>
-                  Base URL *
+                  <FieldLabel required>Base URL</FieldLabel>
                   <input
                     type="text"
                     value={urlQrForm.baseUrl}
@@ -2911,7 +2965,7 @@ export default function App() {
               <fieldset className="form-fieldset">
                 <legend>UTM Parameters</legend>
                 <label>
-                  UTM Source
+                  <FieldLabel optional>UTM Source</FieldLabel>
                   <SearchableSelect
                     value={urlQrForm.utmSource}
                     onChange={(v) => setUrlQrForm(prev => ({ ...prev, utmSource: v }))}
@@ -2920,7 +2974,7 @@ export default function App() {
                   />
                 </label>
                 <label>
-                  UTM Medium
+                  <FieldLabel optional>UTM Medium</FieldLabel>
                   <SearchableSelect
                     value={urlQrForm.utmMedium}
                     onChange={(v) => setUrlQrForm(prev => ({ ...prev, utmMedium: v }))}
@@ -2929,7 +2983,7 @@ export default function App() {
                   />
                 </label>
                 <label>
-                  UTM Campaign
+                  <FieldLabel optional>UTM Campaign</FieldLabel>
                   <SearchableSelect
                     value={urlQrForm.utmCampaign}
                     onChange={(v) => setUrlQrForm(prev => ({ ...prev, utmCampaign: v }))}
@@ -2938,28 +2992,32 @@ export default function App() {
                   />
                 </label>
                 <label>
-                  UTM Content
+                  <FieldLabel optional>UTM Content</FieldLabel>
                   <input type="text" value={urlQrForm.utmContent} onChange={updateUrlQr('utmContent')} placeholder="e.g. email" />
                 </label>
                 <label>
-                  UTM Term
+                  <FieldLabel optional>UTM Term</FieldLabel>
                   <input type="text" value={urlQrForm.utmTerm} onChange={updateUrlQr('utmTerm')} placeholder="e.g. elastic" />
                 </label>
               </fieldset>
-              <button type="submit" className="btn-generate">Generate URL</button>
-              <button type="button" onClick={handleReset} className="btn-reset">🔄 Reset Form</button>
+              <GeneratorActions label={GENERATOR_UI_META.urlQrGenerator.cta} />
             </form>
           )}
 
           {generatorType === 'qrCodeGenerator' && (
             <form
               onSubmit={(e) => { e.preventDefault(); handleGenerate() }}
-              className="form"
+              className="form gen-form"
             >
+              <GeneratorHeader
+                title={GENERATOR_UI_META.qrCodeGenerator.title}
+                description={GENERATOR_UI_META.qrCodeGenerator.description}
+                onReset={handleReset}
+              />
               <fieldset className="form-fieldset">
                 <legend>Link</legend>
                 <label>
-                  Link to encode *
+                  <FieldLabel required>Link to encode</FieldLabel>
                   <input
                     type="text"
                     value={qrForm.qrLink}
@@ -2973,14 +3031,14 @@ export default function App() {
                 <legend>Appearance</legend>
                 <div className="qr-color-row">
                   <label>
-                    QR Code Colour
+                    <FieldLabel optional>QR Code Colour</FieldLabel>
                     <div className="qr-color-input-group">
                       <input type="color" value={qrForm.qrColor} onChange={updateQr('qrColor')} className="qr-color-swatch" />
                       <input type="text" value={qrForm.qrColor} onChange={updateQr('qrColor')} placeholder="#000000" maxLength="7" className="qr-color-hex" />
                     </div>
                   </label>
                   <label className={qrForm.qrTransparent ? 'qr-color-label-disabled' : ''}>
-                    Background Colour
+                    <FieldLabel optional>Background Colour</FieldLabel>
                     <div className="qr-color-input-group">
                       <input type="color" value={qrForm.qrTransparent ? '#ffffff' : qrForm.qrBgColor} onChange={updateQr('qrBgColor')} className="qr-color-swatch" disabled={qrForm.qrTransparent} />
                       <input type="text" value={qrForm.qrTransparent ? 'transparent' : qrForm.qrBgColor} onChange={updateQr('qrBgColor')} placeholder="#FFFFFF" maxLength="7" className="qr-color-hex" disabled={qrForm.qrTransparent} />
@@ -3028,13 +3086,12 @@ export default function App() {
                   </div>
                 </div>
               </fieldset>
-              <button type="submit" className="btn-generate">Generate QR Code</button>
-              <button type="button" onClick={handleReset} className="btn-reset">🔄 Reset Form</button>
+              <GeneratorActions label={GENERATOR_UI_META.qrCodeGenerator.cta} />
             </form>
           )}
         </aside>
 
-        <main className="output-panel">
+        <main className="output-panel gen-output-panel">
           <div className="output-header">
             <h2>
               {generatorType === 'knowBeforeYouGo' ? 'Generated email'
@@ -3043,7 +3100,7 @@ export default function App() {
                 : 'Generated copy'}
             </h2>
           </div>
-          <div className="output-content">
+          <div className={`output-content${!(generatedCopy || (generatorType === 'qrCodeGenerator' && generatedQr)) ? ' gen-output-content--empty' : ''}`}>
             {generatedCopy || (generatorType === 'qrCodeGenerator' && generatedQr) ? (
               <>
                 {generatorType === 'knowBeforeYouGo' && (
@@ -3386,15 +3443,11 @@ export default function App() {
                 )}
               </>
             ) : (
-              <p className="output-placeholder">
-                {generatorType === 'knowBeforeYouGo'
-                  ? 'Fill in the form and click "Generate Email" to create the Know Before You Go logistics email.'
-                    : generatorType === 'urlQrGenerator'
-                      ? 'Fill in the URL and UTM parameters, then click "Generate URL" to create your tracking link.'
-                      : generatorType === 'qrCodeGenerator'
-                        ? 'Enter a link and choose colours, then click "Generate QR Code" to create your branded QR code.'
-                        : 'Fill in the form and click "Generate Meetup Copy" to see the event description here. Use the buttons below to add optional Speaker 2 or Speaker 3.'}
-              </p>
+              <EmptyState
+                emoji={GENERATOR_UI_META[generatorType]?.emoji || '✨'}
+                title={GENERATOR_UI_META[generatorType]?.emptyTitle || 'Nothing generated yet'}
+                description={GENERATOR_UI_META[generatorType]?.emptyDescription || 'Fill in the form and generate to see results here.'}
+              />
             )}
           </div>
         </main>
