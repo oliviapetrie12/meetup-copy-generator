@@ -3,6 +3,7 @@ import QRCodeStyling from "qr-code-styling"
 import elasticLogo from './logo.png'
 import ConferenceKnowBeforeYouGo from './ConferenceKnowBeforeYouGo.jsx'
 import MeetupFollowUp from './MeetupFollowUp.jsx'
+import DevrelEventAssets from './DevrelEventAssets.jsx'
 import {
   FieldLabel,
   GeneratorHeader,
@@ -445,6 +446,12 @@ const GENERATOR_CARDS = [
     value: 'meetupFollowUp',
     title: '📤 Meetup Follow-Up',
     description: 'Generate a post-event email with slide links, standard resources, and UTM tracking.',
+  },
+  {
+    value: 'devrelEventAssets',
+    title: '📋 DevRel Event Assets',
+    description:
+      'Generate a localized Elastic document for conference organizers and community partners to use on event websites, sponsor listings, and promo materials.',
   },
   {
     value: 'urlQrGenerator',
@@ -2177,6 +2184,8 @@ export default function App() {
           <ConferenceKnowBeforeYouGo />
         ) : generatorType === 'meetupFollowUp' ? (
           <MeetupFollowUp />
+        ) : generatorType === 'devrelEventAssets' ? (
+          <DevrelEventAssets />
         ) : (
         <>
         <aside className="form-panel gen-form-panel">

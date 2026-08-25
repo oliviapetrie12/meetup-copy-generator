@@ -2140,3 +2140,90 @@ body {
   margin: 0.5rem 0 0.75rem;
   font-family: monospace;
 }
+
+/* DevRel Event Assets generator */
+.dea-form-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.dea-form .dea-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.dea-copy-google-docs {
+  font-weight: 600;
+  padding: 0.45rem 0.95rem;
+  font-size: 0.86rem;
+}
+
+.dea-copy-google-docs:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.dea-doc-preview {
+  max-height: none;
+  padding: 1.35rem 1.5rem 1.5rem;
+  background: #fff;
+  line-height: 1.55;
+  color: #1e1e2e;
+}
+
+.dea-doc-preview h1 {
+  margin: 0 0 0.85rem;
+  font-size: 1.28rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: #0f172a;
+}
+
+.dea-doc-preview h2 {
+  margin: 1.25rem 0 0.45rem;
+  font-size: 1.02rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #1e293b;
+}
+
+.dea-doc-preview p {
+  margin: 0 0 0.65rem;
+}
+
+.dea-doc-preview ul {
+  margin: 0 0 0.75rem;
+  padding-left: 1.2rem;
+}
+
+.dea-doc-preview li {
+  margin: 0.2rem 0;
+}
+
+.dea-doc-preview a {
+  color: #1d4ed8;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+.dea-copy-status {
+  margin: 0.85rem 0 0;
+}
+
+.dea-copy-status-error {
+  color: #b91c1c;
+  font-weight: 500;
+}
+
+.dea-plain-details {
+  margin: 1.25rem 0 0;
+}
+
+.dea-plain-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
