@@ -28,7 +28,7 @@ export const BRAND_ASSET_LINKS = {
 export const APPROVED_SOCIAL_CHANNELS = [
   { id: 'linkedin', label: 'LinkedIn', url: 'https://www.linkedin.com/company/elastic-co/' },
   { id: 'x', label: 'X', url: 'https://x.com/elastic' },
-  { id: 'youtube', label: 'YouTube', url: 'https://www.youtube.com/@Elastic' },
+  { id: 'youtube', label: 'YouTube', url: 'https://www.youtube.com/@OfficialElasticCommunity' },
   { id: 'github', label: 'GitHub', url: 'https://github.com/elastic' },
 ]
 
@@ -41,7 +41,7 @@ const EN = {
     'Elastic, the Search AI Company, enables everyone to find the answers they need in real time, using all their data, at scale. Elastic’s solutions for search, observability, and security are built on the Elastic Search AI Platform — the development platform used by thousands of companies, including more than 50% of the Fortune 500.',
   developerRelationsHeading: 'Elastic Developer Relations',
   developerRelationsBody:
-    'Elastic supports developers and technical communities through events, meetups, workshops, and educational resources designed to help practitioners explore search, observability, security, and AI.',
+    'The Elastic DevRel team supports developers and technical communities through events, meetups, workshops, and educational resources designed to help practitioners explore search, observability, security, and AI.',
   eventParticipationHeading: 'Event Participation',
   speakerInformationHeading: 'Speaker Information',
   speakerNameLabel: 'Name',
@@ -74,7 +74,7 @@ const PT = {
     'A Elastic, a empresa de Search AI, ajuda pessoas e organizações a encontrar as respostas de que precisam em tempo real, utilizando todos os seus dados em escala. Suas soluções de busca, observabilidade e segurança são desenvolvidas com a Elastic Search AI Platform, uma plataforma utilizada por milhares de empresas, incluindo mais de 50% das companhias da Fortune 500.',
   developerRelationsHeading: 'Developer Relations da Elastic',
   developerRelationsBody:
-    'A Elastic apoia desenvolvedores e comunidades técnicas por meio de eventos, meetups, workshops e recursos educacionais que ajudam profissionais a explorar soluções de busca, observabilidade, segurança e inteligência artificial.',
+    'A equipe de DevRel da Elastic apoia desenvolvedores e comunidades técnicas por meio de eventos, meetups, workshops e recursos educacionais que ajudam profissionais a explorar busca, observabilidade, segurança e inteligência artificial.',
   eventParticipationHeading: 'Participação no evento',
   speakerInformationHeading: 'Informações do palestrante',
   speakerNameLabel: 'Nome',

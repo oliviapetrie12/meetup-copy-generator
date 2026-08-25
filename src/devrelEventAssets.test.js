@@ -218,6 +218,36 @@ describe('event assets document generation', () => {
     }
   })
 
+  it('uses the community YouTube channel and updated DevRel copy in both languages', () => {
+    const youtube = APPROVED_SOCIAL_CHANNELS.find((ch) => ch.id === 'youtube')
+    expect(youtube?.url).toBe('https://www.youtube.com/@OfficialElasticCommunity')
+    expect(youtube?.label).toBe('YouTube')
+
+    const en = generateEventAssetsDocument(sampleForm({ language: 'en' }))
+    const pt = generateEventAssetsDocument(sampleForm({ language: 'pt' }))
+    const enT = getEventAssetsStrings('en')
+    const ptT = getEventAssetsStrings('pt')
+
+    expect(enT.developerRelationsBody).toContain('The Elastic DevRel team supports')
+    expect(ptT.developerRelationsBody).toContain('A equipe de DevRel da Elastic apoia')
+    expect(en.html).toContain(enT.developerRelationsBody)
+    expect(en.plain).toContain(enT.developerRelationsBody)
+    expect(pt.html).toContain(ptT.developerRelationsBody)
+    expect(pt.plain).toContain(ptT.developerRelationsBody)
+
+    expect(en.html).toContain(`<a href="${youtube.url}">${youtube.label}</a>`)
+    expect(en.plain).toContain(`${youtube.label}: ${youtube.url}`)
+    expect(pt.html).toContain(`<a href="${youtube.url}">${youtube.label}</a>`)
+    expect(pt.plain).toContain(`${youtube.label}: ${youtube.url}`)
+
+    for (const doc of [en, pt]) {
+      expect(doc.html).not.toContain('https://www.youtube.com/@Elastic')
+      expect(doc.plain).not.toContain('https://www.youtube.com/@Elastic')
+      expect(doc.html).not.toContain('Elastic supports developers and technical communities')
+      expect(doc.plain).not.toContain('A Elastic apoia desenvolvedores')
+    }
+  })
+
   it('omits invalid contact email from the document', () => {
     const { html } = generateEventAssetsDocument(
       sampleForm({ contactName: 'Olivia', contactEmail: 'not-valid' }),
