@@ -105,6 +105,8 @@ describe('event assets document generation', () => {
     expect(html).toContain(BRAND_ASSET_LINKS.logo)
     expect(html).toContain(BRAND_ASSET_LINKS.brandGuidelines)
     expect(html).toContain(`href="${BRAND_ASSET_LINKS.logo}"`)
+    expect(html).toContain(`<a href="${BRAND_ASSET_LINKS.logo}">${t.elasticLogoLabel}</a>`)
+    expect(html).not.toContain(`>${BRAND_ASSET_LINKS.logo}</a>`)
     expect(html).toContain('lang="en"')
 
     expect(plain).toContain(t.documentTitle)
@@ -240,6 +242,23 @@ describe('event assets document generation', () => {
     expect(html).toContain(t.logoAndBrandAssetsHeading)
     expect(html).toContain(t.elasticLogoLabel)
     expect(html).toContain(t.elasticBrandGuidelinesLabel)
+  })
+
+  it('groups event name and type beneath the document title', () => {
+    const { html } = generateEventAssetsDocument(sampleForm())
+    const t = getEventAssetsStrings('en')
+    expect(html).toContain(
+      `<h1>${t.documentTitle}</h1><div><p><strong>${t.eventLabel}:</strong> TDC São Paulo</p><p><strong>${t.eventTypeLabel}:</strong> Conference</p></div>`,
+    )
+  })
+
+  it('renders brand and social links with descriptive labels as link text', () => {
+    const { html, plain } = generateEventAssetsDocument(sampleForm())
+    const t = getEventAssetsStrings('en')
+    expect(html).toContain(`<a href="${BRAND_ASSET_LINKS.brandGuidelines}">${t.elasticBrandGuidelinesLabel}</a>`)
+    expect(html).toContain(`<a href="${APPROVED_SOCIAL_CHANNELS[0].url}">${APPROVED_SOCIAL_CHANNELS[0].label}</a>`)
+    expect(html).not.toContain(`>${APPROVED_SOCIAL_CHANNELS[0].url}</a>`)
+    expect(plain).toContain(`${APPROVED_SOCIAL_CHANNELS[0].label}: ${APPROVED_SOCIAL_CHANNELS[0].url}`)
   })
 })
 

@@ -189,7 +189,7 @@ function linkItemHtml(label, url) {
   const href = trimField(url)
   const text = trimField(label)
   if (!href || !text) return ''
-  return `<li>${escapeHtml(text)}: <a href="${escapeHtml(href)}">${escapeHtml(href)}</a></li>`
+  return `<li><a href="${escapeHtml(href)}">${escapeHtml(text)}</a></li>`
 }
 
 function linkItemPlain(label, url) {
@@ -214,8 +214,9 @@ export function generateEventAssetsDocument(form, options = {}) {
   htmlParts.push(`<h1>${escapeHtml(t.documentTitle)}</h1>`)
   plainParts.push(t.documentTitle, '')
 
-  htmlParts.push(`<p><strong>${escapeHtml(t.eventLabel)}:</strong> ${escapeHtml(eventName)}</p>`)
-  htmlParts.push(`<p><strong>${escapeHtml(t.eventTypeLabel)}:</strong> ${escapeHtml(eventTypeLabel)}</p>`)
+  htmlParts.push(
+    `<div><p><strong>${escapeHtml(t.eventLabel)}:</strong> ${escapeHtml(eventName)}</p><p><strong>${escapeHtml(t.eventTypeLabel)}:</strong> ${escapeHtml(eventTypeLabel)}</p></div>`,
+  )
   plainParts.push(`${t.eventLabel}: ${eventName}`)
   plainParts.push(`${t.eventTypeLabel}: ${eventTypeLabel}`, '')
 

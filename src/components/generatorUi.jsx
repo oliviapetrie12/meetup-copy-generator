@@ -87,6 +87,7 @@ export function FormSection({ title, hint, children, id }) {
  *   id?: string
  *   defaultOpen?: boolean
  *   completed?: boolean
+ *   optional?: boolean
  *   summary?: string | null
  *   children: import('react').ReactNode
  * }} props
@@ -97,6 +98,7 @@ export function CollapsibleFormSection({
   id,
   defaultOpen = false,
   completed = false,
+  optional = false,
   summary = null,
   children,
 }) {
@@ -106,7 +108,7 @@ export function CollapsibleFormSection({
 
   return (
     <section
-      className={`gen-section gen-section-collapsible${completed ? ' gen-section-collapsible--complete' : ''}`}
+      className={`gen-section gen-section-collapsible${completed ? ' gen-section-collapsible--complete' : ''}${open ? ' gen-section-collapsible--open' : ''}`}
     >
       <button
         type="button"
@@ -116,16 +118,19 @@ export function CollapsibleFormSection({
         aria-controls={panelId}
         onClick={() => setOpen((v) => !v)}
       >
-        <span className="gen-collapse-main">
-          <span className="gen-section-title gen-collapse-title">{title}</span>
-          {completed ? (
-            <span className="gen-collapse-check" aria-label="Completed">
-              ✓
-            </span>
-          ) : null}
+        <span className="gen-collapse-copy">
+          <span className="gen-collapse-main">
+            <span className="gen-section-title gen-collapse-title">{title}</span>
+            {optional ? <span className="gen-badge gen-badge-optional">Optional</span> : null}
+            {completed ? (
+              <span className="gen-collapse-check" aria-label="Completed">
+                ✓
+              </span>
+            ) : null}
+          </span>
+          {!open && summary ? <span className="gen-collapse-summary">{summary}</span> : null}
         </span>
-        {!open && summary ? <span className="gen-collapse-summary">{summary}</span> : null}
-        <span className="gen-collapse-chevron" aria-hidden="true">
+        <span className={`gen-collapse-chevron${open ? ' is-open' : ''}`} aria-hidden="true">
           {open ? '▾' : '▸'}
         </span>
       </button>

@@ -178,8 +178,9 @@ export default function DevrelEventAssets() {
           <CollapsibleFormSection
             id="dea-participation"
             title="Event participation"
-            hint="Optional notes on sponsorship, booth presence, workshops, or other Elastic involvement. Shown as entered — not translated."
+            hint="Notes on sponsorship, booth presence, workshops, or other Elastic involvement. Shown as entered — not translated."
             defaultOpen={false}
+            optional
             completed={participationFilled}
             summary={participationFilled ? 'Details added' : null}
           >
@@ -198,8 +199,9 @@ export default function DevrelEventAssets() {
           <CollapsibleFormSection
             id="dea-speaker"
             title="Speaker information"
-            hint="Optional. Included only when at least one speaker field is filled. Names and bios are not translated."
+            hint="Included only when at least one speaker field is filled. Names and bios are not translated."
             defaultOpen={false}
+            optional
             completed={speakerFilled}
             summary={speakerFilled ? form.speakerName || 'Speaker details added' : null}
           >
@@ -240,8 +242,9 @@ export default function DevrelEventAssets() {
           <CollapsibleFormSection
             id="dea-session"
             title="Session information"
-            hint="Optional. Included only when a session title or description is provided. Session copy is not translated."
+            hint="Included only when a session title or description is provided. Session copy is not translated."
             defaultOpen={false}
+            optional
             completed={sessionFilled}
             summary={sessionFilled ? form.sessionTitle || 'Session details added' : null}
           >
@@ -271,8 +274,9 @@ export default function DevrelEventAssets() {
           <CollapsibleFormSection
             id="dea-contact"
             title="Event contact"
-            hint="Optional organizer-facing contact. Email is validated when provided."
+            hint="Organizer-facing contact. Email is validated when provided."
             defaultOpen={false}
+            optional
             completed={contactFilled && !validation.fieldErrors.contactEmail}
             summary={contactFilled ? form.contactName || form.contactEmail : null}
           >
@@ -328,7 +332,7 @@ export default function DevrelEventAssets() {
           {hasEventName ? (
             <button
               type="button"
-              className="btn-copy dea-copy-google-docs"
+              className="btn-action dea-copy-preview"
               onClick={copyDocument}
               disabled={!canCopy}
               aria-pressed={copyMode === 'html' || copyMode === 'plain'}
