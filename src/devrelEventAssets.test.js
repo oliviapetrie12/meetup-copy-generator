@@ -40,7 +40,6 @@ function sampleForm(overrides = {}) {
     eventName: 'TDC São Paulo',
     language: 'en',
     eventType: 'conference',
-    focusArea: 'search',
     ...overrides,
   }
 }
@@ -56,17 +55,14 @@ describe('event assets form persistence', () => {
     const loaded = loadEventAssetsForm()
     expect(loaded.eventName).toBe('TDC São Paulo')
     expect(loaded.speakerName).toBe('Ada')
-    expect(loaded.focusArea).toBe('search')
+    expect(loaded).not.toHaveProperty('focusArea')
   })
 
-  it('falls back to defaults for unknown language, type, and focus', () => {
-    saveEventAssetsForm(
-      sampleForm({ language: 'es', eventType: 'gala', focusArea: 'marketing' }),
-    )
+  it('falls back to defaults for unknown language and type', () => {
+    saveEventAssetsForm(sampleForm({ language: 'es', eventType: 'gala' }))
     const loaded = loadEventAssetsForm()
     expect(loaded.language).toBe('en')
     expect(loaded.eventType).toBe('conference')
-    expect(loaded.focusArea).toBe('general')
   })
 
   it('reset returns empty defaults and empty-form detection works', () => {
@@ -104,8 +100,8 @@ describe('event assets document generation', () => {
     expect(html).toContain(t.aboutElasticBody)
     expect(html).toContain(t.developerRelationsHeading)
     expect(html).toContain(t.developerRelationsBody)
-    expect(html).toContain(t.areasOfFocusHeading)
-    expect(html).toContain(t.focusAreas.search)
+    expect(html).not.toContain('Areas of Focus')
+    expect(html).not.toContain('Áreas de foco')
     expect(html).toContain(BRAND_ASSET_LINKS.logo)
     expect(html).toContain(BRAND_ASSET_LINKS.brandGuidelines)
     expect(html).toContain(`href="${BRAND_ASSET_LINKS.logo}"`)
@@ -184,8 +180,8 @@ describe('event assets document generation', () => {
     const pt = generateEventAssetsDocument(sampleForm({ language: 'pt', eventType: 'community_event' }))
     expect(en.html).toContain('Community event')
     expect(pt.html).toContain('Evento comunitário')
-    expect(pt.html).toContain('Áreas de foco')
-    expect(pt.plain).toContain('Áreas de foco')
+    expect(pt.html).not.toContain('Áreas de foco')
+    expect(pt.plain).not.toContain('Áreas de foco')
     expect(pt.plain).toContain('Informações do evento')
     expect(pt.html).toContain('tempo real')
     expect(pt.html).toContain('Suas soluções de busca')
@@ -268,8 +264,9 @@ describe('event assets clipboard', () => {
     const { html, plain } = generateEventAssetsDocument(sampleForm({ language: 'pt' }))
     const clip = buildEventAssetsClipboardHtml(html)
     expect(clip).toContain('Informações do evento')
-    expect(clip).toContain('Áreas de foco')
+    expect(clip).not.toContain('Áreas de foco')
     expect(plain).toContain('Informações do evento')
+    expect(plain).not.toContain('Áreas de foco')
   })
 
   it('copies text/html and text/plain when ClipboardItem is supported', async () => {

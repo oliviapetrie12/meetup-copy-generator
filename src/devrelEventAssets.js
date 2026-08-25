@@ -24,21 +24,12 @@ export {
 export const EVENT_ASSETS_STORAGE_KEY = 'devrel-event-assets-form-v1'
 
 export const EVENT_TYPE_VALUES = ['conference', 'meetup', 'hackathon', 'community_event']
-export const FOCUS_AREA_VALUES = ['general', 'search', 'observability', 'security', 'ai']
 
 export const EVENT_TYPE_OPTIONS = [
   { value: 'conference', label: 'Conference' },
   { value: 'meetup', label: 'Meetup' },
   { value: 'hackathon', label: 'Hackathon' },
   { value: 'community_event', label: 'Community event' },
-]
-
-export const FOCUS_AREA_OPTIONS = [
-  { value: 'general', label: 'General' },
-  { value: 'search', label: 'Search' },
-  { value: 'observability', label: 'Observability' },
-  { value: 'security', label: 'Security' },
-  { value: 'ai', label: 'AI' },
 ]
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -52,7 +43,6 @@ export function getInitialEventAssetsForm() {
     eventName: '',
     language: 'en',
     eventType: 'conference',
-    focusArea: 'general',
     participationDetails: '',
     speakerName: '',
     speakerTitle: '',
@@ -72,7 +62,7 @@ export function isEventAssetsFormEmpty(form) {
   const base = getInitialEventAssetsForm()
   const keys = Object.keys(base)
   return keys.every((key) => {
-    if (key === 'language' || key === 'eventType' || key === 'focusArea') {
+    if (key === 'language' || key === 'eventType') {
       return trimField(form?.[key]) === base[key]
     }
     return !trimField(form?.[key])
@@ -83,10 +73,6 @@ function normalizeEventType(value) {
   return EVENT_TYPE_VALUES.includes(value) ? value : 'conference'
 }
 
-function normalizeFocusArea(value) {
-  return FOCUS_AREA_VALUES.includes(value) ? value : 'general'
-}
-
 export function normalizeEventAssetsForm(raw) {
   const base = getInitialEventAssetsForm()
   const src = raw && typeof raw === 'object' ? raw : {}
@@ -94,7 +80,6 @@ export function normalizeEventAssetsForm(raw) {
     eventName: typeof src.eventName === 'string' ? src.eventName : base.eventName,
     language: normalizeEventAssetsLanguage(src.language),
     eventType: normalizeEventType(src.eventType),
-    focusArea: normalizeFocusArea(src.focusArea),
     participationDetails:
       typeof src.participationDetails === 'string' ? src.participationDetails : base.participationDetails,
     speakerName: typeof src.speakerName === 'string' ? src.speakerName : base.speakerName,
@@ -221,7 +206,6 @@ export function generateEventAssetsDocument(form, options = {}) {
   const htmlLang = EVENT_ASSETS_HTML_LANG[normalized.language] || 'en'
   const eventName = trimField(normalized.eventName)
   const eventTypeLabel = t.eventTypes[normalized.eventType] || t.eventTypes.conference
-  const focusBody = t.focusAreas[normalized.focusArea] || t.focusAreas.general
   const socialChannels = getApprovedSocialChannels(options.socialChannels)
 
   const htmlParts = []
@@ -242,10 +226,6 @@ export function generateEventAssetsDocument(form, options = {}) {
   htmlParts.push(`<h2>${escapeHtml(t.developerRelationsHeading)}</h2>`)
   htmlParts.push(`<p>${escapeHtml(t.developerRelationsBody)}</p>`)
   plainParts.push(t.developerRelationsHeading, t.developerRelationsBody, '')
-
-  htmlParts.push(`<h2>${escapeHtml(t.areasOfFocusHeading)}</h2>`)
-  htmlParts.push(`<p>${escapeHtml(focusBody)}</p>`)
-  plainParts.push(t.areasOfFocusHeading, focusBody, '')
 
   const participation = trimField(normalized.participationDetails)
   if (participation) {

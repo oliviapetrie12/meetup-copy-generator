@@ -42,7 +42,6 @@ const EN = {
   developerRelationsHeading: 'Elastic Developer Relations',
   developerRelationsBody:
     'Elastic supports developers and technical communities through events, meetups, workshops, and educational resources designed to help practitioners explore search, observability, security, and AI.',
-  areasOfFocusHeading: 'Areas of Focus',
   eventParticipationHeading: 'Event Participation',
   speakerInformationHeading: 'Speaker Information',
   speakerNameLabel: 'Name',
@@ -64,17 +63,6 @@ const EN = {
     hackathon: 'Hackathon',
     community_event: 'Community event',
   },
-  focusAreas: {
-    general:
-      'The Elastic Search AI Platform helps developers and technical communities search, observe, and protect data at scale. Teams build on Elasticsearch, Kibana, and Elastic’s search, observability, and security solutions — a shared foundation used by thousands of companies.',
-    search:
-      'Elasticsearch and the Elastic Search AI Platform help developers build search experiences, retrieval-augmented generation (RAG) applications, and vector and semantic search over their own data — from site search and workplace search to custom retrieval pipelines.',
-    observability:
-      'Elastic Observability unifies logs, metrics, traces, and profiling so developers and SREs can understand application and infrastructure health in real time, investigate issues faster, and keep systems reliable at scale.',
-    security:
-      'Elastic Security brings SIEM, security analytics, and detection and investigation workflows together on the Search AI Platform so practitioners can search across security data to detect, investigate, and respond.',
-    ai: 'Elastic helps developers ground AI applications in their own data using vector search, semantic retrieval, and Elasticsearch as a context engine for retrieval-augmented generation (RAG) and other Search AI workloads.',
-  },
 }
 
 const PT = {
@@ -87,7 +75,6 @@ const PT = {
   developerRelationsHeading: 'Developer Relations da Elastic',
   developerRelationsBody:
     'A Elastic apoia desenvolvedores e comunidades técnicas por meio de eventos, meetups, workshops e recursos educacionais que ajudam profissionais a explorar soluções de busca, observabilidade, segurança e inteligência artificial.',
-  areasOfFocusHeading: 'Áreas de foco',
   eventParticipationHeading: 'Participação no evento',
   speakerInformationHeading: 'Informações do palestrante',
   speakerNameLabel: 'Nome',
@@ -108,17 +95,6 @@ const PT = {
     meetup: 'Meetup',
     hackathon: 'Hackathon',
     community_event: 'Evento comunitário',
-  },
-  focusAreas: {
-    general:
-      'A Elastic Search AI Platform ajuda desenvolvedores e comunidades técnicas a buscar, observar e proteger dados em escala. Equipes constroem sobre o Elasticsearch, o Kibana e as soluções de busca, observabilidade e segurança da Elastic — uma base compartilhada utilizada por milhares de empresas.',
-    search:
-      'O Elasticsearch e a Elastic Search AI Platform ajudam desenvolvedores a criar experiências de busca, aplicações de geração aumentada por recuperação (RAG) e busca vetorial e semântica sobre os próprios dados — de site search e workplace search a pipelines de recuperação personalizados.',
-    observability:
-      'O Elastic Observability unifica logs, métricas, traces e profiling para que desenvolvedores e SREs entendam a saúde de aplicações e da infraestrutura em tempo real, investiguem problemas com mais rapidez e mantenham sistemas confiáveis em escala.',
-    security:
-      'O Elastic Security reúne SIEM, analytics de segurança e fluxos de detecção e investigação na Search AI Platform, para que profissionais possam buscar dados de segurança a fim de detectar, investigar e responder a ameaças.',
-    ai: 'A Elastic ajuda desenvolvedores a fundamentar aplicações de inteligência artificial nos próprios dados, usando busca vetorial, recuperação semântica e o Elasticsearch como motor de contexto para geração aumentada por recuperação (RAG) e outros workloads de Search AI.',
   },
 }
 

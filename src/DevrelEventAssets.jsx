@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   EVENT_ASSETS_LANGUAGE_OPTIONS,
   EVENT_TYPE_OPTIONS,
-  FOCUS_AREA_OPTIONS,
   copyEventAssetsToClipboard,
   generateEventAssetsDocument,
   getResetEventAssetsForm,
@@ -174,21 +173,6 @@ export default function DevrelEventAssets() {
                 </select>
               </label>
             </div>
-
-            <label className="dea-field" htmlFor="dea-focus-area">
-              <FieldLabel required>Focus area</FieldLabel>
-              <select
-                id="dea-focus-area"
-                value={form.focusArea}
-                onChange={updateField('focusArea')}
-              >
-                {FOCUS_AREA_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </label>
           </FormSection>
 
           <CollapsibleFormSection
