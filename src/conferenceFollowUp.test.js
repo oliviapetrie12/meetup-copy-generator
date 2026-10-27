@@ -187,11 +187,12 @@ describe('conference follow-up email', () => {
       utm_medium: 'nyc',
     })
 
-    expect(plain.startsWith('Elastic @ LangChain Interrupt\n')).toBe(true)
-    expect(plain).toContain(defaultOpeningSentence('LangChain Interrupt'))
+    expect(plain.startsWith(`${defaultOpeningSentence('LangChain Interrupt')}\n`)).toBe(true)
+    expect(plain).not.toContain('Elastic @')
     expect(plain).toContain('We hope to see you at another event soon!')
     expect(plain.endsWith('The Elastic DevRel Team')).toBe(true)
-    expect(html).toContain('<p>Elastic @ LangChain Interrupt</p>')
+    expect(html.startsWith(`<p>${defaultOpeningSentence('LangChain Interrupt')}</p>`)).toBe(true)
+    expect(html).not.toContain('Elastic @')
     expect(html).toContain('If you\u2019d like to stay connected:')
     expect(html).toContain('<ul>')
     expect(html).toContain('>free and instructor-led training</a>')
@@ -306,7 +307,8 @@ describe('conference follow-up email', () => {
   it('turns the rich body back into plain text that keeps the links', () => {
     const { html } = generateConferenceFollowUpEmail(sampleForm())
     const plain = htmlEmailToPlain(html)
-    expect(plain).toContain('Elastic @ LangChain Interrupt')
+    expect(plain.startsWith(defaultOpeningSentence('LangChain Interrupt'))).toBe(true)
+    expect(plain).not.toContain('Elastic @')
     expect(plain).toContain('free and instructor-led training (https://www.elastic.co/training?')
     expect(plain).toContain(`utm_campaign=${DEFAULT_UTM_CAMPAIGN}`)
     expect(plain).toContain('- Subscribe to the Elastic community newsletter (')

@@ -434,7 +434,6 @@ function stayConnectedBullets(included, urls) {
  * }}
  */
 export function generateConferenceFollowUpEmail(form) {
-  const name = String(form?.conferenceName || '').trim() || '[conference name]'
   const opening = String(form?.openingSentence || '').trim() || defaultOpeningSentence(form?.conferenceName)
   const subject =
     typeof form?.subject === 'string' ? form.subject : defaultSubject(form?.conferenceName)
@@ -444,7 +443,7 @@ export function generateConferenceFollowUpEmail(form) {
   const urls = buildConferenceResourceLinks(form)
   const bullets = stayConnectedBullets(included, urls)
 
-  const plainLines = [`Elastic @ ${name}`, '', opening, '']
+  const plainLines = [opening, '']
   if (included.training) {
     plainLines.push(
       `To learn more about Elasticsearch and our products, take a look at the free and instructor-led training: ${urls.training}`,
@@ -458,10 +457,7 @@ export function generateConferenceFollowUpEmail(form) {
   }
   plainLines.push('We hope to see you at another event soon!', '', 'The Elastic DevRel Team')
 
-  const htmlParts = [
-    `<p>Elastic @ ${escapeHtml(name)}</p>`,
-    `<p>${openingToHtml(opening)}</p>`,
-  ]
+  const htmlParts = [`<p>${openingToHtml(opening)}</p>`]
   if (included.training) {
     htmlParts.push(
       `<p>To learn more about Elasticsearch and our products, take a look at the <a href="${escapeHtmlAttr(urls.training)}">free and instructor-led training</a>.</p>`,
