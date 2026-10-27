@@ -1051,6 +1051,103 @@ body {
   color: #1d4ed8;
 }
 
+.form textarea.cfu-opening {
+  min-height: 4.25rem;
+}
+
+.cfu-editable-input,
+.cfu-editable-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 0.75rem;
+  padding: 0.65rem 0.75rem;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: #1e1e2e;
+  background: #fff;
+  border: 1px solid #e0d8ce;
+  border-radius: 10px;
+}
+
+.cfu-editable-textarea {
+  display: block;
+  resize: vertical;
+  min-height: 4.5rem;
+}
+
+.cfu-editable-input:focus,
+.cfu-editable-textarea:focus,
+.cfu-body-editor:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.cfu-body-editor {
+  max-height: none;
+  cursor: text;
+}
+
+.cfu-body-editor:focus {
+  background: #fff;
+}
+
+.cfu-tracked {
+  margin-top: 1.5rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid #e5e0d8;
+}
+
+.cfu-utm-values {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr;
+  gap: 0.35rem 0.75rem;
+  margin: 0.75rem 0 1rem;
+  font-size: 0.85rem;
+}
+
+.cfu-utm-values dt {
+  margin: 0;
+  font-weight: 700;
+  color: #475569;
+}
+
+.cfu-utm-values dd {
+  margin: 0;
+  color: #1e293b;
+  word-break: break-word;
+}
+
+.cfu-link-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cfu-link-list li {
+  margin: 0 0 0.85rem;
+}
+
+.cfu-link-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.cfu-tracked-url {
+  display: block;
+  margin-top: 0.15rem;
+  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  word-break: break-all;
+  color: #1d4ed8;
+}
+
 @media (max-width: 600px) {
   .mfu-output-panel {
     position: static;

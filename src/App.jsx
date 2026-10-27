@@ -3,6 +3,7 @@ import QRCodeStyling from "qr-code-styling"
 import elasticLogo from './logo.png'
 import ConferenceKnowBeforeYouGo from './ConferenceKnowBeforeYouGo.jsx'
 import MeetupFollowUp from './MeetupFollowUp.jsx'
+import ConferenceFollowUp from './ConferenceFollowUp.jsx'
 import DevrelEventAssets from './DevrelEventAssets.jsx'
 import {
   FieldLabel,
@@ -421,6 +422,7 @@ const GENERATOR_TYPES = [
   { value: 'knowBeforeYouGo', label: 'Meetup Know Before You Go' },
   { value: 'conferenceKnowBeforeYouGo', label: 'Conference Know Before You Go' },
   { value: 'meetupFollowUp', label: 'Meetup Follow-Up' },
+  { value: 'conferenceFollowUp', label: 'Conference Follow-Up' },
   { value: 'urlQrGenerator', label: 'URL with UTM Parameters' },
   { value: 'qrCodeGenerator', label: 'QR Code Generator' },
 ]
@@ -446,6 +448,12 @@ const GENERATOR_CARDS = [
     value: 'meetupFollowUp',
     title: '📤 Meetup Follow-Up',
     description: 'Generate a post-event email with slide links, standard resources, and UTM tracking.',
+  },
+  {
+    value: 'conferenceFollowUp',
+    title: '💌 Conference Follow-Up',
+    description:
+      'Generate a post-conference lead follow-up email with resources and automatic UTM tracking.',
   },
   {
     value: 'devrelEventAssets',
@@ -2184,6 +2192,8 @@ export default function App() {
           <ConferenceKnowBeforeYouGo />
         ) : generatorType === 'meetupFollowUp' ? (
           <MeetupFollowUp />
+        ) : generatorType === 'conferenceFollowUp' ? (
+          <ConferenceFollowUp />
         ) : generatorType === 'devrelEventAssets' ? (
           <DevrelEventAssets />
         ) : (
