@@ -291,7 +291,7 @@ export default function ConferenceFollowUp() {
           <FormSection title="UTM parameters" id="cfu-utm-heading">
             <div className="gen-two-col mfu-two-col">
               <label className="mfu-field">
-                <FieldLabel optional>UTM source</FieldLabel>
+                <FieldLabel>UTM source</FieldLabel>
                 <input
                   type="text"
                   value={form.utmSource}
@@ -306,7 +306,7 @@ export default function ConferenceFollowUp() {
                 </span>
               </label>
               <label className="mfu-field">
-                <FieldLabel optional>UTM medium</FieldLabel>
+                <FieldLabel>UTM medium</FieldLabel>
                 <input
                   type="text"
                   value={form.utmMedium}
@@ -322,7 +322,7 @@ export default function ConferenceFollowUp() {
               </label>
             </div>
             <label className="mfu-field">
-              <FieldLabel optional>UTM campaign</FieldLabel>
+              <FieldLabel>UTM campaign</FieldLabel>
               <input
                 type="text"
                 value={form.utmCampaign}
