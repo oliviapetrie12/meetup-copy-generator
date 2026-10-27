@@ -1,7 +1,8 @@
 import { memo, useEffect, useRef, useMemo, useState } from 'react'
 import {
   applyConferenceNameChange,
-  conferenceCampaignFromName,
+  conferenceMediumFromName,
+  DEFAULT_UTM_CAMPAIGN,
   copyConferenceFollowUpEmailToClipboard,
   createEmptyResource,
   defaultOpeningSentence,
@@ -76,8 +77,9 @@ export default function ConferenceFollowUp() {
   const formEmpty = useMemo(() => isConferenceFollowUpFormEmpty(form), [form])
   const canReset =
     !formEmpty || Boolean(generated) || showErrors || subjectCopied || previewCopied || emailCopyMode != null
-  const generatedCampaign = conferenceCampaignFromName(form.conferenceName)
-  const campaignDiverged = form.utmCampaignManual && form.utmCampaign !== generatedCampaign
+  const generatedMedium = conferenceMediumFromName(form.conferenceName)
+  const mediumDiverged = form.utmMediumManual && form.utmMedium !== generatedMedium
+  const campaignDiverged = form.utmCampaignManual && form.utmCampaign !== DEFAULT_UTM_CAMPAIGN
   const openingDiverged =
     form.openingManual && form.openingSentence !== defaultOpeningSentence(form.conferenceName)
 
@@ -94,14 +96,26 @@ export default function ConferenceFollowUp() {
     setForm((prev) => ({ ...prev, openingSentence: value, openingManual: true }))
   }
 
+  const updateMedium = (value) => {
+    setForm((prev) => ({ ...prev, utmMedium: value, utmMediumManual: true }))
+  }
+
+  const useGeneratedMedium = () => {
+    setForm((prev) => ({
+      ...prev,
+      utmMedium: conferenceMediumFromName(prev.conferenceName),
+      utmMediumManual: false,
+    }))
+  }
+
   const updateCampaign = (value) => {
     setForm((prev) => ({ ...prev, utmCampaign: value, utmCampaignManual: true }))
   }
 
-  const useGeneratedCampaign = () => {
+  const useDefaultCampaign = () => {
     setForm((prev) => ({
       ...prev,
-      utmCampaign: conferenceCampaignFromName(prev.conferenceName),
+      utmCampaign: DEFAULT_UTM_CAMPAIGN,
       utmCampaignManual: false,
     }))
   }
@@ -302,7 +316,7 @@ export default function ConferenceFollowUp() {
                   aria-describedby="cfu-source-hint"
                 />
                 <span id="cfu-source-hint" className="form-hint">
-                  Where the email is sent from, e.g., intuition.
+                  Identifies the platform sending the follow-up.
                 </span>
               </label>
               <label className="mfu-field">
@@ -310,15 +324,21 @@ export default function ConferenceFollowUp() {
                 <input
                   type="text"
                   value={form.utmMedium}
-                  onChange={updateField('utmMedium')}
-                  placeholder="e.g. email"
+                  onChange={(e) => updateMedium(e.target.value)}
+                  placeholder="Generated from the conference name"
                   autoComplete="off"
                   spellCheck={false}
                   aria-describedby="cfu-medium-hint"
                 />
                 <span id="cfu-medium-hint" className="form-hint">
-                  The marketing channel, e.g., email.
+                  Identifies the conference and is generated automatically.
+                  {mediumDiverged && generatedMedium ? ` Generated value: ${generatedMedium}.` : ''}
                 </span>
+                {mediumDiverged ? (
+                  <button type="button" className="btn-use-utm-url" onClick={useGeneratedMedium}>
+                    Use generated medium
+                  </button>
+                ) : null}
               </label>
             </div>
             <label className="mfu-field">
@@ -327,18 +347,17 @@ export default function ConferenceFollowUp() {
                 type="text"
                 value={form.utmCampaign}
                 onChange={(e) => updateCampaign(e.target.value)}
-                placeholder="Generated from the conference name"
+                placeholder="conference-followup-cm"
                 autoComplete="off"
                 spellCheck={false}
                 aria-describedby="cfu-campaign-hint"
               />
               <span id="cfu-campaign-hint" className="form-hint">
-                Identifies the conference and is generated automatically.
-                {campaignDiverged && generatedCampaign ? ` Generated value: ${generatedCampaign}.` : ''}
+                Identifies the follow-up program.
               </span>
               {campaignDiverged ? (
-                <button type="button" className="btn-use-utm-url" onClick={useGeneratedCampaign}>
-                  Use generated campaign
+                <button type="button" className="btn-use-utm-url" onClick={useDefaultCampaign}>
+                  Use default campaign
                 </button>
               ) : null}
             </label>
@@ -347,7 +366,7 @@ export default function ConferenceFollowUp() {
           <CollapsibleFormSection
             id="cfu-resources"
             title="Conference resources"
-            hint="Optional links added to the stay-connected list. Each one gets the same UTM parameters."
+            hint="Optional links added to the stay-connected list. elastic.co links get the same UTM parameters."
             optional
             defaultOpen={filledResources.length > 0}
             completed={filledResources.length > 0 && validation.ok}

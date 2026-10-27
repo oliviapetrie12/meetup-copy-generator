@@ -1,10 +1,14 @@
 /**
- * Conference Follow-Up generator — campaign slug, UTM tagging, and email copy.
+ * Conference Follow-Up generator — UTM tagging and email copy.
  *
- * Campaign uses the toolkit’s existing UTM token rules (normalizeCityForUtm):
- * trim, lowercase, spaces to hyphens, punctuation removed.
- * Source and medium default to the Intuition email send. Meetup follow-up
- * still uses its own presets (luma or meetup, plus a city medium).
+ * Mirrors meetup follow-up: a static campaign for the program, source for the
+ * platform, and medium for the event. Medium uses the toolkit’s existing UTM
+ * token rules (normalizeCityForUtm): trim, lowercase, spaces to hyphens,
+ * punctuation removed.
+ *
+ * Tracking matches meetup follow-up. elastic.co hosts (including Discuss) and
+ * the Sessionize destination are tagged. Slack (ela.st) is not. Other custom
+ * links are tagged only when they are elastic.co hosts.
  */
 
 import { escapeHtml, escapeHtmlAttr } from './htmlEscape.js'
@@ -12,6 +16,7 @@ import {
   FOLLOWUP_DESTINATIONS,
   appendUtmParams,
   copyMeetupFollowUpEmailToClipboard,
+  isElasticCoHost,
   isValidHttpUrl,
   normalizeCityForUtm,
 } from './meetupFollowUp.js'
@@ -21,8 +26,11 @@ export const CONFERENCE_FOLLOWUP_STORAGE_KEY = 'conference-followup-form-v1'
 /** Intuition is the platform that sends this follow-up. */
 export const DEFAULT_UTM_SOURCE = 'intuition'
 
-/** Marketing channel for the follow-up email. */
-export const DEFAULT_UTM_MEDIUM = 'email'
+/** Static program id, parallel to meetup-followup-cm. */
+export const DEFAULT_UTM_CAMPAIGN = 'conference-followup-cm'
+
+/** Previous medium default, used only when reading older saved drafts. */
+const LEGACY_UTM_MEDIUM = 'email'
 
 export const DEFAULT_PREVIEW_TEXT =
   'Explore Elastic training, connect with the community, and share what you’re building.'
@@ -33,7 +41,12 @@ const APOSTROPHE = '\u2019'
  * @param {string} conferenceName
  * @returns {string}
  */
-export function conferenceCampaignFromName(conferenceName) {
+/**
+ * Conference slug for utm_medium.
+ * @param {string} conferenceName
+ * @returns {string}
+ */
+export function conferenceMediumFromName(conferenceName) {
   return normalizeCityForUtm(conferenceName)
 }
 
@@ -72,8 +85,9 @@ export function getInitialConferenceFollowUpForm() {
     openingSentence: defaultOpeningSentence(''),
     openingManual: false,
     utmSource: DEFAULT_UTM_SOURCE,
-    utmMedium: DEFAULT_UTM_MEDIUM,
-    utmCampaign: '',
+    utmMedium: '',
+    utmMediumManual: false,
+    utmCampaign: DEFAULT_UTM_CAMPAIGN,
     utmCampaignManual: false,
     resources: [],
   }
@@ -92,8 +106,8 @@ export function applyConferenceNameChange(form, conferenceName) {
   if (!form.openingManual) {
     next.openingSentence = defaultOpeningSentence(conferenceName)
   }
-  if (!form.utmCampaignManual) {
-    next.utmCampaign = conferenceCampaignFromName(conferenceName)
+  if (!form.utmMediumManual) {
+    next.utmMedium = conferenceMediumFromName(conferenceName)
   }
   return next
 }
@@ -105,10 +119,11 @@ export function isConferenceFollowUpFormEmpty(form) {
   if (!form) return true
   if (String(form.conferenceName || '').trim()) return false
   if (String(form.utmSource || '').trim() !== DEFAULT_UTM_SOURCE) return false
-  if (String(form.utmMedium || '').trim() !== DEFAULT_UTM_MEDIUM) return false
-  if (String(form.utmCampaign || '').trim()) return false
-  if (form.openingManual) return false
+  if (form.utmMediumManual) return false
+  if (String(form.utmMedium || '').trim() !== conferenceMediumFromName(form.conferenceName)) return false
   if (form.utmCampaignManual) return false
+  if (String(form.utmCampaign || '').trim() !== DEFAULT_UTM_CAMPAIGN) return false
+  if (form.openingManual) return false
   if (String(form.openingSentence || '') !== defaultOpeningSentence('')) return false
   const resources = Array.isArray(form.resources) ? form.resources : []
   return resources.every((r) => !String(r.label || '').trim() && !String(r.url || '').trim())
@@ -131,17 +146,25 @@ export function loadConferenceFollowUpForm() {
         }))
       : []
     const utmCampaignRaw = typeof parsed.utmCampaign === 'string' ? parsed.utmCampaign : ''
+    const utmMediumRaw = typeof parsed.utmMedium === 'string' ? parsed.utmMedium : ''
     const openingSentence =
       typeof parsed.openingSentence === 'string' && parsed.openingSentence
         ? parsed.openingSentence
         : defaultOpeningSentence(conferenceName)
-    const generatedCampaign = conferenceCampaignFromName(conferenceName)
+    const generatedMedium = conferenceMediumFromName(conferenceName)
     const generatedOpening = defaultOpeningSentence(conferenceName)
+    const campaignTrim = utmCampaignRaw.trim()
+    const mediumTrim = utmMediumRaw.trim()
     const utmCampaignManual =
       typeof parsed.utmCampaignManual === 'boolean'
         ? parsed.utmCampaignManual
-        : Boolean(utmCampaignRaw.trim()) && utmCampaignRaw !== generatedCampaign
-    const utmCampaign = utmCampaignManual ? utmCampaignRaw : generatedCampaign
+        : Boolean(campaignTrim) &&
+          campaignTrim !== generatedMedium &&
+          campaignTrim !== DEFAULT_UTM_CAMPAIGN
+    const utmMediumManual =
+      typeof parsed.utmMediumManual === 'boolean'
+        ? parsed.utmMediumManual
+        : Boolean(mediumTrim) && mediumTrim !== LEGACY_UTM_MEDIUM && mediumTrim !== generatedMedium
     return {
       conferenceName,
       openingSentence,
@@ -153,11 +176,9 @@ export function loadConferenceFollowUpForm() {
         typeof parsed.utmSource === 'string' && parsed.utmSource.trim()
           ? parsed.utmSource
           : DEFAULT_UTM_SOURCE,
-      utmMedium:
-        typeof parsed.utmMedium === 'string' && parsed.utmMedium.trim()
-          ? parsed.utmMedium
-          : DEFAULT_UTM_MEDIUM,
-      utmCampaign,
+      utmMedium: utmMediumManual ? utmMediumRaw : generatedMedium,
+      utmMediumManual,
+      utmCampaign: utmCampaignManual ? utmCampaignRaw : DEFAULT_UTM_CAMPAIGN,
       utmCampaignManual,
       resources,
     }
@@ -206,6 +227,18 @@ export function validCustomResources(form) {
 }
 
 /**
+ * Tag a user-entered link the way meetup follow-up tags a next-event URL:
+ * elastic.co hosts only. Other domains are returned unchanged.
+ * @param {string} url
+ * @param {Record<string, string>} utm
+ */
+export function tagConferenceCustomUrl(url, utm) {
+  const raw = String(url || '').trim()
+  if (!isElasticCoHost(raw)) return raw
+  return appendUtmParams(raw, utm)
+}
+
+/**
  * @param {ReturnType<typeof getInitialConferenceFollowUpForm>} form
  * @returns {{
  *   training: string,
@@ -221,12 +254,12 @@ export function buildConferenceResourceLinks(form) {
   return {
     training: appendUtmParams(FOLLOWUP_DESTINATIONS.training, utm),
     newsletter: appendUtmParams(FOLLOWUP_DESTINATIONS.newsletter, utm),
-    slack: appendUtmParams(FOLLOWUP_DESTINATIONS.slack, utm),
+    slack: FOLLOWUP_DESTINATIONS.slack,
     discuss: appendUtmParams(FOLLOWUP_DESTINATIONS.discuss, utm),
     sessionize: appendUtmParams(FOLLOWUP_DESTINATIONS.sessionize, utm),
     custom: validCustomResources(form).map((r) => ({
       label: r.label,
-      url: appendUtmParams(r.url, utm),
+      url: tagConferenceCustomUrl(r.url, utm),
     })),
   }
 }
