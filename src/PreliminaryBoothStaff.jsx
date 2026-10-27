@@ -171,13 +171,15 @@ export default function PreliminaryBoothStaff() {
           <GeneratorHeader
             title="Preliminary Booth Staff Email"
             description="Generate an early email for confirmed booth staff with event details and registration instructions."
+            emoji="🎟️"
+            tone="pink"
             onReset={requestReset}
             resetDisabled={!canReset}
           >
             {formEmpty ? null : <DraftSavedNote />}
           </GeneratorHeader>
 
-          <FormSection title="Event details" id="pbs-event-heading">
+          <FormSection title="Event details" emoji="📅" id="pbs-event-heading">
             <label className="mfu-field">
               <FieldLabel required>Conference name</FieldLabel>
               <input
@@ -226,7 +228,7 @@ export default function PreliminaryBoothStaff() {
             </label>
           </FormSection>
 
-          <FormSection title="Registration" id="pbs-registration-heading">
+          <FormSection title="Registration" emoji="🎟️" id="pbs-registration-heading">
             <div className="gen-two-col mfu-two-col">
               <label className="mfu-field">
                 <FieldLabel>Registration deadline</FieldLabel>
@@ -327,7 +329,7 @@ export default function PreliminaryBoothStaff() {
             </label>
           </FormSection>
 
-          <FormSection title="Email" id="pbs-email-heading">
+          <FormSection title="Email" emoji="✉️" id="pbs-email-heading">
             <label className="mfu-field">
               <FieldLabel optional>Additional note</FieldLabel>
               <textarea

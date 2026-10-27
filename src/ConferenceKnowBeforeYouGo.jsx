@@ -1217,13 +1217,15 @@ export default function ConferenceKnowBeforeYouGo() {
           <GeneratorHeader
             title="Conference Know Before You Go"
             description="Create the booth logistics email for conference staff and volunteers."
+            emoji="🧳"
+            tone="teal"
             onReset={requestReset}
             resetLabel={t.conf_btnReset}
           >
             {draftHasContent ? <DraftSavedNote /> : null}
           </GeneratorHeader>
           <fieldset className="form-fieldset">
-            <legend>{t.conf_email}</legend>
+            <legend><span className="gen-section-emoji" aria-hidden="true">✉️</span>{t.conf_email}</legend>
             <label>
               <FieldLabel required>{t.conf_subjectLine}</FieldLabel>
               <input
@@ -1413,7 +1415,7 @@ export default function ConferenceKnowBeforeYouGo() {
           </fieldset>
 
           <fieldset className="form-fieldset">
-            <legend>{t.conf_eventDatesHours}</legend>
+            <legend><span className="gen-section-emoji" aria-hidden="true">📅</span>{t.conf_eventDatesHours}</legend>
             <label>
               <FieldLabel optional>{t.conf_boothSetup}</FieldLabel>
               <textarea
@@ -1476,7 +1478,7 @@ export default function ConferenceKnowBeforeYouGo() {
           </fieldset>
 
           <fieldset className="form-fieldset">
-            <legend>{t.conf_location}</legend>
+            <legend><span className="gen-section-emoji" aria-hidden="true">📍</span>{t.conf_location}</legend>
             <div className="gen-two-col">
             <label>
               <FieldLabel optional>{t.conf_venue}</FieldLabel>
@@ -1490,7 +1492,7 @@ export default function ConferenceKnowBeforeYouGo() {
           </fieldset>
 
           <fieldset className="form-fieldset">
-            <legend>{t.conf_contacts}</legend>
+            <legend><span className="gen-section-emoji" aria-hidden="true">👤</span>{t.conf_contacts}</legend>
             <p className="form-hint">{t.conf_contactsHint}</p>
             {(form.contacts || []).map((contact, index) => (
               <div key={index} className="contact-row">
@@ -1539,7 +1541,7 @@ export default function ConferenceKnowBeforeYouGo() {
           </fieldset>
 
           <fieldset className="form-fieldset">
-            <legend>{t.conf_boothLogistics}</legend>
+            <legend><span className="gen-section-emoji" aria-hidden="true">🧳</span>{t.conf_boothLogistics}</legend>
             <label>
               <FieldLabel optional>{t.conf_boothDelivery}</FieldLabel>
               <select value={normalizeBoothDeliveryMethodKey(form.boothMaterialsDeliveryMethod)} onChange={updateBoothDeliveryMethod}>

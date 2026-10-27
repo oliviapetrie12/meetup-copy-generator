@@ -161,13 +161,15 @@ export default function MeetupFollowUp() {
           <GeneratorHeader
             title="Meetup Follow-Up"
             description="Generate a ready-to-send attendee email with slides, resources, and automatic UTM tracking."
+            emoji="📤"
+            tone="blue"
             onReset={requestReset}
             resetDisabled={!canReset}
           >
             {formEmpty ? null : <DraftSavedNote />}
           </GeneratorHeader>
 
-          <FormSection title="Event Details" id="mfu-event-details-heading">
+          <FormSection title="Event Details" emoji="📅" id="mfu-event-details-heading">
 
             <label className="mfu-field">
               <FieldLabel required>Meetup city</FieldLabel>
@@ -274,7 +276,7 @@ export default function MeetupFollowUp() {
             </div>
           </FormSection>
 
-          <FormSection title="Meetup Talks" id="mfu-talks-heading" hint="Add, remove, or reorder talks. Slide URLs must be valid http(s) links.">
+          <FormSection title="Meetup Talks" emoji="🎤" id="mfu-talks-heading" hint="Add, remove, or reorder talks. Slide URLs must be valid http(s) links.">
 
             <div className="mfu-talk-list">
               {form.talks.map((talk, index) => {
@@ -384,6 +386,7 @@ export default function MeetupFollowUp() {
           <CollapsibleFormSection
             id="mfu-next-meetup"
             title="Next Meetup (optional)"
+            emoji="🗓️"
             hint="Promote an upcoming meetup in the attendee follow-up."
             defaultOpen={false}
             completed={nextMeetup.complete}

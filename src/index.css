@@ -11,8 +11,8 @@ body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 15px;
   line-height: 1.5;
-  color: #1e1e2e;
-  background: #e8e2d9;
+  color: #12263a;
+  background: #eef2f5;
 }
 
 /* ===== APP SHELL ===== */
@@ -24,41 +24,57 @@ body {
 }
 
 .header {
-  padding: 0.75rem 1.5rem;
-  background: #1e293b;
+  padding: 0.8rem 1.35rem;
+  background: #12263f;
   display: flex;
   align-items: center;
-  gap: 1.25rem;
+  gap: 0.85rem;
   flex-shrink: 0;
-  flex-wrap: wrap;
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.header-logo {
+  display: block;
+  width: auto;
+  height: 40px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.header-copy {
+  min-width: 0;
 }
 
 .header h1 {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 1.12rem;
   font-weight: 700;
-  color: #f1f5f9;
-  letter-spacing: -0.01em;
-  line-height: 1.35;
-  white-space: normal;
-  max-width: 100%;
-}
-
-.header-emoji {
-  display: inline-block;
-  margin-right: 0.3rem;
-  font-style: normal;
+  color: #f8fafc;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
 }
 
 .header-tagline {
+  display: block;
+  margin: 0.12rem 0 0;
+  font-size: 0.82rem;
   font-weight: 400;
+  line-height: 1.35;
+  color: #d5deea;
 }
 
 .nav-toggle {
   display: none;
   align-items: center;
   gap: 0.4rem;
-  margin: 0;
+  margin: 0 0 0 auto;
   padding: 0.4rem 0.72rem;
   font: inherit;
   font-size: 0.82rem;
@@ -92,35 +108,35 @@ body {
 
 /* ===== SIDEBAR ===== */
 .sidebar {
-  width: 272px;
-  background: #1e293b;
+  width: 304px;
+  background: #12263f;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  padding: 0.9rem 0 1rem;
+  gap: 0.2rem;
+  padding: 1rem 0 1.15rem;
   overflow-x: hidden;
   overflow-y: auto;
   flex-shrink: 0;
-  border-right: 1px solid #0f172a;
+  border-right: 1px solid #0c1b30;
 }
 
 .sidebar-section + .sidebar-section {
-  margin-top: 0.45rem;
-  padding-top: 0.7rem;
+  margin-top: 0.7rem;
+  padding-top: 0.85rem;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .sidebar-heading {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.45rem;
   margin: 0;
   font-size: 0.72rem;
   font-weight: 700;
-  color: #cbd5e1;
-  letter-spacing: 0.02em;
-  text-transform: none;
-  padding: 0.1rem 0.9rem 0.35rem;
+  color: #b7e4ea;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.15rem 1rem 0.45rem;
   white-space: nowrap;
 }
 
@@ -132,17 +148,17 @@ body {
 .sidebar-section-items {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0.4rem;
 }
 
 .sidebar-item {
   display: flex;
   align-items: flex-start;
   justify-content: flex-start;
-  gap: 0.65rem;
-  padding: 0.55rem 0.7rem;
-  margin: 0 0.65rem;
-  width: calc(100% - 1.3rem);
+  gap: 0.7rem;
+  padding: 0.62rem 0.75rem;
+  margin: 0 0.7rem;
+  width: calc(100% - 1.4rem);
   text-align: left;
   font-family: inherit;
   color: #94a3b8;
@@ -161,13 +177,13 @@ body {
 }
 
 .sidebar-item-active {
-  background: rgba(59, 130, 246, 0.22);
-  border-color: rgba(59, 130, 246, 0.55);
-  box-shadow: inset 3px 0 0 #60a5fa;
+  background: rgba(0, 191, 179, 0.18);
+  border-color: rgba(94, 234, 212, 0.55);
+  box-shadow: inset 3px 0 0 #5eead4;
 }
 
 .sidebar-item-active:hover {
-  background: rgba(59, 130, 246, 0.28);
+  background: rgba(0, 191, 179, 0.24);
 }
 
 .sidebar-icon {
@@ -188,27 +204,27 @@ body {
 }
 
 .sidebar-label-text {
-  font-size: 0.8rem;
+  font-size: 0.84rem;
   font-weight: 600;
   color: #ffffff;
   white-space: normal;
-  line-height: 1.3;
-  text-wrap: balance;
+  line-height: 1.35;
+  overflow-wrap: break-word;
 }
 
 .sidebar-item-active .sidebar-label-text {
-  color: #dbeafe;
+  color: #f0fdfa;
 }
 
 .sidebar-item-desc {
-  font-size: 0.68rem;
-  color: #94a3b8;
-  line-height: 1.35;
+  font-size: 0.72rem;
+  color: #c5d0dc;
+  line-height: 1.4;
   white-space: normal;
 }
 
 .sidebar-item-active .sidebar-item-desc {
-  color: #bfdbfe;
+  color: #d8fbf6;
 }
 
 /* ===== APP CONTENT ===== */
@@ -218,6 +234,10 @@ body {
   display: flex;
   padding: 1.25rem;
   gap: 1.25rem;
+  background:
+    radial-gradient(880px 420px at -8% -30%, rgba(0, 191, 179, 0.14), transparent 62%),
+    radial-gradient(720px 380px at 108% -18%, rgba(11, 100, 221, 0.1), transparent 58%),
+    #eef2f5;
 }
 
 /* ===== LAYOUT (form + output) ===== */
@@ -237,6 +257,25 @@ body {
 
   .nav-toggle {
     display: inline-flex;
+    margin-top: 0.15rem;
+  }
+
+  .header {
+    padding: 0.7rem 0.85rem;
+    align-items: flex-start;
+  }
+
+  .header-logo {
+    height: 32px;
+    margin-top: 0.12rem;
+  }
+
+  .header h1 {
+    font-size: 1rem;
+  }
+
+  .header-tagline {
+    font-size: 0.75rem;
   }
 
   .app-body {
@@ -250,7 +289,7 @@ body {
     width: 100%;
     max-height: min(70vh, 34rem);
     border-right: none;
-    border-bottom: 1px solid #0f172a;
+    border-bottom: 1px solid #0c1b30;
   }
 
   .sidebar.sidebar-open {
@@ -268,13 +307,32 @@ body {
   }
 }
 
+@media (min-width: 900px) {
+  .app-content {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .layout {
+    height: 100%;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .form-panel {
+    align-self: stretch;
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+
 /* ===== FORM PANEL ===== */
 .form-panel {
   padding: 1.5rem;
   background: #fff;
-  border-radius: 14px;
-  border: 1px solid #d6cfc6;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.02);
+  border-radius: 16px;
+  border: 1px solid #e3e8ee;
+  box-shadow: 0 10px 28px rgba(16, 36, 64, 0.05);
   overflow-y: auto;
 }
 
@@ -469,7 +527,8 @@ body {
 .form-hint {
   font-size: 0.8rem;
   font-weight: 400;
-  color: #6b7280;
+  color: #5c6b7a;
+  line-height: 1.45;
   margin-top: 0.25rem;
 }
 
@@ -511,7 +570,7 @@ body {
   padding: 0.55rem 0.75rem;
   font: inherit;
   font-size: 0.9rem;
-  border: 1.5px solid #b8b0a4;
+  border: 1.5px solid #c5d0dc;
   border-radius: 10px;
   background: #fff;
   color: #1e293b;
@@ -814,7 +873,7 @@ body {
   margin-top: 0;
   width: 100%;
   box-sizing: border-box;
-  border: 1.5px solid #b8b0a4;
+  border: 1.5px solid #c5d0dc;
   border-radius: 9px;
   background: #fff;
   overflow: hidden;
@@ -1258,6 +1317,15 @@ body {
   box-shadow: 0 2px 8px rgba(37,99,235,0.35);
 }
 
+.btn-generate:focus-visible,
+.btn-copy:focus-visible,
+.btn-reset:focus-visible,
+.btn-action:focus-visible,
+.btn-section-action:focus-visible {
+  outline: 2px solid #0b64dd;
+  outline-offset: 2px;
+}
+
 .btn-generate:active {
   transform: scale(0.98);
 }
@@ -1529,9 +1597,9 @@ body {
   display: flex;
   flex-direction: column;
   background: #fff;
-  border-radius: 14px;
-  border: 1px solid #d6cfc6;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.02);
+  border-radius: 16px;
+  border: 1px solid #e3e8ee;
+  box-shadow: 0 10px 28px rgba(16, 36, 64, 0.05);
   overflow: hidden;
   min-height: 300px;
 }
@@ -1760,17 +1828,18 @@ body {
 .output-text {
   margin: 0;
   font-size: 0.88rem;
+  line-height: 1.55;
   font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, monospace;
   white-space: pre-wrap;
   word-break: break-word;
-  color: #1e1e2e;
+  color: #12263a;
 }
 
 .meetup-page-preview {
   font-family: system-ui, -apple-system, sans-serif;
   padding: 1rem;
-  background: #faf8f5;
-  border: 1px solid #e0d8ce;
+  background: #f7fafb;
+  border: 1px solid #e3e8ee;
   border-radius: 10px;
   max-height: 28rem;
   overflow-y: auto;
@@ -2545,8 +2614,15 @@ body {
 }
 
 @media (max-width: 960px) {
+  .app-content:has(.dea-form-panel) {
+    overflow: auto;
+  }
+
   .layout:has(.dea-form-panel) {
+    height: auto;
     grid-template-columns: 1fr;
+    grid-template-rows: none;
+    align-items: start;
   }
 
   .output-panel.gen-output-panel.dea-output-panel {

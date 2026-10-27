@@ -128,13 +128,15 @@ export default function DevrelEventAssets() {
           <GeneratorHeader
             title="DevRel Event Assets"
             description="Generate a localized Elastic document that conference organizers and community partners can paste into Google Docs for event websites, sponsor listings, and promotional materials."
+            emoji="📋"
+            tone="teal"
             onReset={requestReset}
             resetDisabled={!canReset}
           >
             {formEmpty ? null : <DraftSavedNote />}
           </GeneratorHeader>
 
-          <FormSection title="Event Details" id="dea-event-details-heading">
+          <FormSection title="Event Details" emoji="📅" id="dea-event-details-heading">
             <label className="dea-field" htmlFor="dea-event-name">
               <FieldLabel required>Event name</FieldLabel>
               <input
@@ -193,6 +195,7 @@ export default function DevrelEventAssets() {
           <CollapsibleFormSection
             id="dea-participation"
             title="Event participation"
+            emoji="🤝"
             hint="Notes on sponsorship, booth presence, workshops, or other Elastic involvement. Shown as entered — not translated."
             defaultOpen={false}
             optional
@@ -214,6 +217,7 @@ export default function DevrelEventAssets() {
           <CollapsibleFormSection
             id="dea-speaker"
             title="Speaker information"
+            emoji="🎤"
             hint="Included only when at least one speaker field is filled. Names and bios are not translated."
             defaultOpen={false}
             optional
@@ -257,6 +261,7 @@ export default function DevrelEventAssets() {
           <CollapsibleFormSection
             id="dea-session"
             title="Session information"
+            emoji="💬"
             hint="Included only when a session title or description is provided. Session copy is not translated."
             defaultOpen={false}
             optional
@@ -289,6 +294,7 @@ export default function DevrelEventAssets() {
           <CollapsibleFormSection
             id="dea-contact"
             title="Event contact"
+            emoji="👤"
             hint="Organizer-facing contact. Email is validated when provided."
             defaultOpen={false}
             optional

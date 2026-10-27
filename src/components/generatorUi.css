@@ -2,8 +2,8 @@
 
 .form-panel.gen-form-panel {
   padding: 1.15rem 1.25rem 1.35rem;
-  border-color: #e5e0d8;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  border-color: #e3e8ee;
+  box-shadow: 0 10px 28px rgba(16, 36, 64, 0.05);
 }
 
 .gen-form-header {
@@ -11,9 +11,50 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.85rem;
-  margin: 0 0 1rem;
-  padding: 0 0 0.95rem;
-  border-bottom: 1px solid #efeae3;
+  margin: 0 0 1.05rem;
+  padding: 0.15rem 0 1rem;
+  border-bottom: 1px solid #e6edf3;
+}
+
+.gen-form-header-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.gen-icon-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.55rem;
+  height: 2.55rem;
+  border-radius: 12px;
+  flex-shrink: 0;
+  font-size: 1.25rem;
+  line-height: 1;
+  box-shadow: inset 0 0 0 1px rgba(18, 38, 63, 0.06);
+}
+
+.gen-icon-tile--teal {
+  background: #e5f7f5;
+}
+
+.gen-icon-tile--blue {
+  background: #e7f0fb;
+}
+
+.gen-icon-tile--pink {
+  background: #fdeef6;
+}
+
+.gen-icon-tile--yellow {
+  background: #fff6dc;
+}
+
+.gen-icon-tile--green {
+  background: #eef8e4;
 }
 
 .gen-form-header-copy {
@@ -111,22 +152,26 @@
 /* Soften legacy fieldsets into section cards */
 .form-fieldset {
   margin: 0;
-  padding: 0.95rem 1rem;
-  border: 1px solid #ebe6df;
-  border-radius: 12px;
-  background: #faf9f7;
+  padding: 0.95rem 1rem 1rem;
+  border: 1px solid #e3e8ee;
+  border-radius: 14px;
+  background: #fff;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  box-shadow: 0 1px 2px rgba(16, 36, 64, 0.03);
 }
 
 .form-fieldset legend {
-  padding: 0 0.35rem;
-  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0 0.15rem;
+  font-size: 0.92rem;
   font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: #475569;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: #16324f;
 }
 
 .form label {
@@ -142,9 +187,9 @@
   border-radius: 9px;
   padding: 0.5rem 0.7rem;
   min-height: 2.5rem;
-  border: 1px solid #d6cfc6;
+  border: 1px solid #c9d3de;
   background: #fff;
-  color: #0f172a;
+  color: #12263a;
 }
 
 .form textarea,
@@ -319,22 +364,37 @@
 
 .gen-section {
   margin: 0;
-  padding: 0.95rem 1rem;
-  border: 1px solid #ebe6df;
-  border-radius: 12px;
-  background: #faf9f7;
+  padding: 0.95rem 1rem 1rem;
+  border: 1px solid #e3e8ee;
+  border-radius: 14px;
+  background: #fff;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.8rem;
+  box-shadow: 0 1px 2px rgba(16, 36, 64, 0.03);
 }
 
 .gen-section-title {
   margin: 0;
-  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.92rem;
   font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: #475569;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: #16324f;
+}
+
+.gen-section-emoji {
+  font-size: 0.95rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.gen-collapse-title {
+  display: inline-flex;
+  width: auto;
 }
 
 .gen-section-hint {
@@ -482,15 +542,15 @@
   align-self: start;
   max-height: calc(100vh - 5.5rem);
   min-height: 0;
-  border-color: #e5e0d8;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  border-color: #e3e8ee;
+  box-shadow: 0 10px 28px rgba(16, 36, 64, 0.05);
   display: flex;
   flex-direction: column;
 }
 
 .output-panel.gen-output-panel .output-header {
-  background: #faf9f7;
-  border-bottom-color: #efeae3;
+  background: linear-gradient(180deg, #f6fbfb 0%, #f8fafc 100%);
+  border-bottom-color: #e6edf3;
 }
 
 .output-panel.gen-output-panel .output-content {
@@ -521,12 +581,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 3rem;
-  height: 3rem;
-  margin-bottom: 0.85rem;
-  border-radius: 999px;
-  background: #eff6ff;
-  font-size: 1.25rem;
+  width: 4.4rem;
+  height: 4.4rem;
+  margin-bottom: 0.95rem;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #f4fbfa 0%, #e7f6f4 100%);
+  box-shadow: inset 0 0 0 1px rgba(0, 166, 156, 0.18);
+  font-size: 1.9rem;
   line-height: 1;
 }
 
@@ -562,6 +623,16 @@
   line-height: 1.3;
   color: #64748b;
   background: #f1f5f9;
+}
+
+@media (min-width: 900px) {
+  .output-panel.gen-output-panel {
+    position: relative;
+    top: auto;
+    align-self: start;
+    max-height: 100%;
+    overflow: hidden;
+  }
 }
 
 @media (max-width: 800px) {

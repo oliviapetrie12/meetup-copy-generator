@@ -279,13 +279,15 @@ export default function ConferenceFollowUp() {
           <GeneratorHeader
             title="Conference Follow-Up"
             description="Generate a post-conference lead follow-up email with resources and automatic UTM tracking."
+            emoji="💌"
+            tone="pink"
             onReset={requestReset}
             resetDisabled={!canReset}
           >
             {formEmpty ? null : <DraftSavedNote />}
           </GeneratorHeader>
 
-          <FormSection title="Event details" id="cfu-event-heading">
+          <FormSection title="Event details" emoji="📅" id="cfu-event-heading">
             <label className="mfu-field">
               <FieldLabel required>Conference name</FieldLabel>
               <input
@@ -344,7 +346,7 @@ export default function ConferenceFollowUp() {
             </label>
           </FormSection>
 
-          <FormSection title="UTM parameters" id="cfu-utm-heading">
+          <FormSection title="UTM parameters" emoji="🔗" id="cfu-utm-heading">
             <div className="gen-two-col mfu-two-col">
               <label className="mfu-field">
                 <FieldLabel>UTM source</FieldLabel>
@@ -407,6 +409,7 @@ export default function ConferenceFollowUp() {
 
           <FormSection
             title="Standard resources"
+            emoji="✨"
             id="cfu-standard-heading"
             hint="Included in the email. Turn off any you do not need."
           >
@@ -427,6 +430,7 @@ export default function ConferenceFollowUp() {
           <CollapsibleFormSection
             id="cfu-resources"
             title="Conference resources"
+            emoji="📎"
             hint="Optional links added to the stay-connected list. elastic.co links get the same UTM parameters."
             optional
             defaultOpen={filledResources.length > 0}

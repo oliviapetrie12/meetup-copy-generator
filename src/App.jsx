@@ -1555,33 +1555,37 @@ const GENERATOR_UI_META = {
     title: 'Event Promotion',
     description: 'Generate Meetup and Luma event page copy from speakers, agenda, and venue details.',
     emptyTitle: 'No event copy yet',
-    emptyDescription: 'Fill in the form and generate to see Meetup and Luma descriptions here.',
+    emptyDescription: 'Add speakers, the agenda, and the venue, then generate Meetup and Luma copy.',
     cta: 'Generate event promotion',
     emoji: '📣',
+    tone: 'yellow',
   },
   knowBeforeYouGo: {
     title: 'Meetup Know Before You Go',
     description: 'Create the logistics email for attendees before your meetup.',
     emptyTitle: 'No email yet',
-    emptyDescription: 'Fill in venue, agenda, and logistics details, then generate your Know Before You Go email.',
+    emptyDescription: 'Add the venue and logistics, then generate the attendee email.',
     cta: 'Generate meetup logistics',
     emoji: '✉️',
+    tone: 'blue',
   },
   urlQrGenerator: {
     title: 'UTM URL Builder',
     description: 'Add campaign tracking parameters to any Elastic URL.',
     emptyTitle: 'No URL yet',
-    emptyDescription: 'Enter a destination URL and UTM fields, then build your tracking link.',
+    emptyDescription: 'Enter a destination URL and UTM fields, then build your tracked link.',
     cta: 'Build UTM URL',
     emoji: '🔗',
+    tone: 'green',
   },
   qrCodeGenerator: {
     title: 'QR Code Generator',
     description: 'Create a branded Elastic QR code from any link.',
     emptyTitle: 'No QR code yet',
-    emptyDescription: 'Enter a link and colours, then generate your QR code.',
+    emptyDescription: 'Enter a link and choose a style, then generate your QR code.',
     cta: 'Generate QR code',
     emoji: '◉',
+    tone: 'teal',
   },
 }
 
@@ -2298,6 +2302,15 @@ export default function App() {
   return (
     <div className="app">
       <header className="header">
+        <div className="header-brand">
+          <img className="header-logo" src={elasticLogo} alt="Elastic" />
+          <div className="header-copy">
+            <h1>DevRel Programs Toolkit</h1>
+            <p className="header-tagline">
+              Everything needed for meetups and conference logistics, all in one place.
+            </p>
+          </div>
+        </div>
         <button
           type="button"
           className="nav-toggle"
@@ -2308,15 +2321,6 @@ export default function App() {
           <span aria-hidden="true">{navOpen ? '✕' : '☰'}</span>
           {navOpen ? 'Close' : 'Tools'}
         </button>
-        <h1>
-          <span className="header-emoji" role="img" aria-hidden="true">
-            🧰
-          </span>
-          Elastic DevRel (Programs) Toolkit -{' '}
-          <span className="header-tagline">
-            Everything needed for meetups and conference logistics, all in one place.
-          </span>
-        </h1>
       </header>
 
       <div className="app-body">
@@ -2401,6 +2405,8 @@ export default function App() {
             <GeneratorHeader
               title={GENERATOR_UI_META.eventPromotion.title}
               description={GENERATOR_UI_META.eventPromotion.description}
+              emoji={GENERATOR_UI_META.eventPromotion.emoji}
+              tone={GENERATOR_UI_META.eventPromotion.tone}
               onReset={requestReset}
               resetLabel={tEvent.btnResetForm}
             >
@@ -2531,7 +2537,7 @@ export default function App() {
             <span className="form-hint">When enabled, adds a call-for-speakers section after the Agenda.</span>
 
             <fieldset className="form-fieldset">
-              <legend>Speaker 1</legend>
+              <legend><span className="gen-section-emoji" aria-hidden="true">🎤</span>Speaker 1</legend>
               <label>
                 <FieldLabel optional>Speaker 1 name</FieldLabel>
                 <input
@@ -2617,7 +2623,7 @@ export default function App() {
 
             {showSpeaker2 && (
             <fieldset className="form-fieldset">
-              <legend>Speaker 2</legend>
+              <legend><span className="gen-section-emoji" aria-hidden="true">🎤</span>Speaker 2</legend>
               <label>
                 <FieldLabel optional>Speaker 2 name</FieldLabel>
                 <input
@@ -2700,7 +2706,7 @@ export default function App() {
 
             {showSpeaker3 && (
             <fieldset className="form-fieldset">
-              <legend>Speaker 3</legend>
+              <legend><span className="gen-section-emoji" aria-hidden="true">🎤</span>Speaker 3</legend>
               <label>
                 <FieldLabel optional>Speaker 3 name</FieldLabel>
                 <input
@@ -2786,7 +2792,7 @@ export default function App() {
               />
             </label>
             <fieldset className="form-fieldset">
-              <legend>{tEvent.meetupPageSectionsLegend}</legend>
+              <legend><span className="gen-section-emoji" aria-hidden="true">📄</span>{tEvent.meetupPageSectionsLegend}</legend>
               <p className="form-hint kbyg-quick-fill-hint">
                 {tEvent.meetupPageSectionsHint}
               </p>
@@ -2863,7 +2869,7 @@ export default function App() {
               </label>
             </fieldset>
             <fieldset className="form-fieldset">
-              <legend>{tEvent.intuitionLegend}</legend>
+              <legend><span className="gen-section-emoji" aria-hidden="true">✉️</span>{tEvent.intuitionLegend}</legend>
               <label><FieldLabel optional>{tEvent.audienceLabel}</FieldLabel> <input type="text" value={form.intuitionAudience} onChange={update('intuitionAudience')} placeholder={tEvent.phAudience} /></label>
               <label><FieldLabel optional>{tEvent.intuitionWhyLabel}</FieldLabel> <input type="text" value={form.intuitionWhyAttend} onChange={update('intuitionWhyAttend')} placeholder={tEvent.phIntuitionWhy} /></label>
               <label><FieldLabel optional>{tEvent.intuitionKeyLabel}</FieldLabel> <input type="text" value={form.intuitionKeyTakeaway} onChange={update('intuitionKeyTakeaway')} placeholder={tEvent.phIntuitionKey} /></label>
@@ -2895,6 +2901,8 @@ export default function App() {
             <GeneratorHeader
               title={GENERATOR_UI_META.knowBeforeYouGo.title}
               description={GENERATOR_UI_META.knowBeforeYouGo.description}
+              emoji={GENERATOR_UI_META.knowBeforeYouGo.emoji}
+              tone={GENERATOR_UI_META.knowBeforeYouGo.tone}
               onReset={requestReset}
               resetLabel={tKbyg.kbyg_btnReset}
             >
@@ -2966,7 +2974,7 @@ export default function App() {
               </div>
             </fieldset>
             <fieldset className="form-fieldset">
-              <legend>{tKbyg.kbyg_eventDetails}</legend>
+              <legend><span className="gen-section-emoji" aria-hidden="true">📅</span>{tKbyg.kbyg_eventDetails}</legend>
               <label><FieldLabel required>{tKbyg.kbyg_eventTitle}</FieldLabel> <input type="text" value={kbygForm.eventTitle} onChange={updateKbyg('eventTitle')} placeholder={tKbyg.kbyg_ph_eventTitle} /></label>
               <div className="gen-two-col">
               <label><FieldLabel required>{tKbyg.kbyg_eventDate}</FieldLabel> <input type="text" value={kbygForm.eventDate} onChange={updateKbyg('eventDate')} placeholder={tKbyg.kbyg_ph_eventDate} /></label>
@@ -2975,7 +2983,7 @@ export default function App() {
               <label><FieldLabel optional>{tKbyg.kbyg_arrivalTime}</FieldLabel> <input type="text" value={kbygForm.arrivalTime} onChange={updateKbyg('arrivalTime')} placeholder={tKbyg.kbyg_ph_arrivalTime} /></label>
             </fieldset>
             <fieldset className="form-fieldset">
-              <legend>{tKbyg.kbyg_location}</legend>
+              <legend><span className="gen-section-emoji" aria-hidden="true">📍</span>{tKbyg.kbyg_location}</legend>
               <label><FieldLabel required>{tKbyg.kbyg_venueName}</FieldLabel> <input type="text" value={kbygForm.venueName} onChange={updateKbyg('venueName')} placeholder={tKbyg.kbyg_ph_venueName} /></label>
               <label><FieldLabel optional>{tKbyg.kbyg_venueAddress}</FieldLabel> <input type="text" value={kbygForm.venueAddress} onChange={updateKbyg('venueAddress')} placeholder={tKbyg.kbyg_ph_venueAddress} /></label>
               <label>
@@ -3011,7 +3019,7 @@ export default function App() {
               </div>
             </fieldset>
             <fieldset className="form-fieldset">
-              <legend>{tKbyg.kbyg_helpfulContacts}</legend>
+              <legend><span className="gen-section-emoji" aria-hidden="true">👤</span>{tKbyg.kbyg_helpfulContacts}</legend>
               {(kbygForm.contacts || []).map((contact, index) => (
                 <div key={index} className="contact-row">
                   <label><FieldLabel optional>{tKbyg.kbyg_contactName}</FieldLabel> <input type="text" value={contact.name} onChange={updateKbygContact(index, 'name')} placeholder={tKbyg.kbyg_ph_contactName} /></label>
@@ -3044,7 +3052,7 @@ export default function App() {
               </div>
             </fieldset>
             <fieldset className="form-fieldset">
-              <legend>{tKbyg.kbyg_logistics}</legend>
+              <legend><span className="gen-section-emoji" aria-hidden="true">🍽️</span>{tKbyg.kbyg_logistics}</legend>
               <label><FieldLabel optional>{tKbyg.kbyg_food}</FieldLabel> <input type="text" value={kbygForm.foodDetails} onChange={updateKbyg('foodDetails')} placeholder={tKbyg.kbyg_ph_food} /></label>
               <label><FieldLabel optional>{tKbyg.kbyg_drink}</FieldLabel> <input type="text" value={kbygForm.drinkDetails} onChange={updateKbyg('drinkDetails')} placeholder={tKbyg.kbyg_ph_drink} /></label>
               <label><FieldLabel optional>{tKbyg.kbyg_swag}</FieldLabel> <input type="text" value={kbygForm.swagNotes} onChange={updateKbyg('swagNotes')} placeholder={tKbyg.kbyg_ph_swag} /></label>
@@ -3098,7 +3106,7 @@ export default function App() {
             </fieldset>
             {/* Tail flow: Photo checklist (above) → Internal agenda → TL;DR → Additional */}
             <fieldset className="form-fieldset">
-              <legend>{tKbyg.kbyg_agenda}</legend>
+              <legend><span className="gen-section-emoji" aria-hidden="true">🗒️</span>{tKbyg.kbyg_agenda}</legend>
               <div className="kbyg-internal-agenda-field">
                 <FieldLabel htmlFor="kbyg-internal-agenda" optional>{tKbyg.kbyg_internalAgenda}</FieldLabel>
                 <p id="kbyg-internal-agenda-desc" className="form-hint kbyg-internal-agenda-hint">
@@ -3159,12 +3167,14 @@ export default function App() {
               <GeneratorHeader
                 title={GENERATOR_UI_META.urlQrGenerator.title}
                 description={GENERATOR_UI_META.urlQrGenerator.description}
+                emoji={GENERATOR_UI_META.urlQrGenerator.emoji}
+                tone={GENERATOR_UI_META.urlQrGenerator.tone}
                 onReset={requestReset}
               >
                 {urlQrDirty ? <DraftSavedNote /> : null}
               </GeneratorHeader>
               <fieldset className="form-fieldset">
-                <legend>Destination</legend>
+                <legend><span className="gen-section-emoji" aria-hidden="true">🔗</span>Destination</legend>
                 <label>
                   <FieldLabel required>Base URL</FieldLabel>
                   <input
@@ -3177,7 +3187,7 @@ export default function App() {
                 </label>
               </fieldset>
               <fieldset className="form-fieldset">
-                <legend>UTM Parameters</legend>
+                <legend><span className="gen-section-emoji" aria-hidden="true">🏷️</span>UTM Parameters</legend>
                 <label>
                   <FieldLabel optional>UTM Source</FieldLabel>
                   <SearchableSelect
@@ -3226,12 +3236,14 @@ export default function App() {
               <GeneratorHeader
                 title={GENERATOR_UI_META.qrCodeGenerator.title}
                 description={GENERATOR_UI_META.qrCodeGenerator.description}
+                emoji={GENERATOR_UI_META.qrCodeGenerator.emoji}
+                tone={GENERATOR_UI_META.qrCodeGenerator.tone}
                 onReset={requestReset}
               >
                 {qrDirty ? <DraftSavedNote /> : null}
               </GeneratorHeader>
               <fieldset className="form-fieldset">
-                <legend>Link</legend>
+                <legend><span className="gen-section-emoji" aria-hidden="true">🔗</span>Link</legend>
                 <label>
                   <FieldLabel required>Link to encode</FieldLabel>
                   <input
@@ -3244,7 +3256,7 @@ export default function App() {
                 </label>
               </fieldset>
               <fieldset className="form-fieldset">
-                <legend>Appearance</legend>
+                <legend><span className="gen-section-emoji" aria-hidden="true">🎨</span>Appearance</legend>
                 <div className="qr-color-row">
                   <label>
                     <FieldLabel optional>QR Code Colour</FieldLabel>

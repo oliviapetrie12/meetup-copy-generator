@@ -89,6 +89,8 @@ export function FieldLabel({ children, required = false, optional = false, htmlF
 export function GeneratorHeader({
   title,
   description,
+  emoji,
+  tone = 'teal',
   resetLabel = 'Reset form',
   onReset,
   resetDisabled = false,
@@ -96,10 +98,17 @@ export function GeneratorHeader({
 }) {
   return (
     <header className="gen-form-header">
-      <div className="gen-form-header-copy">
-        <h2 className="gen-form-title">{title}</h2>
-        {description ? <p className="gen-form-desc">{description}</p> : null}
-        {children ? <div className="gen-form-header-extras">{children}</div> : null}
+      <div className="gen-form-header-main">
+        {emoji ? (
+          <span className={`gen-icon-tile gen-icon-tile--${tone}`} aria-hidden="true">
+            {emoji}
+          </span>
+        ) : null}
+        <div className="gen-form-header-copy">
+          <h2 className="gen-form-title">{title}</h2>
+          {description ? <p className="gen-form-desc">{description}</p> : null}
+          {children ? <div className="gen-form-header-extras">{children}</div> : null}
+        </div>
       </div>
       {onReset ? (
         <button
@@ -118,14 +127,19 @@ export function GeneratorHeader({
 
 /**
  * Soft section card (prefer over heavy fieldsets when migrating).
- * @param {{ title: string, hint?: string, children: import('react').ReactNode, id?: string }} props
+ * @param {{ title: string, hint?: string, emoji?: string, children: import('react').ReactNode, id?: string }} props
  */
-export function FormSection({ title, hint, children, id }) {
+export function FormSection({ title, hint, emoji, children, id }) {
   const headingId = id || undefined
   return (
     <section className="gen-section" aria-labelledby={headingId}>
       <h3 id={headingId} className="gen-section-title">
-        {title}
+        {emoji ? (
+          <span className="gen-section-emoji" aria-hidden="true">
+            {emoji}
+          </span>
+        ) : null}
+        <span>{title}</span>
       </h3>
       {hint ? <p className="gen-section-hint">{hint}</p> : null}
       {children}
@@ -143,6 +157,7 @@ export function FormSection({ title, hint, children, id }) {
  *   completed?: boolean
  *   optional?: boolean
  *   summary?: string | null
+ *   emoji?: string
  *   children: import('react').ReactNode
  * }} props
  */
@@ -154,6 +169,7 @@ export function CollapsibleFormSection({
   completed = false,
   optional = false,
   summary = null,
+  emoji,
   children,
 }) {
   const [open, setOpen] = useState(defaultOpen)
@@ -174,7 +190,14 @@ export function CollapsibleFormSection({
       >
         <span className="gen-collapse-copy">
           <span className="gen-collapse-main">
-            <span className="gen-section-title gen-collapse-title">{title}</span>
+            <span className="gen-section-title gen-collapse-title">
+              {emoji ? (
+                <span className="gen-section-emoji" aria-hidden="true">
+                  {emoji}
+                </span>
+              ) : null}
+              <span>{title}</span>
+            </span>
             {optional ? <span className="gen-badge gen-badge-optional">Optional</span> : null}
             {completed ? (
               <span className="gen-collapse-check" aria-label="Completed">
