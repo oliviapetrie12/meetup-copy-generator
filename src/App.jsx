@@ -4,6 +4,7 @@ import elasticLogo from './logo.png'
 import ConferenceKnowBeforeYouGo from './ConferenceKnowBeforeYouGo.jsx'
 import MeetupFollowUp from './MeetupFollowUp.jsx'
 import ConferenceFollowUp from './ConferenceFollowUp.jsx'
+import PreliminaryBoothStaff from './PreliminaryBoothStaff.jsx'
 import DevrelEventAssets from './DevrelEventAssets.jsx'
 import {
   FieldLabel,
@@ -425,6 +426,7 @@ const GENERATOR_TYPES = [
   { value: 'eventPromotion', label: 'Event Promotion' },
   { value: 'knowBeforeYouGo', label: 'Meetup Know Before You Go' },
   { value: 'conferenceKnowBeforeYouGo', label: 'Conference Know Before You Go' },
+  { value: 'preliminaryBoothStaff', label: 'Preliminary Booth Staff Email' },
   { value: 'meetupFollowUp', label: 'Meetup Follow-Up' },
   { value: 'conferenceFollowUp', label: 'Conference Follow-Up' },
   { value: 'urlQrGenerator', label: 'URL with UTM Parameters' },
@@ -463,6 +465,11 @@ const GENERATOR_SECTIONS = [
         value: 'conferenceKnowBeforeYouGo',
         title: '🧳 Conference Know Before You Go',
         description: 'Booth logistics email for staff.',
+      },
+      {
+        value: 'preliminaryBoothStaff',
+        title: '🎟️ Preliminary Booth Staff Email',
+        description: 'Early registration email for booth staff.',
       },
     ],
   },
@@ -2375,6 +2382,8 @@ export default function App() {
           <MeetupFollowUp />
         ) : generatorType === 'conferenceFollowUp' ? (
           <ConferenceFollowUp />
+        ) : generatorType === 'preliminaryBoothStaff' ? (
+          <PreliminaryBoothStaff />
         ) : generatorType === 'devrelEventAssets' ? (
           <DevrelEventAssets />
         ) : (
