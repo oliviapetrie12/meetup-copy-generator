@@ -427,49 +427,74 @@ const GENERATOR_TYPES = [
   { value: 'qrCodeGenerator', label: 'QR Code Generator' },
 ]
 
-const GENERATOR_CARDS = [
+const GENERATOR_SECTIONS = [
   {
-    value: 'eventPromotion',
-    title: '📣 Event Promotion',
-    description: 'Generate Meetup event page copy, LinkedIn promo copy, and Intuition Email Copy.',
+    id: 'promote',
+    label: 'Promote',
+    icon: '📣',
+    tools: [
+      {
+        value: 'eventPromotion',
+        title: '📣 Event Promotion',
+        description: 'Meetup, LinkedIn, and Intuition copy.',
+      },
+      {
+        value: 'devrelEventAssets',
+        title: '📋 DevRel Event Assets',
+        description: 'Localized copy for event partners.',
+      },
+    ],
   },
   {
-    value: 'knowBeforeYouGo',
-    title: '✉️ Meetup Know Before You Go',
-    description: 'Generate the speaker and host logistics email, including TL;DR, agenda, and helpful contacts.',
+    id: 'logistics',
+    label: 'Event Logistics',
+    icon: '📋',
+    tools: [
+      {
+        value: 'knowBeforeYouGo',
+        title: '✉️ Meetup Know Before You Go',
+        description: 'Speaker and host logistics email.',
+      },
+      {
+        value: 'conferenceKnowBeforeYouGo',
+        title: '🧳 Conference Know Before You Go',
+        description: 'Booth logistics email for staff.',
+      },
+    ],
   },
   {
-    value: 'conferenceKnowBeforeYouGo',
-    title: '🧳 Conference Know Before You Go',
-    description:
-      'Generate a conference booth logistics email for staff, including TL;DR, schedule, setup, and contacts.',
+    id: 'follow-up',
+    label: 'Follow-Up',
+    icon: '💌',
+    tools: [
+      {
+        value: 'meetupFollowUp',
+        title: '📤 Meetup Follow-Up',
+        description: 'Post-event email with slides and UTMs.',
+      },
+      {
+        value: 'conferenceFollowUp',
+        title: '💌 Conference Follow-Up',
+        description: 'Lead follow-up with tracked resources.',
+      },
+    ],
   },
   {
-    value: 'meetupFollowUp',
-    title: '📤 Meetup Follow-Up',
-    description: 'Generate a post-event email with slide links, standard resources, and UTM tracking.',
-  },
-  {
-    value: 'conferenceFollowUp',
-    title: '💌 Conference Follow-Up',
-    description:
-      'Generate a post-conference lead follow-up email with resources and automatic UTM tracking.',
-  },
-  {
-    value: 'devrelEventAssets',
-    title: '📋 DevRel Event Assets',
-    description:
-      'Generate a localized Elastic document for conference organizers and community partners to use on event websites, sponsor listings, and promo materials.',
-  },
-  {
-    value: 'urlQrGenerator',
-    title: '🔗 UTM URL Builder',
-    description: 'Build a UTM-tracked URL with source, medium, campaign, content, and term parameters. Shorten the link or turn it into a QR code instantly.',
-  },
-  {
-    value: 'qrCodeGenerator',
-    title: '◉ QR Code Generator',
-    description: 'Generate a branded QR code with custom colours, dot and eye shapes, and the Elastic logo centred. Download as a high-res PNG.',
+    id: 'utilities',
+    label: 'Utilities',
+    icon: '🛠️',
+    tools: [
+      {
+        value: 'urlQrGenerator',
+        title: '🔗 UTM URL Builder',
+        description: 'Build, shorten, or QR a tracked URL.',
+      },
+      {
+        value: 'qrCodeGenerator',
+        title: '◉ QR Code Generator',
+        description: 'Branded QR code as a high-res PNG.',
+      },
+    ],
   },
 ]
 
@@ -1487,6 +1512,7 @@ const GENERATOR_UI_META = {
 
 export default function App() {
   const [generatorType, setGeneratorType] = useState('eventPromotion')
+  const [navOpen, setNavOpen] = useState(false)
   const [form, setForm] = useState(INITIAL_STATE)
   const [kbygForm, setKbygForm] = useState(loadKbygFormFromStorage)
   useEffect(() => {
@@ -2143,6 +2169,16 @@ export default function App() {
   return (
     <div className="app">
       <header className="header">
+        <button
+          type="button"
+          className="nav-toggle"
+          aria-expanded={navOpen}
+          aria-controls="generator-nav"
+          onClick={() => setNavOpen((open) => !open)}
+        >
+          <span aria-hidden="true">{navOpen ? '✕' : '☰'}</span>
+          {navOpen ? 'Close' : 'Tools'}
+        </button>
         <h1>
           <span className="header-emoji" role="img" aria-hidden="true">
             🧰
@@ -2155,36 +2191,58 @@ export default function App() {
       </header>
 
       <div className="app-body">
-        <nav className="sidebar" aria-label="Generator navigation">
-          <div className="sidebar-heading">Generators</div>
-          {GENERATOR_CARDS.map((card) => {
-            const [icon, ...rest] = card.title.split(' ')
-            const label = rest.join(' ')
-            return (
-              <button
-                key={card.value}
-                type="button"
-                className={`sidebar-item ${generatorType === card.value ? 'sidebar-item-active' : ''}`}
-                onClick={() => {
-                  setGeneratorType(card.value)
-                  setGeneratedCopy('')
-                  setMeetupPageHtml('')
-                  setEventPageGeneratedContent(null)
-                  setKbygEmailHtml('')
-                  setGeneratedSubject('')
-                  setLinkedInPost('')
-                }}
-                aria-pressed={generatorType === card.value}
-                title={card.title}
-              >
-                <span className="sidebar-icon">{icon}</span>
-                <span className="sidebar-item-text">
-                  <span className="sidebar-label-text">{label}</span>
-                  <span className="sidebar-item-desc">{card.description}</span>
+        <nav
+          id="generator-nav"
+          className={`sidebar${navOpen ? ' sidebar-open' : ''}`}
+          aria-label="Generator navigation"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setNavOpen(false)
+          }}
+        >
+          {GENERATOR_SECTIONS.map((section) => (
+            <div key={section.id} className="sidebar-section">
+              <div className="sidebar-heading" id={`nav-${section.id}`}>
+                <span className="sidebar-section-icon" aria-hidden="true">
+                  {section.icon}
                 </span>
-              </button>
-            )
-          })}
+                {section.label}
+              </div>
+              <div className="sidebar-section-items" role="group" aria-labelledby={`nav-${section.id}`}>
+                {section.tools.map((card) => {
+                  const [icon, ...rest] = card.title.split(' ')
+                  const label = rest.join(' ')
+                  const selected = generatorType === card.value
+                  return (
+                    <button
+                      key={card.value}
+                      type="button"
+                      className={`sidebar-item${selected ? ' sidebar-item-active' : ''}`}
+                      onClick={() => {
+                        setGeneratorType(card.value)
+                        setNavOpen(false)
+                        setGeneratedCopy('')
+                        setMeetupPageHtml('')
+                        setEventPageGeneratedContent(null)
+                        setKbygEmailHtml('')
+                        setGeneratedSubject('')
+                        setLinkedInPost('')
+                      }}
+                      aria-pressed={selected}
+                      title={card.title}
+                    >
+                      <span className="sidebar-icon" aria-hidden="true">
+                        {icon}
+                      </span>
+                      <span className="sidebar-item-text">
+                        <span className="sidebar-label-text">{label}</span>
+                        <span className="sidebar-item-desc">{card.description}</span>
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
         <div className="app-content">
         <div className="layout">

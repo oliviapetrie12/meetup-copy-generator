@@ -556,7 +556,7 @@
   background: #f1f5f9;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 800px) {
   .output-panel.gen-output-panel {
     position: static;
     max-height: none;
