@@ -288,11 +288,7 @@ export default function ConferenceFollowUp() {
             </label>
           </FormSection>
 
-          <FormSection
-            title="UTM parameters"
-            id="cfu-utm-heading"
-            hint="Campaign is generated from the conference name using the existing UTM slug format. Enter source and medium for this email."
-          >
+          <FormSection title="UTM parameters" id="cfu-utm-heading">
             <div className="gen-two-col mfu-two-col">
               <label className="mfu-field">
                 <FieldLabel optional>UTM source</FieldLabel>
@@ -300,10 +296,14 @@ export default function ConferenceFollowUp() {
                   type="text"
                   value={form.utmSource}
                   onChange={updateField('utmSource')}
-                  placeholder="e.g. luma"
+                  placeholder="e.g. intuition"
                   autoComplete="off"
                   spellCheck={false}
+                  aria-describedby="cfu-source-hint"
                 />
+                <span id="cfu-source-hint" className="form-hint">
+                  Where the email is sent from, e.g., intuition.
+                </span>
               </label>
               <label className="mfu-field">
                 <FieldLabel optional>UTM medium</FieldLabel>
@@ -311,10 +311,14 @@ export default function ConferenceFollowUp() {
                   type="text"
                   value={form.utmMedium}
                   onChange={updateField('utmMedium')}
-                  placeholder="e.g. nyc"
+                  placeholder="e.g. email"
                   autoComplete="off"
                   spellCheck={false}
+                  aria-describedby="cfu-medium-hint"
                 />
+                <span id="cfu-medium-hint" className="form-hint">
+                  The marketing channel, e.g., email.
+                </span>
               </label>
             </div>
             <label className="mfu-field">
@@ -329,9 +333,8 @@ export default function ConferenceFollowUp() {
                 aria-describedby="cfu-campaign-hint"
               />
               <span id="cfu-campaign-hint" className="form-hint">
-                {generatedCampaign
-                  ? `Generated value: ${generatedCampaign}. Lowercase, hyphens, punctuation removed.`
-                  : 'Lowercase, hyphens, punctuation removed.'}
+                Identifies the conference and is generated automatically.
+                {campaignDiverged && generatedCampaign ? ` Generated value: ${generatedCampaign}.` : ''}
               </span>
               {campaignDiverged ? (
                 <button type="button" className="btn-use-utm-url" onClick={useGeneratedCampaign}>

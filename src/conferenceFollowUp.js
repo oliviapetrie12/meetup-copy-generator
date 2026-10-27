@@ -3,9 +3,8 @@
  *
  * Campaign uses the toolkit’s existing UTM token rules (normalizeCityForUtm):
  * trim, lowercase, spaces to hyphens, punctuation removed.
- * Meetup follow-up fixes campaign at `meetup-followup-cm` and derives medium
- * from a city. This email has no matching source or medium preset, so those
- * values stay whatever the user enters.
+ * Source and medium default to the Intuition email send. Meetup follow-up
+ * still uses its own presets (luma or meetup, plus a city medium).
  */
 
 import { escapeHtml, escapeHtmlAttr } from './htmlEscape.js'
@@ -18,6 +17,12 @@ import {
 } from './meetupFollowUp.js'
 
 export const CONFERENCE_FOLLOWUP_STORAGE_KEY = 'conference-followup-form-v1'
+
+/** Intuition is the platform that sends this follow-up. */
+export const DEFAULT_UTM_SOURCE = 'intuition'
+
+/** Marketing channel for the follow-up email. */
+export const DEFAULT_UTM_MEDIUM = 'email'
 
 export const DEFAULT_PREVIEW_TEXT =
   'Explore Elastic training, connect with the community, and share what you’re building.'
@@ -66,8 +71,8 @@ export function getInitialConferenceFollowUpForm() {
     conferenceName: '',
     openingSentence: defaultOpeningSentence(''),
     openingManual: false,
-    utmSource: '',
-    utmMedium: '',
+    utmSource: DEFAULT_UTM_SOURCE,
+    utmMedium: DEFAULT_UTM_MEDIUM,
     utmCampaign: '',
     utmCampaignManual: false,
     resources: [],
@@ -99,8 +104,8 @@ export function applyConferenceNameChange(form, conferenceName) {
 export function isConferenceFollowUpFormEmpty(form) {
   if (!form) return true
   if (String(form.conferenceName || '').trim()) return false
-  if (String(form.utmSource || '').trim()) return false
-  if (String(form.utmMedium || '').trim()) return false
+  if (String(form.utmSource || '').trim() !== DEFAULT_UTM_SOURCE) return false
+  if (String(form.utmMedium || '').trim() !== DEFAULT_UTM_MEDIUM) return false
   if (String(form.utmCampaign || '').trim()) return false
   if (form.openingManual) return false
   if (form.utmCampaignManual) return false
@@ -125,13 +130,18 @@ export function loadConferenceFollowUpForm() {
           url: typeof r?.url === 'string' ? r.url : '',
         }))
       : []
-    const utmCampaign = typeof parsed.utmCampaign === 'string' ? parsed.utmCampaign : ''
+    const utmCampaignRaw = typeof parsed.utmCampaign === 'string' ? parsed.utmCampaign : ''
     const openingSentence =
       typeof parsed.openingSentence === 'string' && parsed.openingSentence
         ? parsed.openingSentence
         : defaultOpeningSentence(conferenceName)
     const generatedCampaign = conferenceCampaignFromName(conferenceName)
     const generatedOpening = defaultOpeningSentence(conferenceName)
+    const utmCampaignManual =
+      typeof parsed.utmCampaignManual === 'boolean'
+        ? parsed.utmCampaignManual
+        : Boolean(utmCampaignRaw.trim()) && utmCampaignRaw !== generatedCampaign
+    const utmCampaign = utmCampaignManual ? utmCampaignRaw : generatedCampaign
     return {
       conferenceName,
       openingSentence,
@@ -139,13 +149,16 @@ export function loadConferenceFollowUpForm() {
         typeof parsed.openingManual === 'boolean'
           ? parsed.openingManual
           : openingSentence !== generatedOpening,
-      utmSource: typeof parsed.utmSource === 'string' ? parsed.utmSource : '',
-      utmMedium: typeof parsed.utmMedium === 'string' ? parsed.utmMedium : '',
+      utmSource:
+        typeof parsed.utmSource === 'string' && parsed.utmSource.trim()
+          ? parsed.utmSource
+          : DEFAULT_UTM_SOURCE,
+      utmMedium:
+        typeof parsed.utmMedium === 'string' && parsed.utmMedium.trim()
+          ? parsed.utmMedium
+          : DEFAULT_UTM_MEDIUM,
       utmCampaign,
-      utmCampaignManual:
-        typeof parsed.utmCampaignManual === 'boolean'
-          ? parsed.utmCampaignManual
-          : utmCampaign !== generatedCampaign,
+      utmCampaignManual,
       resources,
     }
   } catch {

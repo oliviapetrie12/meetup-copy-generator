@@ -9,6 +9,8 @@ import {
   defaultOpeningSentence,
   defaultSubject,
   generateConferenceFollowUpEmail,
+  DEFAULT_UTM_MEDIUM,
+  DEFAULT_UTM_SOURCE,
   getInitialConferenceFollowUpForm,
   htmlEmailToPlain,
   isConferenceFollowUpFormEmpty,
@@ -62,6 +64,8 @@ describe('conference campaign slug', () => {
 
   it('fills campaign and opening from the name until the user edits them', () => {
     const named = applyConferenceNameChange(getInitialConferenceFollowUpForm(), 'LangChain Interrupt')
+    expect(named.utmSource).toBe('intuition')
+    expect(named.utmMedium).toBe('email')
     expect(named.utmCampaign).toBe('langchain-interrupt')
     expect(named.openingSentence).toBe('Thank you for stopping by our booth at LangChain Interrupt!')
 
@@ -114,15 +118,41 @@ describe('conference resource links', () => {
     expect(links.custom[0].label).toBe('Booth deck')
   })
 
-  it('omits blank UTM parameters and leaves a user-entered campaign as typed', () => {
+  it('includes intuition, email, and the generated campaign on every resource link', () => {
     const form = applyConferenceNameChange(getInitialConferenceFollowUpForm(), 'LangChain Interrupt')
+    form.resources = [{ id: 'deck', label: 'Deck', url: 'https://example.com/deck?x=1' }]
+    const links = buildConferenceResourceLinks(form)
+    const hrefs = [
+      links.training,
+      links.newsletter,
+      links.slack,
+      links.discuss,
+      links.sessionize,
+      links.custom[0].url,
+    ]
+    for (const href of hrefs) {
+      const url = new URL(href)
+      expect(url.searchParams.get('utm_source')).toBe(DEFAULT_UTM_SOURCE)
+      expect(url.searchParams.get('utm_medium')).toBe(DEFAULT_UTM_MEDIUM)
+      expect(url.searchParams.get('utm_campaign')).toBe('langchain-interrupt')
+    }
+    expect(new URL(links.custom[0].url).searchParams.get('x')).toBe('1')
+  })
+
+  it('updates every resource link when a UTM value changes', () => {
+    const form = applyConferenceNameChange(getInitialConferenceFollowUpForm(), 'LangChain Interrupt')
+    form.utmSource = 'salesforce'
+    form.utmMedium = 'newsletter'
     form.utmCampaign = 'Q3 Booth'
     form.utmCampaignManual = true
-    const url = new URL(buildConferenceResourceLinks(form).training)
-    expect(url.searchParams.get('utm_campaign')).toBe('Q3 Booth')
-    expect(url.searchParams.has('utm_source')).toBe(false)
-    expect(url.searchParams.has('utm_medium')).toBe(false)
-    expect(url.toString()).toContain('utm_campaign=Q3+Booth')
+    const links = buildConferenceResourceLinks(form)
+    for (const href of [links.training, links.newsletter, links.slack, links.discuss, links.sessionize]) {
+      const url = new URL(href)
+      expect(url.searchParams.get('utm_source')).toBe('salesforce')
+      expect(url.searchParams.get('utm_medium')).toBe('newsletter')
+      expect(url.searchParams.get('utm_campaign')).toBe('Q3 Booth')
+    }
+    expect(links.training).toContain('utm_campaign=Q3+Booth')
   })
 })
 
@@ -247,6 +277,17 @@ describe('conference follow-up validation and storage', () => {
     expect(loaded.openingSentence).toBe('Hello there.')
     expect(loaded.resources[0].url).toBe('https://example.com/deck')
     expect(localStorage.getItem(CONFERENCE_FOLLOWUP_STORAGE_KEY)).toContain('custom-camp')
+  })
+
+  it('restores source and medium defaults when a saved draft left them blank', () => {
+    localStorage.setItem(
+      CONFERENCE_FOLLOWUP_STORAGE_KEY,
+      JSON.stringify({ conferenceName: 'LangChain Interrupt', utmSource: '', utmMedium: '  ' }),
+    )
+    const loaded = loadConferenceFollowUpForm()
+    expect(loaded.utmSource).toBe(DEFAULT_UTM_SOURCE)
+    expect(loaded.utmMedium).toBe(DEFAULT_UTM_MEDIUM)
+    expect(loaded.utmCampaign).toBe('langchain-interrupt')
   })
 
   it('handles blocked localStorage without throwing', () => {
