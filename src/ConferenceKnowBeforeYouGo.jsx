@@ -15,7 +15,10 @@ import {
   GeneratorHeader,
   GeneratorActions,
   EmptyState,
+  DraftSavedNote,
+  ConfirmResetDialog,
 } from './components/generatorUi.jsx'
+import { draftsEqual, readDraft, writeDraft } from './draftStorage.js'
 
 function escapeHtml(s) {
   if (s == null) return ''
@@ -487,6 +490,119 @@ function buildContactsSectionPlain(form, strings) {
   return parts.join('\n').replace(/\n+$/, '\n')
 }
 
+const CONFERENCE_KBYG_STORAGE_KEY = 'conference-kbyg-form-v1'
+const CONFERENCE_KBYG_ENHANCE_MODES = new Set(['email', 'slack', 'doc'])
+const CONFERENCE_KBYG_STRING_FIELDS = [
+  'conferenceName',
+  'knowBeforeYouGoDeckUrl',
+  'leadCaptureText',
+  'customTldrNotes',
+  'eventDatesBoothSetup',
+  'eventDatesBoothHours',
+  'eventDatesBoothCleanup',
+  'eventDatesNotes',
+  'staffingScheduleLink',
+  'staffingScheduleNotes',
+  'ticketsText',
+  'locationVenue',
+  'locationAddress',
+  'boothMaterialsShippedToName',
+  'avSetupRequirements',
+  'swagText',
+  'parkingText',
+  'foodBeverageText',
+  'engagementDetails',
+  'engagementPrize',
+]
+
+function normalizeConferenceKbygForm(raw, lang) {
+  const base = getInitialForm(lang)
+  const src = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}
+  const next = { ...base }
+  for (const key of CONFERENCE_KBYG_STRING_FIELDS) {
+    if (typeof src[key] === 'string') next[key] = src[key]
+  }
+  if (typeof src.generateTldr === 'boolean') next.generateTldr = src.generateTldr
+  if (src.tldrInclude && typeof src.tldrInclude === 'object') {
+    const include = { ...getInitialTldrInclude() }
+    for (const key of Object.keys(include)) {
+      if (typeof src.tldrInclude[key] === 'boolean') include[key] = src.tldrInclude[key]
+    }
+    next.tldrInclude = include
+  }
+  if (typeof src.boothMaterialsDeliveryMethod === 'string') {
+    next.boothMaterialsDeliveryMethod = normalizeBoothDeliveryMethodKey(src.boothMaterialsDeliveryMethod)
+  }
+  if (src.engagementType === 'none' || src.engagementType === 'kahoot' || src.engagementType === 'raffle') {
+    next.engagementType = src.engagementType
+  }
+  if (Array.isArray(src.contacts) && src.contacts.length) {
+    next.contacts = src.contacts.map((contact) => ({
+      ...INITIAL_CONTACT,
+      name: typeof contact?.name === 'string' ? contact.name : '',
+      role: typeof contact?.role === 'string' ? contact.role : '',
+      email: typeof contact?.email === 'string' ? contact.email : '',
+      phone: typeof contact?.phone === 'string' ? contact.phone : '',
+      group: typeof contact?.group === 'string' ? contact.group : '',
+    }))
+  }
+  if (Array.isArray(src.additionalSections)) {
+    next.additionalSections = src.additionalSections.map((section) => ({
+      title: typeof section?.title === 'string' ? section.title : '',
+      content: typeof section?.content === 'string' ? section.content : '',
+    }))
+  }
+  return next
+}
+
+export function loadConferenceKbygDraft() {
+  const saved = readDraft(CONFERENCE_KBYG_STORAGE_KEY)
+  const conferenceLanguage = normalizeLanguage(saved?.conferenceLanguage || 'en')
+  const form = normalizeConferenceKbygForm(saved?.form, conferenceLanguage)
+  const subjectManuallyEdited = saved?.subjectManuallyEdited === true
+  return {
+    conferenceLanguage,
+    form,
+    subjectLine:
+      typeof saved?.subjectLine === 'string'
+        ? saved.subjectLine
+        : generateAutoSubjectLine(form, conferenceLanguage),
+    subjectManuallyEdited,
+    organizerImportText: typeof saved?.organizerImportText === 'string' ? saved.organizerImportText : '',
+    kbygEnhanceExisting: typeof saved?.kbygEnhanceExisting === 'string' ? saved.kbygEnhanceExisting : '',
+    kbygEnhanceUpdates: typeof saved?.kbygEnhanceUpdates === 'string' ? saved.kbygEnhanceUpdates : '',
+    kbygEnhanceMode: CONFERENCE_KBYG_ENHANCE_MODES.has(saved?.kbygEnhanceMode)
+      ? saved.kbygEnhanceMode
+      : 'email',
+  }
+}
+
+export function saveConferenceKbygDraft(draft) {
+  writeDraft(CONFERENCE_KBYG_STORAGE_KEY, {
+    conferenceLanguage: normalizeLanguage(draft?.conferenceLanguage || 'en'),
+    form: normalizeConferenceKbygForm(draft?.form, draft?.conferenceLanguage || 'en'),
+    subjectLine: typeof draft?.subjectLine === 'string' ? draft.subjectLine : '',
+    subjectManuallyEdited: draft?.subjectManuallyEdited === true,
+    organizerImportText: typeof draft?.organizerImportText === 'string' ? draft.organizerImportText : '',
+    kbygEnhanceExisting: typeof draft?.kbygEnhanceExisting === 'string' ? draft.kbygEnhanceExisting : '',
+    kbygEnhanceUpdates: typeof draft?.kbygEnhanceUpdates === 'string' ? draft.kbygEnhanceUpdates : '',
+    kbygEnhanceMode: CONFERENCE_KBYG_ENHANCE_MODES.has(draft?.kbygEnhanceMode) ? draft.kbygEnhanceMode : 'email',
+  })
+}
+
+export function conferenceKbygHasContent(draft) {
+  const lang = normalizeLanguage(draft?.conferenceLanguage || 'en')
+  const form = normalizeConferenceKbygForm(draft?.form, lang)
+  if (!draftsEqual(form, getInitialForm(lang))) return true
+  if (draft?.subjectManuallyEdited === true) return true
+  if (String(draft?.organizerImportText || '').trim()) return true
+  if (String(draft?.kbygEnhanceExisting || '').trim()) return true
+  if (String(draft?.kbygEnhanceUpdates || '').trim()) return true
+  if (draft?.kbygEnhanceMode && draft.kbygEnhanceMode !== 'email') return true
+  if (lang !== 'en') return true
+  return false
+}
+
 /** Auto subject: "[Event Name] Know Before You Go + [booth info]" (venue, else first line of address). */
 function generateAutoSubjectLine(form, lang = 'en') {
   const strings = getConferenceStrings(lang)
@@ -790,21 +906,23 @@ function generateConferenceEmailPlain(form, opts = {}) {
 }
 
 export default function ConferenceKnowBeforeYouGo() {
-  const [conferenceLanguage, setConferenceLanguage] = useState('en')
-  const [form, setForm] = useState(() => getInitialForm('en'))
-  const subjectManuallyEditedRef = useRef(false)
-  const [subjectLine, setSubjectLine] = useState(() => generateAutoSubjectLine(getInitialForm('en'), 'en'))
+  const [draftSeed] = useState(loadConferenceKbygDraft)
+  const [conferenceLanguage, setConferenceLanguage] = useState(draftSeed.conferenceLanguage)
+  const [form, setForm] = useState(draftSeed.form)
+  const subjectManuallyEditedRef = useRef(draftSeed.subjectManuallyEdited)
+  const [subjectLine, setSubjectLine] = useState(draftSeed.subjectLine)
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false)
   const [plain, setPlain] = useState('')
   const [html, setHtml] = useState('')
   const [emailCopied, setEmailCopied] = useState(false)
   const [googleDocCopied, setGoogleDocCopied] = useState(false)
   const [subjectCopied, setSubjectCopied] = useState(false)
-  const [organizerImportText, setOrganizerImportText] = useState('')
+  const [organizerImportText, setOrganizerImportText] = useState(draftSeed.organizerImportText)
   const [structuredKbygPreview, setStructuredKbygPreview] = useState('')
   const [structuredKbygCopied, setStructuredKbygCopied] = useState(false)
-  const [kbygEnhanceExisting, setKbygEnhanceExisting] = useState('')
-  const [kbygEnhanceUpdates, setKbygEnhanceUpdates] = useState('')
-  const [kbygEnhanceMode, setKbygEnhanceMode] = useState('email')
+  const [kbygEnhanceExisting, setKbygEnhanceExisting] = useState(draftSeed.kbygEnhanceExisting)
+  const [kbygEnhanceUpdates, setKbygEnhanceUpdates] = useState(draftSeed.kbygEnhanceUpdates)
+  const [kbygEnhanceMode, setKbygEnhanceMode] = useState(draftSeed.kbygEnhanceMode)
   const [kbygEnhanceOutput, setKbygEnhanceOutput] = useState('')
   const [kbygEnhanceCopied, setKbygEnhanceCopied] = useState(false)
   const [translateMessage, setTranslateMessage] = useState(null)
@@ -824,6 +942,50 @@ export default function ConferenceKnowBeforeYouGo() {
     if (subjectManuallyEditedRef.current) return
     setSubjectLine(generateAutoSubjectLine(form, conferenceLanguage))
   }, [form.conferenceName, form.locationVenue, form.locationAddress, conferenceLanguage])
+
+  useEffect(() => {
+    saveConferenceKbygDraft({
+      conferenceLanguage,
+      form,
+      subjectLine,
+      subjectManuallyEdited: subjectManuallyEditedRef.current,
+      organizerImportText,
+      kbygEnhanceExisting,
+      kbygEnhanceUpdates,
+      kbygEnhanceMode,
+    })
+  }, [
+    conferenceLanguage,
+    form,
+    subjectLine,
+    organizerImportText,
+    kbygEnhanceExisting,
+    kbygEnhanceUpdates,
+    kbygEnhanceMode,
+  ])
+
+  const draftHasContent = useMemo(
+    () =>
+      conferenceKbygHasContent({
+        conferenceLanguage,
+        form,
+        subjectLine,
+        subjectManuallyEdited: subjectManuallyEditedRef.current,
+        organizerImportText,
+        kbygEnhanceExisting,
+        kbygEnhanceUpdates,
+        kbygEnhanceMode,
+      }),
+    [
+      conferenceLanguage,
+      form,
+      subjectLine,
+      organizerImportText,
+      kbygEnhanceExisting,
+      kbygEnhanceUpdates,
+      kbygEnhanceMode,
+    ],
+  )
 
   const update = (key) => (e) => {
     const v = e.target.value
@@ -934,10 +1096,11 @@ export default function ConferenceKnowBeforeYouGo() {
   )
 
   const handleReset = () => {
-    const next = getInitialForm(conferenceLanguage)
+    const next = getInitialForm('en')
     subjectManuallyEditedRef.current = false
+    setConferenceLanguage('en')
     setForm(next)
-    setSubjectLine(generateAutoSubjectLine(next, conferenceLanguage))
+    setSubjectLine(generateAutoSubjectLine(next, 'en'))
     setPlain('')
     setHtml('')
     setOrganizerImportText('')
@@ -946,6 +1109,15 @@ export default function ConferenceKnowBeforeYouGo() {
     setKbygEnhanceUpdates('')
     setKbygEnhanceMode('email')
     setKbygEnhanceOutput('')
+    setConfirmResetOpen(false)
+  }
+
+  const requestReset = () => {
+    if (draftHasContent) {
+      setConfirmResetOpen(true)
+      return
+    }
+    handleReset()
   }
 
   const handleParseOrganizerDetails = () => {
@@ -1045,9 +1217,11 @@ export default function ConferenceKnowBeforeYouGo() {
           <GeneratorHeader
             title="Conference Know Before You Go"
             description="Create the booth logistics email for conference staff and volunteers."
-            onReset={handleReset}
+            onReset={requestReset}
             resetLabel={t.conf_btnReset}
-          />
+          >
+            {draftHasContent ? <DraftSavedNote /> : null}
+          </GeneratorHeader>
           <fieldset className="form-fieldset">
             <legend>{t.conf_email}</legend>
             <label>
@@ -1584,6 +1758,12 @@ export default function ConferenceKnowBeforeYouGo() {
           )}
         </div>
       </main>
+      <ConfirmResetDialog
+        open={confirmResetOpen}
+        titleId="ckbyg-confirm-title"
+        onCancel={() => setConfirmResetOpen(false)}
+        onConfirm={handleReset}
+      />
     </>
   )
 }

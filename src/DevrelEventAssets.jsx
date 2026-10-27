@@ -18,6 +18,8 @@ import {
   CollapsibleFormSection,
   GeneratorActions,
   EmptyState,
+  DraftSavedNote,
+  ConfirmResetDialog,
 } from './components/generatorUi.jsx'
 
 /**
@@ -29,6 +31,7 @@ export default function DevrelEventAssets() {
   const [copyMode, setCopyMode] = useState(/** @type {null | 'html' | 'plain' | 'error'} */ (null))
   const [copyMessage, setCopyMessage] = useState('')
   const [showErrors, setShowErrors] = useState(false)
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false)
 
   useEffect(() => {
     saveEventAssetsForm(form)
@@ -60,6 +63,16 @@ export default function DevrelEventAssets() {
     setCopyMode(null)
     setCopyMessage('')
     setShowErrors(false)
+    setConfirmResetOpen(false)
+  }
+
+  const requestReset = () => {
+    if (!canReset) return
+    if (!formEmpty) {
+      setConfirmResetOpen(true)
+      return
+    }
+    applyReset()
   }
 
   const copyDocument = async () => {
@@ -115,9 +128,11 @@ export default function DevrelEventAssets() {
           <GeneratorHeader
             title="DevRel Event Assets"
             description="Generate a localized Elastic document that conference organizers and community partners can paste into Google Docs for event websites, sponsor listings, and promotional materials."
-            onReset={applyReset}
+            onReset={requestReset}
             resetDisabled={!canReset}
-          />
+          >
+            {formEmpty ? null : <DraftSavedNote />}
+          </GeneratorHeader>
 
           <FormSection title="Event Details" id="dea-event-details-heading">
             <label className="dea-field" htmlFor="dea-event-name">
@@ -376,6 +391,12 @@ export default function DevrelEventAssets() {
           )}
         </div>
       </main>
+      <ConfirmResetDialog
+        open={confirmResetOpen}
+        titleId="dea-confirm-title"
+        onCancel={() => setConfirmResetOpen(false)}
+        onConfirm={applyReset}
+      />
     </>
   )
 }

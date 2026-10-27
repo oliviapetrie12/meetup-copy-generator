@@ -23,6 +23,7 @@ import {
   CollapsibleFormSection,
   GeneratorActions,
   EmptyState,
+  DraftSavedNote,
 } from './components/generatorUi.jsx'
 
 const EmailBodyEditor = memo(
@@ -280,7 +281,9 @@ export default function ConferenceFollowUp() {
             description="Generate a post-conference lead follow-up email with resources and automatic UTM tracking."
             onReset={requestReset}
             resetDisabled={!canReset}
-          />
+          >
+            {formEmpty ? null : <DraftSavedNote />}
+          </GeneratorHeader>
 
           <FormSection title="Event details" id="cfu-event-heading">
             <label className="mfu-field">

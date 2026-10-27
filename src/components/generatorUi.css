@@ -43,6 +43,14 @@
   margin-top: 0.65rem;
 }
 
+.draft-saved-note {
+  margin: 0 0 0.45rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.35;
+  color: #64748b;
+}
+
 .gen-form-header .gen-reset-btn {
   margin-top: 0;
   flex-shrink: 0;

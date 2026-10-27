@@ -2,7 +2,61 @@
  * Shared generator UI primitives for consistent form/output chrome across the toolkit.
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+
+export function DraftSavedNote() {
+  return (
+    <p className="draft-saved-note" role="status">
+      Draft saved on this device
+    </p>
+  )
+}
+
+/**
+ * Confirm before a reset that would clear entered form details.
+ */
+export function ConfirmResetDialog({
+  open,
+  titleId,
+  message = 'Reset this form? The details you entered will be cleared on this device.',
+  confirmLabel = 'Reset form',
+  onCancel,
+  onConfirm,
+}) {
+  useEffect(() => {
+    if (!open) return undefined
+    const onKey = (event) => {
+      if (event.key === 'Escape') onCancel()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onCancel])
+
+  if (!open) return null
+  return (
+    <div className="mfu-confirm-backdrop" role="presentation" onClick={onCancel}>
+      <div
+        className="mfu-confirm-dialog"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <p id={titleId} className="mfu-confirm-message">
+          {message}
+        </p>
+        <div className="mfu-confirm-actions">
+          <button type="button" className="btn-reset mfu-confirm-cancel" onClick={onCancel}>
+            Cancel
+          </button>
+          <button type="button" className="btn-generate mfu-confirm-reset" onClick={onConfirm}>
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export function FieldLabel({ children, required = false, optional = false, htmlFor }) {
   const inner = (

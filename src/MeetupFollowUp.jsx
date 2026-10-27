@@ -18,6 +18,7 @@ import {
   CollapsibleFormSection,
   GeneratorActions,
   EmptyState,
+  DraftSavedNote,
 } from './components/generatorUi.jsx'
 
 /**
@@ -162,7 +163,9 @@ export default function MeetupFollowUp() {
             description="Generate a ready-to-send attendee email with slides, resources, and automatic UTM tracking."
             onReset={requestReset}
             resetDisabled={!canReset}
-          />
+          >
+            {formEmpty ? null : <DraftSavedNote />}
+          </GeneratorHeader>
 
           <FormSection title="Event Details" id="mfu-event-details-heading">
 

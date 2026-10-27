@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import QRCodeStyling from "qr-code-styling"
 import elasticLogo from './logo.png'
 import ConferenceKnowBeforeYouGo from './ConferenceKnowBeforeYouGo.jsx'
@@ -10,7 +10,10 @@ import {
   GeneratorHeader,
   GeneratorActions,
   EmptyState,
+  DraftSavedNote,
+  ConfirmResetDialog,
 } from './components/generatorUi.jsx'
+import { draftsEqual, mergeDraftRecord, readDraft, writeDraft } from './draftStorage.js'
 import {
   makeMoreConcise,
   parseKbygPlainSections,
@@ -408,6 +411,7 @@ const INITIAL_STATE = {
   hostOrSponsor: '',
   rsvpInstructions: '',
   arrivalInstructions: '',
+  parkingNotes: '',
   intuitionAudience: '',
   intuitionWhyAttend: '',
   intuitionKeyTakeaway: '',
@@ -547,6 +551,55 @@ const KBYG_INITIAL_STATE = {
 }
 
 const KBYG_FORM_STORAGE_KEY = 'meetup-kbyg-form-v1'
+const EVENT_PROMOTION_STORAGE_KEY = 'event-promotion-form-v1'
+const UTM_URL_BUILDER_STORAGE_KEY = 'utm-url-builder-form-v1'
+const QR_CODE_GENERATOR_STORAGE_KEY = 'qr-code-generator-form-v1'
+
+const SPEAKER_2_KEYS = [
+  'speaker2Name',
+  'speaker2Title',
+  'speaker2Company',
+  'speaker2TalkTitle',
+  'speaker2TalkAbstract',
+]
+const SPEAKER_3_KEYS = [
+  'speaker3Name',
+  'speaker3Title',
+  'speaker3Company',
+  'speaker3TalkTitle',
+  'speaker3TalkAbstract',
+]
+
+function speakerKeysFilled(form, keys) {
+  return keys.some((key) => String(form?.[key] || '').trim())
+}
+
+function loadEventPromotionDraft() {
+  const saved = readDraft(EVENT_PROMOTION_STORAGE_KEY)
+  const form = mergeDraftRecord(INITIAL_STATE, saved?.form)
+  const showSpeaker3 = Boolean(saved?.showSpeaker3) || speakerKeysFilled(form, SPEAKER_3_KEYS)
+  const showSpeaker2 =
+    Boolean(saved?.showSpeaker2) || speakerKeysFilled(form, SPEAKER_2_KEYS) || showSpeaker3
+  const eventPageLanguage = ['en', 'es', 'pt'].includes(saved?.eventPageLanguage)
+    ? saved.eventPageLanguage
+    : 'en'
+  return { form, showSpeaker2, showSpeaker3, eventPageLanguage }
+}
+
+function eventPromotionHasContent(form, extras) {
+  if (!draftsEqual(mergeDraftRecord(INITIAL_STATE, form), INITIAL_STATE)) return true
+  if (extras?.showSpeaker2 || extras?.showSpeaker3) return true
+  if (extras?.eventPageLanguage && extras.eventPageLanguage !== 'en') return true
+  return false
+}
+
+function loadUrlQrDraft() {
+  return mergeDraftRecord(URL_QR_INITIAL_STATE, readDraft(UTM_URL_BUILDER_STORAGE_KEY))
+}
+
+function loadQrDraft() {
+  return mergeDraftRecord(QR_INITIAL_STATE, readDraft(QR_CODE_GENERATOR_STORAGE_KEY))
+}
 
 /** Removed standalone Speakers section — strip legacy keys from persisted JSON. */
 const KBYG_LEGACY_SPEAKER_FIELD_KEYS = [
@@ -558,34 +611,49 @@ const KBYG_LEGACY_SPEAKER_FIELD_KEYS = [
   'speaker2TalkTitle',
 ]
 
-function loadKbygFormFromStorage() {
-  if (typeof localStorage === 'undefined') return KBYG_INITIAL_STATE
+function loadKbygDraft() {
+  const empty = { form: KBYG_INITIAL_STATE, language: 'en', importPaste: '' }
+  if (typeof localStorage === 'undefined') return empty
   try {
     const raw = localStorage.getItem(KBYG_FORM_STORAGE_KEY)
-    if (!raw) return KBYG_INITIAL_STATE
+    if (!raw) return empty
     const parsed = JSON.parse(raw)
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return KBYG_INITIAL_STATE
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return empty
     const parsedRest = { ...parsed }
     for (const k of KBYG_LEGACY_SPEAKER_FIELD_KEYS) delete parsedRest[k]
+    const language = ['en', 'es', 'pt'].includes(parsed.__draftLanguage) ? parsed.__draftLanguage : 'en'
+    const importPaste = typeof parsed.__importPaste === 'string' ? parsed.__importPaste : ''
+    delete parsedRest.__draftLanguage
+    delete parsedRest.__importPaste
     return {
-      ...KBYG_INITIAL_STATE,
-      ...parsedRest,
-      kbygTldrInclude: {
-        ...getInitialKbygTldrInclude(),
-        ...(parsed.kbygTldrInclude && typeof parsed.kbygTldrInclude === 'object' ? parsed.kbygTldrInclude : {}),
+      form: {
+        ...KBYG_INITIAL_STATE,
+        ...parsedRest,
+        kbygTldrInclude: {
+          ...getInitialKbygTldrInclude(),
+          ...(parsed.kbygTldrInclude && typeof parsed.kbygTldrInclude === 'object' ? parsed.kbygTldrInclude : {}),
+        },
+        includePhotos: Object.prototype.hasOwnProperty.call(parsed, 'includePhotos')
+          ? parsed.includePhotos
+          : Object.prototype.hasOwnProperty.call(parsed, 'includeTakePhotos')
+            ? parsed.includeTakePhotos
+            : KBYG_INITIAL_STATE.includePhotos,
+        kbygEmojiHeaders: Object.prototype.hasOwnProperty.call(parsed, 'kbygEmojiHeaders')
+          ? parsed.kbygEmojiHeaders
+          : KBYG_INITIAL_STATE.kbygEmojiHeaders,
       },
-      includePhotos: Object.prototype.hasOwnProperty.call(parsed, 'includePhotos')
-        ? parsed.includePhotos
-        : Object.prototype.hasOwnProperty.call(parsed, 'includeTakePhotos')
-          ? parsed.includeTakePhotos
-          : KBYG_INITIAL_STATE.includePhotos,
-      kbygEmojiHeaders: Object.prototype.hasOwnProperty.call(parsed, 'kbygEmojiHeaders')
-        ? parsed.kbygEmojiHeaders
-        : KBYG_INITIAL_STATE.kbygEmojiHeaders,
+      language,
+      importPaste,
     }
   } catch {
-    return KBYG_INITIAL_STATE
+    return empty
   }
+}
+
+function kbygHasContent(form, language, importPaste) {
+  if (language && language !== 'en') return true
+  if (String(importPaste || '').trim()) return true
+  return !draftsEqual(mergeDraftRecord(KBYG_INITIAL_STATE, form), KBYG_INITIAL_STATE)
 }
 
 const UTM_SOURCE_OPTIONS = [
@@ -1513,18 +1581,13 @@ const GENERATOR_UI_META = {
 export default function App() {
   const [generatorType, setGeneratorType] = useState('eventPromotion')
   const [navOpen, setNavOpen] = useState(false)
-  const [form, setForm] = useState(INITIAL_STATE)
-  const [kbygForm, setKbygForm] = useState(loadKbygFormFromStorage)
-  useEffect(() => {
-    try {
-      localStorage.setItem(KBYG_FORM_STORAGE_KEY, JSON.stringify(kbygForm))
-    } catch {
-      // ignore quota / private mode
-    }
-  }, [kbygForm])
-
-  const [urlQrForm, setUrlQrForm] = useState(URL_QR_INITIAL_STATE)
-  const [qrForm, setQrForm] = useState(QR_INITIAL_STATE)
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false)
+  const [eventPromotionSeed] = useState(loadEventPromotionDraft)
+  const [form, setForm] = useState(eventPromotionSeed.form)
+  const [kbygSeed] = useState(loadKbygDraft)
+  const [kbygForm, setKbygForm] = useState(kbygSeed.form)
+  const [urlQrForm, setUrlQrForm] = useState(loadUrlQrDraft)
+  const [qrForm, setQrForm] = useState(loadQrDraft)
   const [generatedQr, setGeneratedQr] = useState(false)
   const [qrCopied, setQrCopied] = useState(false)
   const qrContainerRef = useRef(null)
@@ -1549,11 +1612,11 @@ export default function App() {
   const [intuitionWhyAttendCopied, setIntuitionWhyAttendCopied] = useState(false)
   const [intuitionBodyCopied, setIntuitionBodyCopied] = useState(false)
   const [kbygTldrRotation, setKbygTldrRotation] = useState(0)
-  const [eventPageLanguage, setEventPageLanguage] = useState('en')
-  const [meetupKbygLanguage, setMeetupKbygLanguage] = useState('en')
+  const [eventPageLanguage, setEventPageLanguage] = useState(eventPromotionSeed.eventPageLanguage)
+  const [meetupKbygLanguage, setMeetupKbygLanguage] = useState(kbygSeed.language)
   const tEvent = useMemo(() => getGeneratorUiTranslations(eventPageLanguage), [eventPageLanguage])
   const tKbyg = useMemo(() => getGeneratorUiTranslations(meetupKbygLanguage), [meetupKbygLanguage])
-  const [kbygQuickImportPaste, setKbygQuickImportPaste] = useState('')
+  const [kbygQuickImportPaste, setKbygQuickImportPaste] = useState(kbygSeed.importPaste)
   const [kbygQuickImportFeedback, setKbygQuickImportFeedback] = useState('')
   useEffect(() => {
     if (!kbygQuickImportFeedback) return
@@ -1565,8 +1628,33 @@ export default function App() {
   const [comboboxOpen, setComboboxOpen] = useState(false)
   const [comboboxHighlight, setComboboxHighlight] = useState(0)
   const comboboxRef = useRef(null)
-  const [showSpeaker2, setShowSpeaker2] = useState(false)
-  const [showSpeaker3, setShowSpeaker3] = useState(false)
+  const [showSpeaker2, setShowSpeaker2] = useState(eventPromotionSeed.showSpeaker2)
+  const [showSpeaker3, setShowSpeaker3] = useState(eventPromotionSeed.showSpeaker3)
+
+  useEffect(() => {
+    writeDraft(EVENT_PROMOTION_STORAGE_KEY, {
+      form,
+      showSpeaker2,
+      showSpeaker3,
+      eventPageLanguage,
+    })
+  }, [form, showSpeaker2, showSpeaker3, eventPageLanguage])
+
+  useEffect(() => {
+    writeDraft(KBYG_FORM_STORAGE_KEY, {
+      ...kbygForm,
+      __draftLanguage: meetupKbygLanguage,
+      __importPaste: kbygQuickImportPaste,
+    })
+  }, [kbygForm, meetupKbygLanguage, kbygQuickImportPaste])
+
+  useEffect(() => {
+    writeDraft(UTM_URL_BUILDER_STORAGE_KEY, urlQrForm)
+  }, [urlQrForm])
+
+  useEffect(() => {
+    writeDraft(QR_CODE_GENERATOR_STORAGE_KEY, qrForm)
+  }, [qrForm])
 
   const formRef = useRef(form)
   formRef.current = form
@@ -2068,10 +2156,32 @@ export default function App() {
     }
   }
 
+  const eventPromotionDirty = useMemo(
+    () => eventPromotionHasContent(form, { showSpeaker2, showSpeaker3, eventPageLanguage }),
+    [form, showSpeaker2, showSpeaker3, eventPageLanguage],
+  )
+  const kbygDirty = useMemo(
+    () => kbygHasContent(kbygForm, meetupKbygLanguage, kbygQuickImportPaste),
+    [kbygForm, meetupKbygLanguage, kbygQuickImportPaste],
+  )
+  const urlQrDirty = useMemo(() => !draftsEqual(urlQrForm, URL_QR_INITIAL_STATE), [urlQrForm])
+  const qrDirty = useMemo(() => !draftsEqual(qrForm, QR_INITIAL_STATE), [qrForm])
+  const activeDraftDirty =
+    generatorType === 'knowBeforeYouGo'
+      ? kbygDirty
+      : generatorType === 'urlQrGenerator'
+        ? urlQrDirty
+        : generatorType === 'qrCodeGenerator'
+          ? qrDirty
+          : generatorType === 'eventPromotion'
+            ? eventPromotionDirty
+            : false
+
   const handleReset = () => {
     if (generatorType === 'knowBeforeYouGo') {
       setKbygTldrRotation(0)
       setKbygForm(KBYG_INITIAL_STATE)
+      setMeetupKbygLanguage('en')
       setKbygQuickImportPaste('')
       setKbygQuickImportFeedback('')
     } else if (generatorType === 'urlQrGenerator') {
@@ -2083,6 +2193,7 @@ export default function App() {
       setForm(INITIAL_STATE)
       setShowSpeaker2(false)
       setShowSpeaker3(false)
+      setEventPageLanguage('en')
     }
     setGeneratedCopy('')
     setMeetupPageHtml('')
@@ -2090,7 +2201,18 @@ export default function App() {
     setKbygEmailHtml('')
     setGeneratedSubject('')
     setLinkedInPost('')
+    setConfirmResetOpen(false)
   }
+
+  const requestReset = () => {
+    if (activeDraftDirty) {
+      setConfirmResetOpen(true)
+      return
+    }
+    handleReset()
+  }
+
+  const cancelReset = useCallback(() => setConfirmResetOpen(false), [])
 
   const handleCopyKbygEmailHtml = async () => {
     if (!kbygEmailHtml || !generatedCopy) return
@@ -2220,6 +2342,7 @@ export default function App() {
                       onClick={() => {
                         setGeneratorType(card.value)
                         setNavOpen(false)
+                        setConfirmResetOpen(false)
                         setGeneratedCopy('')
                         setMeetupPageHtml('')
                         setEventPageGeneratedContent(null)
@@ -2269,9 +2392,11 @@ export default function App() {
             <GeneratorHeader
               title={GENERATOR_UI_META.eventPromotion.title}
               description={GENERATOR_UI_META.eventPromotion.description}
-              onReset={handleReset}
+              onReset={requestReset}
               resetLabel={tEvent.btnResetForm}
-            />
+            >
+              {eventPromotionDirty ? <DraftSavedNote /> : null}
+            </GeneratorHeader>
             <label>
               <FieldLabel optional>User Group</FieldLabel>
               <div className="combobox" ref={comboboxRef}>
@@ -2761,9 +2886,10 @@ export default function App() {
             <GeneratorHeader
               title={GENERATOR_UI_META.knowBeforeYouGo.title}
               description={GENERATOR_UI_META.knowBeforeYouGo.description}
-              onReset={handleReset}
+              onReset={requestReset}
               resetLabel={tKbyg.kbyg_btnReset}
             >
+              {kbygDirty ? <DraftSavedNote /> : null}
               <div
                 className="form-language-row form-kbyg-toolbar-settings"
                 role="group"
@@ -3024,8 +3150,10 @@ export default function App() {
               <GeneratorHeader
                 title={GENERATOR_UI_META.urlQrGenerator.title}
                 description={GENERATOR_UI_META.urlQrGenerator.description}
-                onReset={handleReset}
-              />
+                onReset={requestReset}
+              >
+                {urlQrDirty ? <DraftSavedNote /> : null}
+              </GeneratorHeader>
               <fieldset className="form-fieldset">
                 <legend>Destination</legend>
                 <label>
@@ -3089,8 +3217,10 @@ export default function App() {
               <GeneratorHeader
                 title={GENERATOR_UI_META.qrCodeGenerator.title}
                 description={GENERATOR_UI_META.qrCodeGenerator.description}
-                onReset={handleReset}
-              />
+                onReset={requestReset}
+              >
+                {qrDirty ? <DraftSavedNote /> : null}
+              </GeneratorHeader>
               <fieldset className="form-fieldset">
                 <legend>Link</legend>
                 <label>
@@ -3533,6 +3663,12 @@ export default function App() {
       </div>
       </div>
       </div>
+      <ConfirmResetDialog
+        open={confirmResetOpen}
+        titleId="toolkit-confirm-title"
+        onCancel={cancelReset}
+        onConfirm={handleReset}
+      />
     </div>
   )
 }
