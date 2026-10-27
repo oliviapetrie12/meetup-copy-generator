@@ -1,5 +1,8 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  ALREADY_REGISTERED_MESSAGE,
+  REGISTRATION_MODE_ALREADY,
+  REGISTRATION_MODE_SELF,
   copyPreliminaryBoothStaffEmailToClipboard,
   defaultSubject,
   generatePreliminaryBoothStaffEmail,
@@ -19,6 +22,7 @@ import {
   FormSection,
   GeneratorActions,
   GeneratorHeader,
+  SegmentedControl,
 } from './components/generatorUi.jsx'
 
 const EmailBodyEditor = memo(
@@ -72,6 +76,9 @@ export default function PreliminaryBoothStaff() {
   const linkTextDiverged =
     form.registrationLinkTextManual && form.registrationLinkText !== form.conferenceName
   const instructionsDiverged = form.registrationInstructionsManual
+  const registeredMessageDiverged =
+    form.alreadyRegisteredMessageManual && form.alreadyRegisteredMessage !== ALREADY_REGISTERED_MESSAGE
+  const staffRegisterThemselves = form.registrationMode !== REGISTRATION_MODE_ALREADY
 
   const patchForm = (patch) => {
     setForm((prev) => updatePreliminaryBoothStaffForm(prev, patch))
@@ -229,6 +236,18 @@ export default function PreliminaryBoothStaff() {
           </FormSection>
 
           <FormSection title="Registration" emoji="🎟️" id="pbs-registration-heading">
+            <SegmentedControl
+              name="Registration approach"
+              value={form.registrationMode}
+              onChange={(registrationMode) => patchForm({ registrationMode })}
+              options={[
+                { value: REGISTRATION_MODE_SELF, label: 'Staff will register themselves' },
+                { value: REGISTRATION_MODE_ALREADY, label: 'Team is already registered' },
+              ]}
+            />
+
+            {staffRegisterThemselves ? (
+            <>
             <div className="gen-two-col mfu-two-col">
               <label className="mfu-field">
                 <FieldLabel>Registration deadline</FieldLabel>
@@ -327,6 +346,38 @@ export default function PreliminaryBoothStaff() {
                 </button>
               ) : null}
             </label>
+            </>
+            ) : (
+            <label className="mfu-field">
+              <FieldLabel>Registration message</FieldLabel>
+              <textarea
+                value={form.alreadyRegisteredMessage}
+                onChange={(e) =>
+                  patchForm({
+                    alreadyRegisteredMessage: e.target.value,
+                    alreadyRegisteredMessageManual: true,
+                  })
+                }
+                rows={4}
+                aria-describedby="pbs-registered-hint"
+              />
+              <span id="pbs-registered-hint" className="form-hint">
+                Shown under Registration in the email. Add any extra details the team should know.
+              </span>
+              {registeredMessageDiverged ? (
+                <button
+                  type="button"
+                  className="btn-use-utm-url"
+                  onClick={() => {
+                    patchForm({ alreadyRegisteredMessageManual: false })
+                    refreshGeneratedBody()
+                  }}
+                >
+                  Use default message
+                </button>
+              ) : null}
+            </label>
+            )}
           </FormSection>
 
           <FormSection title="Email" emoji="✉️" id="pbs-email-heading">

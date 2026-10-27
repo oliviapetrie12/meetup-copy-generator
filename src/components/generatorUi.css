@@ -236,6 +236,9 @@
   color: #475569;
   font-size: 0.875rem;
   font-weight: 550;
+  line-height: 1.35;
+  white-space: normal;
+  text-wrap: balance;
   cursor: pointer;
 }
 

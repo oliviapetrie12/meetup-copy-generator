@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  ALREADY_REGISTERED_MESSAGE,
   PRELIMINARY_BOOTH_STAFF_STORAGE_KEY,
+  REGISTRATION_MODE_ALREADY,
+  REGISTRATION_MODE_SELF,
   copyPreliminaryBoothStaffEmailToClipboard,
   defaultSubject,
   generatePreliminaryBoothStaffEmail,
@@ -82,6 +85,7 @@ describe('preliminary booth staff email', () => {
     )
     expect(email.html).toContain('<ol>')
     expect(email.html).not.toContain('class=')
+    expect(email.plain).not.toContain('Everyone has been registered')
   })
 
   it('omits the code step and renumbers when no code is provided', () => {
@@ -150,12 +154,83 @@ describe('preliminary booth staff email', () => {
     expect(email.html).toContain('<a href="https://reg.example.com/ato">All Things Open</a>')
   })
 
+  it('uses an editable note when the team is already registered', () => {
+    const already = updatePreliminaryBoothStaffForm(sampleForm(), {
+      registrationMode: REGISTRATION_MODE_ALREADY,
+    })
+    expect(already.registrationDeadline).toBe('March 6')
+    expect(already.registrationCode).toBe('BOOTH2026')
+    expect(already.registrationLink).toBe('https://reg.example.com/ato')
+    expect(already.registrationInstructions).toContain('Please register by March 6:')
+    expect(already.alreadyRegisteredMessage).toBe(ALREADY_REGISTERED_MESSAGE)
+
+    const email = generatePreliminaryBoothStaffEmail(already)
+    expect(email.plain).toContain(
+      'Thank you for helping staff the DevRel booth at All Things Open on March 16–18! I wanted to share some preliminary details.',
+    )
+    expect(email.plain).not.toContain('registration instructions')
+    expect(email.plain).toContain('🎟️ Registration')
+    expect(email.plain).toContain(ALREADY_REGISTERED_MESSAGE)
+    expect(email.plain).not.toContain('Please register')
+    expect(email.plain).not.toContain('March 6')
+    expect(email.plain).not.toContain('BOOTH2026')
+    expect(email.plain).not.toContain('reg.example.com')
+    expect(email.plain).not.toContain('Visit ')
+    expect(email.html).toContain(`<p>${ALREADY_REGISTERED_MESSAGE}</p>`)
+    expect(email.html).not.toContain('<a ')
+    expect(email.html).not.toContain('<ol>')
+
+    const edited = updatePreliminaryBoothStaffForm(already, {
+      alreadyRegisteredMessage: 'Everyone has been registered.\n\nBadges will be at the booth. See All Things Open.',
+      alreadyRegisteredMessageManual: true,
+    })
+    const editedEmail = generatePreliminaryBoothStaffEmail(edited)
+    expect(editedEmail.plain).toContain('Everyone has been registered.')
+    expect(editedEmail.plain).toContain('Badges will be at the booth. See All Things Open.')
+    expect(editedEmail.plain).not.toContain('using the code provided')
+    expect(editedEmail.html).not.toContain('<a ')
+    expect(editedEmail.html).toContain('<p>Everyone has been registered.</p>')
+    expect(editedEmail.html).toContain('<p>Badges will be at the booth. See All Things Open.</p>')
+
+    const back = updatePreliminaryBoothStaffForm(edited, { registrationMode: REGISTRATION_MODE_SELF })
+    expect(back.registrationCode).toBe('BOOTH2026')
+    expect(back.registrationLink).toBe('https://reg.example.com/ato')
+    expect(back.alreadyRegisteredMessage).toContain('Badges will be at the booth.')
+    const selfEmail = generatePreliminaryBoothStaffEmail(back)
+    expect(selfEmail.plain).toContain('Use code BOOTH2026')
+    expect(selfEmail.plain).toContain('https://reg.example.com/ato')
+    expect(selfEmail.plain).not.toContain('Badges will be at the booth.')
+
+    const again = updatePreliminaryBoothStaffForm(back, { registrationMode: REGISTRATION_MODE_ALREADY })
+    expect(generatePreliminaryBoothStaffEmail(again).plain).toContain('Badges will be at the booth.')
+    expect(again.registrationDeadline).toBe('March 6')
+  })
+
+  it('omits the registration section when the already-registered note is cleared', () => {
+    const email = generatePreliminaryBoothStaffEmail(
+      updatePreliminaryBoothStaffForm(sampleForm(), {
+        registrationMode: REGISTRATION_MODE_ALREADY,
+        alreadyRegisteredMessage: '   ',
+        alreadyRegisteredMessageManual: true,
+      }),
+    )
+    expect(email.plain).not.toContain('🎟️ Registration')
+    expect(email.plain).not.toContain('Please register')
+    expect(email.plain).not.toContain('BOOTH2026')
+    expect(email.plain).not.toContain('registration instructions')
+  })
+
   it('requires a conference name and a valid registration link', () => {
     expect(validatePreliminaryBoothStaffForm(getInitialPreliminaryBoothStaffForm()).ok).toBe(false)
     expect(validatePreliminaryBoothStaffForm(sampleForm()).ok).toBe(true)
     const invalid = validatePreliminaryBoothStaffForm(sampleForm({ registrationLink: 'not a url' }))
     expect(invalid.ok).toBe(false)
     expect(invalid.fieldErrors.registrationLink).toMatch(/http/)
+    expect(
+      validatePreliminaryBoothStaffForm(
+        sampleForm({ registrationMode: REGISTRATION_MODE_ALREADY, registrationLink: 'not a url' }),
+      ).ok,
+    ).toBe(true)
   })
 
   it('treats a fresh form as empty and a named conference as a draft', () => {
@@ -166,6 +241,11 @@ describe('preliminary booth staff email', () => {
       registrationLinkTextManual: true,
     })
     expect(isPreliminaryBoothStaffFormEmpty(linkTextOnly)).toBe(false)
+    expect(getInitialPreliminaryBoothStaffForm().registrationMode).toBe(REGISTRATION_MODE_SELF)
+    const alreadyOnly = updatePreliminaryBoothStaffForm(getInitialPreliminaryBoothStaffForm(), {
+      registrationMode: REGISTRATION_MODE_ALREADY,
+    })
+    expect(isPreliminaryBoothStaffFormEmpty(alreadyOnly)).toBe(false)
   })
 
   it('saves and restores each draft separately from the other generators', () => {
@@ -185,6 +265,37 @@ describe('preliminary booth staff email', () => {
     expect(loaded.registrationCode).toBe('BOOTH2026')
     expect(JSON.parse(localStorage.getItem('conference-followup-form-v1')).conferenceName).toBe('Other event')
     expect(localStorage.getItem(PRELIMINARY_BOOTH_STAFF_STORAGE_KEY)).toContain('All Things Open')
+  })
+
+  it('saves the registration approach and edited message with the draft', () => {
+    const form = updatePreliminaryBoothStaffForm(sampleForm(), {
+      registrationMode: REGISTRATION_MODE_ALREADY,
+      alreadyRegisteredMessage: 'The team is registered. Pick up badges on site.',
+      alreadyRegisteredMessageManual: true,
+    })
+    savePreliminaryBoothStaffForm(form)
+
+    const loaded = loadPreliminaryBoothStaffForm()
+    expect(loaded.registrationMode).toBe(REGISTRATION_MODE_ALREADY)
+    expect(loaded.alreadyRegisteredMessage).toBe('The team is registered. Pick up badges on site.')
+    expect(loaded.registrationDeadline).toBe('March 6')
+    expect(loaded.registrationCode).toBe('BOOTH2026')
+    const email = generatePreliminaryBoothStaffEmail(loaded)
+    expect(email.plain).toContain('Pick up badges on site.')
+    expect(email.plain).not.toContain('Please register')
+  })
+
+  it('keeps an older draft on self-registration when no approach was saved', () => {
+    const legacy = sampleForm()
+    delete legacy.registrationMode
+    delete legacy.alreadyRegisteredMessage
+    delete legacy.alreadyRegisteredMessageManual
+    localStorage.setItem(PRELIMINARY_BOOTH_STAFF_STORAGE_KEY, JSON.stringify(legacy))
+
+    const loaded = loadPreliminaryBoothStaffForm()
+    expect(loaded.registrationMode).toBe(REGISTRATION_MODE_SELF)
+    expect(loaded.alreadyRegisteredMessage).toBe(ALREADY_REGISTERED_MESSAGE)
+    expect(generatePreliminaryBoothStaffEmail(loaded).plain).toContain('Please register by March 6:')
   })
 
   it('keeps ordered-list numbers and the registration URL in an edited body', () => {

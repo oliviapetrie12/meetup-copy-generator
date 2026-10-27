@@ -16,6 +16,12 @@ export const LOGISTICS_PARAGRAPH =
 
 const LET_ME_KNOW = `Let me know once you${APOSTROPHE}ve registered.`
 
+export const REGISTRATION_MODE_SELF = 'self'
+export const REGISTRATION_MODE_ALREADY = 'already'
+
+export const ALREADY_REGISTERED_MESSAGE =
+  'Everyone has been registered using the code provided as part of our sponsorship.'
+
 function trim(value) {
   return String(value || '').trim()
 }
@@ -75,6 +81,12 @@ export function withDerivedFields(form) {
   if (!next.registrationInstructionsManual) {
     next.registrationInstructions = defaultRegistrationInstructions(next)
   }
+  if (next.registrationMode !== REGISTRATION_MODE_ALREADY) {
+    next.registrationMode = REGISTRATION_MODE_SELF
+  }
+  if (!next.alreadyRegisteredMessageManual) {
+    next.alreadyRegisteredMessage = ALREADY_REGISTERED_MESSAGE
+  }
   return next
 }
 
@@ -91,6 +103,9 @@ export function getInitialPreliminaryBoothStaffForm() {
     registrationCode: '',
     registrationInstructions: '',
     registrationInstructionsManual: false,
+    registrationMode: REGISTRATION_MODE_SELF,
+    alreadyRegisteredMessage: '',
+    alreadyRegisteredMessageManual: false,
     additionalNote: '',
     senderName: '',
     subject: '',
@@ -132,20 +147,21 @@ export function validatePreliminaryBoothStaffForm(form) {
   const fieldErrors = {}
   if (!trim(form?.conferenceName)) fieldErrors.conferenceName = 'Enter a conference name.'
   const link = trim(form?.registrationLink)
-  if (link && !isValidHttpUrl(link)) {
+  const staffRegisterThemselves = form?.registrationMode !== REGISTRATION_MODE_ALREADY
+  if (staffRegisterThemselves && link && !isValidHttpUrl(link)) {
     fieldErrors.registrationLink = 'Enter a valid http(s) registration link.'
   }
   return { ok: Object.keys(fieldErrors).length === 0, fieldErrors }
 }
 
-function introSentence(form, hasRegistration) {
+function introSentence(form, includeRegistrationInstructions) {
   const name = trim(form.conferenceName)
   const dates = trim(form.eventDates)
   let sentence = 'Thank you for helping staff the DevRel booth'
   if (name) sentence += ` at ${name}`
   if (dates) sentence += ` on ${dates}`
   sentence += '! I wanted to share some preliminary details'
-  if (hasRegistration) sentence += ' and registration instructions'
+  if (includeRegistrationInstructions) sentence += ' and registration instructions'
   sentence += '.'
   return sentence
 }
@@ -159,6 +175,14 @@ function overviewItems(form) {
   if (location) items.push(['Location', location])
   if (sponsorship) items.push(['Elastic sponsorship', sponsorship])
   return items
+}
+
+function renderMessage(text) {
+  const parts = noteParagraphs(text)
+  return {
+    html: parts.map((part) => `<p>${escapeMultiline(part)}</p>`).join(''),
+    plain: parts.join('\n\n'),
+  }
 }
 
 function noteParagraphs(note) {
@@ -297,24 +321,29 @@ export function generatePreliminaryBoothStaffEmail(form) {
   const normalized = withDerivedFields(form || {})
   const subject =
     typeof normalized.subject === 'string' ? normalized.subject : defaultSubject(normalized.conferenceName)
+  const teamAlreadyRegistered = normalized.registrationMode === REGISTRATION_MODE_ALREADY
   const instructions = trim(normalized.registrationInstructions)
-  const hasRegistration = Boolean(instructions)
-  const intro = introSentence(normalized, hasRegistration)
+  const registeredMessage = trim(normalized.alreadyRegisteredMessage)
+  const hasSelfRegistration = !teamAlreadyRegistered && Boolean(instructions)
+  const hasRegisteredNote = teamAlreadyRegistered && Boolean(registeredMessage)
+  const intro = introSentence(normalized, hasSelfRegistration)
   const overview = overviewItems(normalized)
   const notes = noteParagraphs(normalized.additionalNote)
   const sender = trim(normalized.senderName)
-  const rendered = hasRegistration
+  const rendered = hasSelfRegistration
     ? renderInstructions(
         normalized.registrationInstructions,
         trim(normalized.registrationLinkText),
         trim(normalized.registrationLink),
       )
-    : { html: '', plain: '' }
+    : hasRegisteredNote
+      ? renderMessage(registeredMessage)
+      : { html: '', plain: '' }
 
   const plainLines = ['Hi team,', '', intro]
   const htmlParts = ['<p>Hi team,</p>', `<p>${escapeHtml(intro)}</p>`]
 
-  if (hasRegistration) {
+  if (hasSelfRegistration || hasRegisteredNote) {
     plainLines.push('', '🎟️ Registration', '', rendered.plain)
     htmlParts.push('<p><strong>🎟️ Registration</strong></p>', rendered.html)
   }
