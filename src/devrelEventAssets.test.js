@@ -274,6 +274,33 @@ describe('event assets document generation', () => {
     expect(html).toContain(t.elasticBrandGuidelinesLabel)
   })
 
+  it('includes a localized Elastic brand resources link in both languages', () => {
+    const en = generateEventAssetsDocument(sampleForm({ language: 'en' }))
+    const pt = generateEventAssetsDocument(sampleForm({ language: 'pt' }))
+    const enT = getEventAssetsStrings('en')
+    const ptT = getEventAssetsStrings('pt')
+    const href = `<a href="${BRAND_ASSET_LINKS.portal}">${BRAND_ASSET_LINKS.portal}</a>`
+
+    expect(enT.elasticBrandResourcesHeading).toBe('Elastic Brand Resources')
+    expect(en.html).toContain(`<h2>${enT.elasticBrandResourcesHeading}</h2>`)
+    expect(en.html).toContain(enT.elasticBrandResourcesBody)
+    expect(en.html).toContain(href)
+    expect(en.plain).toContain(`${enT.elasticBrandResourcesBody} ${BRAND_ASSET_LINKS.portal}`)
+    expect(en.html).toContain(enT.logoAndBrandAssetsHeading)
+
+    expect(ptT.elasticBrandResourcesHeading).toBe('Recursos de marca da Elastic')
+    expect(pt.html).toContain(`<h2>${ptT.elasticBrandResourcesHeading}</h2>`)
+    expect(pt.html).toContain(ptT.elasticBrandResourcesBody)
+    expect(pt.html).toContain(href)
+    expect(pt.plain).toContain(`${ptT.elasticBrandResourcesBody} ${BRAND_ASSET_LINKS.portal}`)
+    expect(pt.html).not.toContain(enT.elasticBrandResourcesHeading)
+    expect(pt.plain).not.toContain(enT.elasticBrandResourcesBody)
+
+    const clip = buildEventAssetsClipboardHtml(pt.html)
+    expect(clip).toContain(href)
+    expect(clip).not.toMatch(/\sclass\s*=/i)
+  })
+
   it('groups event name and type beneath the document title', () => {
     const { html } = generateEventAssetsDocument(sampleForm())
     const t = getEventAssetsStrings('en')

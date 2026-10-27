@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
+  BRAND_ASSET_LINKS,
   EVENT_ASSETS_LANGUAGE_OPTIONS,
   EVENT_TYPE_OPTIONS,
   copyEventAssetsToClipboard,
@@ -127,7 +128,7 @@ export default function DevrelEventAssets() {
         >
           <GeneratorHeader
             title="DevRel Event Assets"
-            description="Generate a localized Elastic document that conference organizers and community partners can paste into Google Docs for event websites, sponsor listings, and promotional materials."
+            description="Create a shareable resource document for conference organizers and community partners, including Elastic information, event details, and brand resources."
             emoji="📋"
             tone="teal"
             onReset={requestReset}
@@ -190,6 +191,22 @@ export default function DevrelEventAssets() {
                 </select>
               </label>
             </div>
+          </FormSection>
+
+          <FormSection
+            title="Elastic Brand Resources"
+            emoji="🎨"
+            id="dea-brand-resources-heading"
+            hint="Find official Elastic logos and brand guidance on the Elastic brand site."
+          >
+            <a
+              className="dea-brand-link"
+              href={BRAND_ASSET_LINKS.portal}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {BRAND_ASSET_LINKS.portal}
+            </a>
           </FormSection>
 
           <CollapsibleFormSection

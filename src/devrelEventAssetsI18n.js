@@ -15,6 +15,7 @@ export const EVENT_ASSETS_HTML_LANG = {
 }
 
 export const BRAND_ASSET_LINKS = {
+  portal: 'https://brand.elastic.co/',
   logo: 'https://brand.elastic.co/302f66895/p/06c73c-our-logo/b/35d033',
   brandGuidelines: 'https://brand.elastic.co/302f66895/p/2424b6-elastic-brand-guide',
 }
@@ -50,6 +51,8 @@ const EN = {
   sessionInformationHeading: 'Session Information',
   sessionTitleLabel: 'Title',
   sessionDescriptionLabel: 'Description',
+  elasticBrandResourcesHeading: 'Elastic Brand Resources',
+  elasticBrandResourcesBody: 'Find official Elastic logos and brand guidance.',
   logoAndBrandAssetsHeading: 'Logo and Brand Assets',
   elasticLogoLabel: 'Elastic logo',
   elasticBrandGuidelinesLabel: 'Elastic brand guidelines',
@@ -83,6 +86,8 @@ const PT = {
   sessionInformationHeading: 'Informações da sessão',
   sessionTitleLabel: 'Título',
   sessionDescriptionLabel: 'Descrição',
+  elasticBrandResourcesHeading: 'Recursos de marca da Elastic',
+  elasticBrandResourcesBody: 'Encontre logos oficiais e orientações de marca da Elastic.',
   logoAndBrandAssetsHeading: 'Logo e ativos de marca',
   elasticLogoLabel: 'Logo da Elastic',
   elasticBrandGuidelinesLabel: 'Diretrizes de marca da Elastic',

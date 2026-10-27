@@ -262,6 +262,13 @@ export function generateEventAssetsDocument(form, options = {}) {
     plainParts.push('')
   }
 
+  htmlParts.push(`<h2>${escapeHtml(t.elasticBrandResourcesHeading)}</h2>`)
+  htmlParts.push(
+    `<p>${escapeHtml(t.elasticBrandResourcesBody)} <a href="${escapeHtml(BRAND_ASSET_LINKS.portal)}">${escapeHtml(BRAND_ASSET_LINKS.portal)}</a></p>`,
+  )
+  plainParts.push(t.elasticBrandResourcesHeading)
+  plainParts.push(`${t.elasticBrandResourcesBody} ${BRAND_ASSET_LINKS.portal}`, '')
+
   htmlParts.push(`<h2>${escapeHtml(t.logoAndBrandAssetsHeading)}</h2>`)
   htmlParts.push('<ul>')
   htmlParts.push(linkItemHtml(t.elasticLogoLabel, BRAND_ASSET_LINKS.logo))
