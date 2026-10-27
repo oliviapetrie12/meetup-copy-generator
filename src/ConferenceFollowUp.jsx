@@ -6,7 +6,9 @@ import {
   copyConferenceFollowUpEmailToClipboard,
   createEmptyResource,
   defaultOpeningSentence,
+  defaultSubject,
   generateConferenceFollowUpEmail,
+  STANDARD_RESOURCES,
   getResetConferenceFollowUpForm,
   htmlEmailToPlain,
   isConferenceFollowUpFormEmpty,
@@ -56,9 +58,7 @@ export default function ConferenceFollowUp() {
   const [generated, setGenerated] = useState(null)
   const [showErrors, setShowErrors] = useState(false)
   const [confirmResetOpen, setConfirmResetOpen] = useState(false)
-  const [subject, setSubject] = useState('')
   const [preview, setPreview] = useState('')
-  const [subjectDirty, setSubjectDirty] = useState(false)
   const [previewDirty, setPreviewDirty] = useState(false)
   const [bodyDirty, setBodyDirty] = useState(false)
   const [editedHtml, setEditedHtml] = useState('')
@@ -82,6 +82,7 @@ export default function ConferenceFollowUp() {
   const campaignDiverged = form.utmCampaignManual && form.utmCampaign !== DEFAULT_UTM_CAMPAIGN
   const openingDiverged =
     form.openingManual && form.openingSentence !== defaultOpeningSentence(form.conferenceName)
+  const subjectDiverged = form.subjectManual && form.subject !== defaultSubject(form.conferenceName)
 
   const updateConferenceName = (value) => {
     setForm((prev) => applyConferenceNameChange(prev, value))
@@ -92,8 +93,27 @@ export default function ConferenceFollowUp() {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
+  const refreshGeneratedBody = () => {
+    setBodyDirty(false)
+    setEditedHtml('')
+    setBodyRevision((n) => n + 1)
+  }
+
+  const updateSubject = (value) => {
+    setForm((prev) => ({ ...prev, subject: value, subjectManual: true }))
+  }
+
+  const useDefaultSubject = () => {
+    setForm((prev) => ({
+      ...prev,
+      subject: defaultSubject(prev.conferenceName),
+      subjectManual: false,
+    }))
+  }
+
   const updateOpening = (value) => {
     setForm((prev) => ({ ...prev, openingSentence: value, openingManual: true }))
+    refreshGeneratedBody()
   }
 
   const updateMedium = (value) => {
@@ -126,6 +146,15 @@ export default function ConferenceFollowUp() {
       openingSentence: defaultOpeningSentence(prev.conferenceName),
       openingManual: false,
     }))
+    refreshGeneratedBody()
+  }
+
+  const setIncludedResource = (id, checked) => {
+    setForm((prev) => ({
+      ...prev,
+      includedResources: { ...prev.includedResources, [id]: checked },
+    }))
+    refreshGeneratedBody()
   }
 
   const updateResource = (id, key, value) => {
@@ -152,7 +181,6 @@ export default function ConferenceFollowUp() {
       return
     }
     const email = generateConferenceFollowUpEmail(form)
-    setSubjectDirty(false)
     setPreviewDirty(false)
     setBodyDirty(false)
     setEditedHtml('')
@@ -173,11 +201,6 @@ export default function ConferenceFollowUp() {
   }, [form])
 
   useEffect(() => {
-    if (!generated || subjectDirty) return
-    setSubject(generated.subject)
-  }, [generated, subjectDirty])
-
-  useEffect(() => {
     if (!generated || previewDirty) return
     setPreview(generated.preview)
   }, [generated, previewDirty])
@@ -191,9 +214,7 @@ export default function ConferenceFollowUp() {
     setForm(getResetConferenceFollowUpForm())
     setGenerated(null)
     setShowErrors(false)
-    setSubject('')
     setPreview('')
-    setSubjectDirty(false)
     setPreviewDirty(false)
     setBodyDirty(false)
     setEditedHtml('')
@@ -210,9 +231,9 @@ export default function ConferenceFollowUp() {
   }
 
   const copySubject = async () => {
-    if (!subject) return
+    if (!form.subject) return
     try {
-      await navigator.clipboard.writeText(subject)
+      await navigator.clipboard.writeText(form.subject)
       setSubjectCopied(true)
       window.setTimeout(() => setSubjectCopied(false), 2000)
     } catch {
@@ -283,6 +304,24 @@ export default function ConferenceFollowUp() {
             </label>
 
             <label className="mfu-field">
+              <FieldLabel>Subject line</FieldLabel>
+              <input
+                type="text"
+                value={form.subject}
+                onChange={(e) => updateSubject(e.target.value)}
+                aria-describedby="cfu-subject-hint"
+              />
+              <span id="cfu-subject-hint" className="form-hint">
+                Defaults to a booth thank-you. Edit it for a workshop, hackathon, or other activity.
+              </span>
+              {subjectDiverged ? (
+                <button type="button" className="btn-use-utm-url" onClick={useDefaultSubject}>
+                  Use default subject
+                </button>
+              ) : null}
+            </label>
+
+            <label className="mfu-field">
               <FieldLabel>Opening sentence</FieldLabel>
               <textarea
                 className="cfu-opening"
@@ -292,7 +331,7 @@ export default function ConferenceFollowUp() {
                 aria-describedby="cfu-opening-hint"
               />
               <span id="cfu-opening-hint" className="form-hint">
-                Defaults to a thank-you that includes the conference name.
+                Defaults to a booth thank-you. Edit it for a workshop, hackathon, or other activity.
               </span>
               {openingDiverged ? (
                 <button type="button" className="btn-use-utm-url" onClick={useDefaultOpening}>
@@ -361,6 +400,25 @@ export default function ConferenceFollowUp() {
                 </button>
               ) : null}
             </label>
+          </FormSection>
+
+          <FormSection
+            title="Standard resources"
+            id="cfu-standard-heading"
+            hint="Included in the email. Turn off any you do not need."
+          >
+            <div className="tldr-include-checkboxes">
+              {STANDARD_RESOURCES.map((resource) => (
+                <label key={resource.id} className="checkbox-label tldr-include-option">
+                  <input
+                    type="checkbox"
+                    checked={form.includedResources[resource.id] !== false}
+                    onChange={(e) => setIncludedResource(resource.id, e.target.checked)}
+                  />
+                  {resource.label}
+                </label>
+              ))}
+            </div>
           </FormSection>
 
           <CollapsibleFormSection
@@ -451,11 +509,8 @@ export default function ConferenceFollowUp() {
                 <input
                   className="cfu-editable-input"
                   type="text"
-                  value={subject}
-                  onChange={(e) => {
-                    setSubjectDirty(true)
-                    setSubject(e.target.value)
-                  }}
+                  value={form.subject}
+                  onChange={(e) => updateSubject(e.target.value)}
                   aria-label="Subject line"
                 />
                 <div className="output-actions output-actions-inline">
@@ -513,7 +568,7 @@ export default function ConferenceFollowUp() {
               </p>
               {bodyDirty ? (
                 <p className="form-hint mfu-copy-email-hint">
-                  Generate follow-up again to rebuild the subject, preview text, and email body from the form.
+                  Generate follow-up again to rebuild the preview text and email body from the form.
                 </p>
               ) : null}
 

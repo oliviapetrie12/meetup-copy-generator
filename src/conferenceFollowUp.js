@@ -68,6 +68,39 @@ export function defaultSubject(conferenceName) {
   return `Thanks for stopping by Elastic${APOSTROPHE}s booth at ${name}!`
 }
 
+/** Standard links in the follow-up email. All are included unless turned off. */
+export const STANDARD_RESOURCES = [
+  { id: 'training', label: 'Free and instructor-led training' },
+  { id: 'newsletter', label: 'Community newsletter' },
+  { id: 'slack', label: 'Slack' },
+  { id: 'discuss', label: 'Discuss' },
+  { id: 'sessionize', label: 'Submit a session' },
+]
+
+export function defaultIncludedResources() {
+  return {
+    training: true,
+    newsletter: true,
+    slack: true,
+    discuss: true,
+    sessionize: true,
+  }
+}
+
+/**
+ * @param {ReturnType<typeof getInitialConferenceFollowUpForm> | null | undefined} form
+ */
+export function includedResourcesFromForm(form) {
+  const defaults = defaultIncludedResources()
+  const raw = form?.includedResources
+  if (!raw || typeof raw !== 'object') return defaults
+  const next = { ...defaults }
+  for (const resource of STANDARD_RESOURCES) {
+    if (typeof raw[resource.id] === 'boolean') next[resource.id] = raw[resource.id]
+  }
+  return next
+}
+
 /**
  * @returns {{ id: string, label: string, url: string }}
  */
@@ -82,8 +115,11 @@ export function createEmptyResource() {
 export function getInitialConferenceFollowUpForm() {
   return {
     conferenceName: '',
+    subject: defaultSubject(''),
+    subjectManual: false,
     openingSentence: defaultOpeningSentence(''),
     openingManual: false,
+    includedResources: defaultIncludedResources(),
     utmSource: DEFAULT_UTM_SOURCE,
     utmMedium: '',
     utmMediumManual: false,
@@ -103,6 +139,9 @@ export function getResetConferenceFollowUpForm() {
  */
 export function applyConferenceNameChange(form, conferenceName) {
   const next = { ...form, conferenceName }
+  if (!form.subjectManual) {
+    next.subject = defaultSubject(conferenceName)
+  }
   if (!form.openingManual) {
     next.openingSentence = defaultOpeningSentence(conferenceName)
   }
@@ -123,8 +162,12 @@ export function isConferenceFollowUpFormEmpty(form) {
   if (String(form.utmMedium || '').trim() !== conferenceMediumFromName(form.conferenceName)) return false
   if (form.utmCampaignManual) return false
   if (String(form.utmCampaign || '').trim() !== DEFAULT_UTM_CAMPAIGN) return false
+  if (form.subjectManual) return false
+  if (String(form.subject ?? defaultSubject('')) !== defaultSubject('')) return false
   if (form.openingManual) return false
   if (String(form.openingSentence || '') !== defaultOpeningSentence('')) return false
+  const included = includedResourcesFromForm(form)
+  if (STANDARD_RESOURCES.some((resource) => !included[resource.id])) return false
   const resources = Array.isArray(form.resources) ? form.resources : []
   return resources.every((r) => !String(r.label || '').trim() && !String(r.url || '').trim())
 }
@@ -151,8 +194,14 @@ export function loadConferenceFollowUpForm() {
       typeof parsed.openingSentence === 'string' && parsed.openingSentence
         ? parsed.openingSentence
         : defaultOpeningSentence(conferenceName)
+    const subjectRaw = typeof parsed.subject === 'string' ? parsed.subject : ''
     const generatedMedium = conferenceMediumFromName(conferenceName)
     const generatedOpening = defaultOpeningSentence(conferenceName)
+    const generatedSubject = defaultSubject(conferenceName)
+    const subjectManual =
+      typeof parsed.subjectManual === 'boolean'
+        ? parsed.subjectManual
+        : Boolean(subjectRaw.trim()) && subjectRaw !== generatedSubject
     const campaignTrim = utmCampaignRaw.trim()
     const mediumTrim = utmMediumRaw.trim()
     const utmCampaignManual =
@@ -167,7 +216,10 @@ export function loadConferenceFollowUpForm() {
         : Boolean(mediumTrim) && mediumTrim !== LEGACY_UTM_MEDIUM && mediumTrim !== generatedMedium
     return {
       conferenceName,
+      subject: subjectManual ? subjectRaw : generatedSubject,
+      subjectManual,
       openingSentence,
+      includedResources: includedResourcesFromForm(parsed),
       openingManual:
         typeof parsed.openingManual === 'boolean'
           ? parsed.openingManual
@@ -270,12 +322,16 @@ export function buildConferenceResourceLinks(form) {
  */
 export function listConferenceTrackedLinks(form) {
   const links = buildConferenceResourceLinks(form)
-  return [
+  const included = includedResourcesFromForm(form)
+  const standard = [
     { id: 'training', label: 'Training', href: links.training },
     { id: 'newsletter', label: 'Newsletter', href: links.newsletter },
     { id: 'slack', label: 'Slack', href: links.slack },
     { id: 'discuss', label: 'Discuss', href: links.discuss },
     { id: 'sessionize', label: 'Meetup sessions', href: links.sessionize },
+  ].filter((link) => included[link.id])
+  return [
+    ...standard,
     ...links.custom.map((r, i) => ({
       id: `custom-${i}`,
       label: r.label,
@@ -320,6 +376,53 @@ function openingToHtml(opening) {
 }
 
 /**
+ * Stay-connected bullets for the resources that are turned on.
+ * Slack and Discuss share one sentence when both are included.
+ * @param {ReturnType<typeof includedResourcesFromForm>} included
+ * @param {ReturnType<typeof buildConferenceResourceLinks>} urls
+ * @returns {{ plain: string, html: string }[]}
+ */
+function stayConnectedBullets(included, urls) {
+  /** @type {{ plain: string, html: string }[]} */
+  const bullets = []
+  if (included.newsletter) {
+    bullets.push({
+      plain: `- Subscribe to the Elastic community newsletter: ${urls.newsletter}`,
+      html: `<li><a href="${escapeHtmlAttr(urls.newsletter)}">Subscribe to the Elastic community newsletter</a></li>`,
+    })
+  }
+  if (included.slack && included.discuss) {
+    bullets.push({
+      plain: `- Ask technical questions on Slack (${urls.slack}) or Discuss (${urls.discuss})`,
+      html: `<li>Ask technical questions on <a href="${escapeHtmlAttr(urls.slack)}">Slack</a> or <a href="${escapeHtmlAttr(urls.discuss)}">Discuss</a></li>`,
+    })
+  } else if (included.slack) {
+    bullets.push({
+      plain: `- Ask technical questions on Slack (${urls.slack})`,
+      html: `<li>Ask technical questions on <a href="${escapeHtmlAttr(urls.slack)}">Slack</a></li>`,
+    })
+  } else if (included.discuss) {
+    bullets.push({
+      plain: `- Ask technical questions on Discuss (${urls.discuss})`,
+      html: `<li>Ask technical questions on <a href="${escapeHtmlAttr(urls.discuss)}">Discuss</a></li>`,
+    })
+  }
+  if (included.sessionize) {
+    bullets.push({
+      plain: `- Submit a session to speak at a future meetup: ${urls.sessionize}`,
+      html: `<li><a href="${escapeHtmlAttr(urls.sessionize)}">Submit a session to speak at a future meetup</a></li>`,
+    })
+  }
+  urls.custom.forEach((resource) => {
+    bullets.push({
+      plain: `- ${resource.label}: ${resource.url}`,
+      html: `<li><a href="${escapeHtmlAttr(resource.url)}">${escapeHtml(resource.label)}</a></li>`,
+    })
+  })
+  return bullets
+}
+
+/**
  * @param {ReturnType<typeof getInitialConferenceFollowUpForm>} form
  * @returns {{
  *   subject: string,
@@ -333,58 +436,50 @@ function openingToHtml(opening) {
 export function generateConferenceFollowUpEmail(form) {
   const name = String(form?.conferenceName || '').trim() || '[conference name]'
   const opening = String(form?.openingSentence || '').trim() || defaultOpeningSentence(form?.conferenceName)
-  const subject = defaultSubject(form?.conferenceName)
+  const subject =
+    typeof form?.subject === 'string' ? form.subject : defaultSubject(form?.conferenceName)
   const preview = DEFAULT_PREVIEW_TEXT
+  const included = includedResourcesFromForm(form)
   const utm = buildConferenceFollowUpUtm(form)
   const urls = buildConferenceResourceLinks(form)
+  const bullets = stayConnectedBullets(included, urls)
 
-  const plainLines = [
-    `Elastic @ ${name}`,
-    '',
-    opening,
-    '',
-    `To learn more about Elasticsearch and our products, take a look at the free and instructor-led training: ${urls.training}`,
-    '',
-    `If you${APOSTROPHE}d like to stay connected:`,
-    '',
-    `- Subscribe to the Elastic community newsletter: ${urls.newsletter}`,
-    `- Ask technical questions on Slack (${urls.slack}) or Discuss (${urls.discuss})`,
-    `- Submit a session to speak at a future meetup: ${urls.sessionize}`,
-  ]
-
-  urls.custom.forEach((resource) => {
-    plainLines.push(`- ${resource.label}: ${resource.url}`)
-  })
-
-  plainLines.push('', 'We hope to see you at another event soon!', '', 'The Elastic DevRel Team')
-
-  const customLis = urls.custom
-    .map(
-      (resource) =>
-        `<li><a href="${escapeHtmlAttr(resource.url)}">${escapeHtml(resource.label)}</a></li>`,
+  const plainLines = [`Elastic @ ${name}`, '', opening, '']
+  if (included.training) {
+    plainLines.push(
+      `To learn more about Elasticsearch and our products, take a look at the free and instructor-led training: ${urls.training}`,
+      '',
     )
-    .join('')
+  }
+  if (bullets.length) {
+    plainLines.push(`If you${APOSTROPHE}d like to stay connected:`, '')
+    bullets.forEach((bullet) => plainLines.push(bullet.plain))
+    plainLines.push('')
+  }
+  plainLines.push('We hope to see you at another event soon!', '', 'The Elastic DevRel Team')
 
-  const html = [
+  const htmlParts = [
     `<p>Elastic @ ${escapeHtml(name)}</p>`,
     `<p>${openingToHtml(opening)}</p>`,
-    `<p>To learn more about Elasticsearch and our products, take a look at the <a href="${escapeHtmlAttr(urls.training)}">free and instructor-led training</a>.</p>`,
-    `<p>If you${APOSTROPHE}d like to stay connected:</p>`,
-    '<ul>',
-    `<li><a href="${escapeHtmlAttr(urls.newsletter)}">Subscribe to the Elastic community newsletter</a></li>`,
-    `<li>Ask technical questions on <a href="${escapeHtmlAttr(urls.slack)}">Slack</a> or <a href="${escapeHtmlAttr(urls.discuss)}">Discuss</a></li>`,
-    `<li><a href="${escapeHtmlAttr(urls.sessionize)}">Submit a session to speak at a future meetup</a></li>`,
-    customLis,
-    '</ul>',
-    '<p>We hope to see you at another event soon!</p>',
-    '<p>The Elastic DevRel Team</p>',
-  ].join('')
+  ]
+  if (included.training) {
+    htmlParts.push(
+      `<p>To learn more about Elasticsearch and our products, take a look at the <a href="${escapeHtmlAttr(urls.training)}">free and instructor-led training</a>.</p>`,
+    )
+  }
+  if (bullets.length) {
+    htmlParts.push(
+      `<p>If you${APOSTROPHE}d like to stay connected:</p>`,
+      `<ul>${bullets.map((bullet) => bullet.html).join('')}</ul>`,
+    )
+  }
+  htmlParts.push('<p>We hope to see you at another event soon!</p>', '<p>The Elastic DevRel Team</p>')
 
   return {
     subject,
     preview,
     plain: plainLines.join('\n'),
-    html,
+    html: htmlParts.join(''),
     utm,
     links: listConferenceTrackedLinks(form),
   }

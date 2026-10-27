@@ -69,6 +69,7 @@ describe('conference medium slug', () => {
     expect(named.utmMedium).toBe('langchain-interrupt')
     expect(named.utmCampaign).toBe(DEFAULT_UTM_CAMPAIGN)
     expect(named.openingSentence).toBe('Thank you for stopping by our booth at LangChain Interrupt!')
+    expect(named.subject).toBe('Thanks for stopping by Elastic\u2019s booth at LangChain Interrupt!')
 
     const custom = applyConferenceNameChange(
       {
@@ -79,6 +80,8 @@ describe('conference medium slug', () => {
         utmCampaignManual: true,
         openingSentence: 'Hello from the booth.',
         openingManual: true,
+        subject: 'Thanks for joining the workshop!',
+        subjectManual: true,
       },
       'KubeCon Europe',
     )
@@ -86,6 +89,7 @@ describe('conference medium slug', () => {
     expect(custom.utmMedium).toBe('booth')
     expect(custom.utmCampaign).toBe('spring-booth')
     expect(custom.openingSentence).toBe('Hello from the booth.')
+    expect(custom.subject).toBe('Thanks for joining the workshop!')
   })
 })
 
@@ -242,6 +246,63 @@ describe('conference follow-up email', () => {
     expect(plain).toContain('<script>alert(1)</script>')
   })
 
+  it('uses an edited subject and opening in the generated email', () => {
+    const form = sampleForm({
+      subject: 'Thanks for joining the workshop!',
+      subjectManual: true,
+      openingSentence: 'Glad you could make the workshop.',
+      openingManual: true,
+    })
+    const { subject, html, plain } = generateConferenceFollowUpEmail(form)
+    expect(subject).toBe('Thanks for joining the workshop!')
+    expect(html).toContain('<p>Glad you could make the workshop.</p>')
+    expect(plain).toContain('Glad you could make the workshop.')
+    expect(html).not.toContain('Thank you for stopping by')
+  })
+
+  it('keeps the wording natural as standard resources are turned off', () => {
+    const base = applyConferenceNameChange(getInitialConferenceFollowUpForm(), 'LangChain Interrupt')
+
+    const slackOnly = generateConferenceFollowUpEmail({
+      ...base,
+      includedResources: { training: false, newsletter: false, slack: true, discuss: false, sessionize: false },
+    })
+    expect(slackOnly.plain).toContain('Ask technical questions on Slack (https://ela.st/slack)')
+    expect(slackOnly.plain).not.toContain('or Discuss')
+    expect(slackOnly.plain).not.toContain('free and instructor-led training')
+    expect(slackOnly.html).not.toContain('www.elastic.co/training')
+    expect(slackOnly.links.map((link) => link.id)).toEqual(['slack'])
+
+    const discussOnly = generateConferenceFollowUpEmail({
+      ...base,
+      includedResources: { training: false, newsletter: false, slack: false, discuss: true, sessionize: false },
+    })
+    expect(discussOnly.plain).toContain('Ask technical questions on Discuss (')
+    expect(discussOnly.plain).not.toContain('Slack')
+    expect(discussOnly.html).toContain('utm_campaign=conference-followup-cm')
+    expect(discussOnly.html).toContain('utm_medium=langchain-interrupt')
+
+    const none = generateConferenceFollowUpEmail({
+      ...base,
+      includedResources: { training: false, newsletter: false, slack: false, discuss: false, sessionize: false },
+    })
+    expect(none.plain).not.toContain('stay connected')
+    expect(none.html).not.toContain('<ul>')
+    expect(none.html).not.toContain('free and instructor-led training')
+    expect(none.plain).toContain('We hope to see you at another event soon!')
+    expect(none.links).toEqual([])
+
+    const customOnly = generateConferenceFollowUpEmail({
+      ...base,
+      includedResources: { training: false, newsletter: false, slack: false, discuss: false, sessionize: false },
+      resources: [{ id: 'deck', label: 'Deck', url: 'https://example.com/deck' }],
+    })
+    expect(customOnly.plain).toContain("If you’d like to stay connected:")
+    expect(customOnly.plain).toContain('- Deck: https://example.com/deck')
+    expect(customOnly.html).not.toContain('Slack')
+    expect(customOnly.html).not.toContain('newsletter')
+  })
+
   it('turns the rich body back into plain text that keeps the links', () => {
     const { html } = generateConferenceFollowUpEmail(sampleForm())
     const plain = htmlEmailToPlain(html)
@@ -323,6 +384,32 @@ describe('conference follow-up validation and storage', () => {
     expect(loaded.utmCampaignManual).toBe(false)
     expect(loaded.utmMedium).toBe('langchain-interrupt')
     expect(loaded.utmMediumManual).toBe(false)
+    expect(loaded.includedResources.training).toBe(true)
+    expect(loaded.subject).toBe('Thanks for stopping by Elastic\u2019s booth at LangChain Interrupt!')
+  })
+
+  it('keeps a saved subject edit and a resource that was turned off', () => {
+    saveConferenceFollowUpForm(
+      sampleForm({
+        subject: 'Thanks for joining the workshop!',
+        subjectManual: true,
+        includedResources: {
+          training: false,
+          newsletter: true,
+          slack: true,
+          discuss: true,
+          sessionize: true,
+        },
+      }),
+    )
+    const loaded = loadConferenceFollowUpForm()
+    expect(loaded.subject).toBe('Thanks for joining the workshop!')
+    expect(loaded.subjectManual).toBe(true)
+    expect(loaded.includedResources.training).toBe(false)
+    expect(loaded.includedResources.newsletter).toBe(true)
+    expect(isConferenceFollowUpFormEmpty({ ...getInitialConferenceFollowUpForm(), includedResources: loaded.includedResources })).toBe(
+      false,
+    )
   })
 
   it('handles blocked localStorage without throwing', () => {
