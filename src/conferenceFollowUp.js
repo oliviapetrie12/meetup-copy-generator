@@ -410,7 +410,7 @@ function stayConnectedBullets(included, urls) {
   if (included.sessionize) {
     bullets.push({
       plain: `- Submit a session to speak at a future meetup: ${urls.sessionize}`,
-      html: `<li><a href="${escapeHtmlAttr(urls.sessionize)}">Submit a session to speak at a future meetup</a></li>`,
+      html: `<li><a href="${escapeHtmlAttr(urls.sessionize)}">Submit a session</a> to speak at a future meetup</li>`,
     })
   }
   urls.custom.forEach((resource) => {

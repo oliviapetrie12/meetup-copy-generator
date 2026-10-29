@@ -199,7 +199,8 @@ describe('conference follow-up email', () => {
     expect(html).toContain('>Subscribe to the Elastic community newsletter</a>')
     expect(html).toContain('>Slack</a>')
     expect(html).toContain('>Discuss</a>')
-    expect(html).toContain('>Submit a session to speak at a future meetup</a>')
+    expect(html).toContain('>Submit a session</a> to speak at a future meetup')
+    expect(html).not.toContain('>Submit a session to speak at a future meetup</a>')
     expect(html).not.toContain('internal checklist')
     expect(html).not.toMatch(/\sclass\s*=/i)
 

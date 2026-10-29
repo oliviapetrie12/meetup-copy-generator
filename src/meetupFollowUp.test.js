@@ -308,6 +308,8 @@ describe('follow-up clipboard HTML', () => {
     expect(shape.excludesClassAttr).toBe(true)
     expect(shape.excludesScript).toBe(true)
 
+    expect(clip).toContain('>Submit a session</a> to speak at a future meetup')
+    expect(clip).not.toContain('>Submit a session to speak at a future meetup</a>')
     expect(clip).toContain('href="https://slides.example/search"')
     expect(clip).toContain('utm_campaign=meetup-followup-cm')
     expect(clip).toContain('utm_source=luma')

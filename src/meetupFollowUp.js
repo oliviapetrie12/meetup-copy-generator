@@ -484,7 +484,7 @@ export function generateMeetupFollowUpEmail(form) {
     '<ul>',
     `<li><a href="${escapeHtmlAttr(newsletterUrl)}">Subscribe to the Elastic community newsletter</a></li>`,
     `<li>Ask technical questions on <a href="${escapeHtmlAttr(slackUrl)}">Slack</a> or <a href="${escapeHtmlAttr(discussUrl)}">Discuss</a></li>`,
-    `<li><a href="${escapeHtmlAttr(sessionizeUrl)}">Submit a session to speak at a future meetup</a></li>`,
+    `<li><a href="${escapeHtmlAttr(sessionizeUrl)}">Submit a session</a> to speak at a future meetup</li>`,
     '</ul>',
   ]
   if (nextMeetup) {
