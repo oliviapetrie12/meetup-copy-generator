@@ -507,7 +507,7 @@ const GENERATOR_SECTIONS = [
       {
         value: 'attendeeListFormatter',
         title: '👥 Attendee List Formatter',
-        description: 'Format spreadsheet rows into first, last, and email.',
+        description: 'Combine registration CSVs into one attendee list.',
       },
       {
         value: 'qrCodeGenerator',

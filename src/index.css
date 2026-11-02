@@ -2795,15 +2795,132 @@ body {
   color: #64748b;
 }
 
+.alf-files {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin: 0.15rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.alf-file-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.45rem 0.75rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid #e3e8ee;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.alf-file-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.28rem;
+  min-width: 0;
+}
+
+.alf-file-name {
+  font-size: 0.84rem;
+  font-weight: 650;
+  color: #12263a;
+  word-break: break-word;
+}
+
+.alf-file-meta {
+  margin: 0;
+}
+
+.alf-file-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.alf-conflicts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin: 0 0 0.85rem;
+}
+
+.alf-conflict {
+  margin: 0;
+  padding: 0.75rem 0.85rem 0.85rem;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.alf-conflict legend {
+  padding: 0 0.25rem;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #991b1b;
+}
+
+.alf-conflict-copy {
+  margin: 0.15rem 0 0;
+}
+
+.alf-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.28rem;
+  margin-top: 0.65rem;
+}
+
+.alf-choice-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #475569;
+}
+
+.alf-choice-option {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.4rem;
+  width: auto;
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.alf-choice-option input {
+  margin-top: 0.2rem;
+}
+
+.alf-choice-source {
+  font-weight: 400;
+}
+
+.alf-conflict .btn-section-action {
+  margin-top: 0.75rem;
+}
+
 .alf-table {
   width: 100%;
-  min-width: 58rem;
+  min-width: 66rem;
   border-collapse: collapse;
 }
 
 .alf-table th:nth-child(3),
 .alf-table td:nth-child(3) {
   min-width: 16rem;
+}
+
+.alf-source {
+  min-width: 8rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: #475569;
+  word-break: break-word;
 }
 
 .alf-table th {

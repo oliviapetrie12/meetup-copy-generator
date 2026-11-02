@@ -7,6 +7,7 @@ export const OUTPUT_COLUMNS = ['First Name', 'Last Name', 'Email']
 
 export const SORT_BY_FIRST_NAME = 'firstName'
 export const SORT_BY_LAST_NAME = 'lastName'
+export const PASTE_SOURCE_NAME = 'Pasted spreadsheet'
 
 export const COLUMN_ROLE_OPTIONS = [
   { value: 'ignore', label: 'Ignore' },
@@ -429,13 +430,133 @@ function attendeeFromCells(cells, mapping, id) {
   }
 }
 
-export function buildAttendees(dataRows, mapping) {
+export function buildAttendees(dataRows, mapping, options = {}) {
+  const sourceId = options.sourceId || ''
+  const sourceName = options.sourceName || ''
+  const idPrefix = options.idPrefix || sourceId || 'attendee'
   const attendees = []
   dataRows.forEach((cells, index) => {
-    const attendee = attendeeFromCells(cells, mapping, `attendee-${index + 1}`)
-    if (attendee) attendees.push(attendee)
+    const attendee = attendeeFromCells(cells, mapping, `${idPrefix}-${index + 1}`)
+    if (!attendee) return
+    attendees.push({ ...attendee, sourceId, sourceName })
   })
   return attendees
+}
+
+export function createSource(text, { id, name, kind = 'file' } = {}) {
+  const base = {
+    id,
+    name,
+    kind,
+    parsedText: text,
+    sheet: null,
+    mapping: [],
+    appliedMapping: null,
+    status: 'error',
+    error: '',
+  }
+  const sheet = parseAttendeeSheet(text)
+  if (sheet.error) {
+    return { source: { ...base, error: sheet.error }, attendees: [] }
+  }
+  const attendees = buildAttendees(sheet.dataRows, sheet.mapping, { sourceId: id, sourceName: name })
+  if (!mappingIsReady(sheet.mapping).ok) {
+    return {
+      source: {
+        ...base,
+        sheet,
+        mapping: sheet.mapping.slice(),
+        status: 'needs-mapping',
+        error: '',
+      },
+      attendees: [],
+    }
+  }
+  if (!attendees.length) {
+    return {
+      source: {
+        ...base,
+        sheet,
+        mapping: sheet.mapping.slice(),
+        error: 'No attendee rows found.',
+      },
+      attendees: [],
+    }
+  }
+  return {
+    source: {
+      ...base,
+      sheet,
+      mapping: sheet.mapping.slice(),
+      appliedMapping: sheet.mapping.slice(),
+      status: 'imported',
+      error: '',
+    },
+    attendees,
+  }
+}
+
+export function integrateSources(sources, attendees, entries) {
+  let nextSources = sources.slice()
+  let nextAttendees = attendees
+  let activateId = null
+  for (const entry of entries) {
+    const created = createSource(entry.text, {
+      id: entry.id,
+      name: entry.name,
+      kind: entry.kind,
+    })
+    const index = nextSources.findIndex((source) => source.id === entry.id)
+    if (index >= 0) nextSources[index] = created.source
+    else nextSources.push(created.source)
+    nextAttendees = nextAttendees
+      .filter((row) => row.sourceId !== entry.id)
+      .concat(created.attendees)
+    if (!activateId && created.source.status === 'needs-mapping') activateId = created.source.id
+  }
+  return { sources: nextSources, attendees: nextAttendees, activateId }
+}
+
+export function applySourceMapping(sources, attendees, sourceId, mapping) {
+  const ready = mappingIsReady(mapping)
+  if (!ready.ok) return { ok: false, message: ready.message, sources, attendees }
+  const source = sources.find((item) => item.id === sourceId)
+  if (!source?.sheet) {
+    return { ok: false, message: 'That file could not be read.', sources, attendees }
+  }
+  const built = buildAttendees(source.sheet.dataRows, mapping, {
+    sourceId: source.id,
+    sourceName: source.name,
+  })
+  if (!built.length) {
+    return { ok: false, message: 'No attendee rows found in the mapped columns.', sources, attendees }
+  }
+  return {
+    ok: true,
+    message: '',
+    sources: sources.map((item) => (
+      item.id === sourceId
+        ? {
+          ...item,
+          mapping: mapping.slice(),
+          appliedMapping: mapping.slice(),
+          status: 'imported',
+          error: '',
+        }
+        : item
+    )),
+    attendees: attendees.filter((row) => row.sourceId !== sourceId).concat(built),
+  }
+}
+
+export function dropSource(sources, attendees, sourceId) {
+  const removed = sources.find((source) => source.id === sourceId)
+  return {
+    sources: sources.filter((source) => source.id !== sourceId),
+    attendees: attendees
+      .filter((row) => row.sourceId !== sourceId)
+      .map((row) => stripSourceName(row, removed?.name)),
+  }
 }
 
 export function updateAttendee(attendee, patch) {
@@ -496,14 +617,105 @@ export function keepAttendeeRow(attendees, id) {
   return attendees.filter((attendee) => attendee.id === id || emailKey(attendee.email) !== key)
 }
 
-export function getReviewFlags(attendee, duplicateKeys) {
+function fieldCompare(field, value) {
+  const normalized = field === 'email' ? normalizeEmail(value) : normalizeName(value)
+  return field === 'email' ? normalized : normalized.toLocaleLowerCase()
+}
+
+function distinctFieldOptions(rows, field) {
+  const options = []
+  for (const row of rows) {
+    const value = field === 'email' ? normalizeEmail(row.email) : normalizeName(row[field])
+    const compare = fieldCompare(field, value)
+    const source = row.sourceName || PASTE_SOURCE_NAME
+    const existing = options.find((option) => option.compare === compare)
+    if (existing) {
+      if (!existing.sources.includes(source)) existing.sources.push(source)
+    } else {
+      options.push({ value, compare, sources: [source] })
+    }
+  }
+  return options
+}
+
+export function conflictingDuplicateGroups(attendees) {
+  const groups = new Map()
+  for (const attendee of attendees) {
+    const key = emailKey(attendee.email)
+    if (!key) continue
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key).push(attendee)
+  }
+  const conflicts = []
+  for (const [key, rows] of groups) {
+    if (rows.length < 2) continue
+    const fields = {
+      firstName: distinctFieldOptions(rows, 'firstName'),
+      lastName: distinctFieldOptions(rows, 'lastName'),
+      email: distinctFieldOptions(rows, 'email'),
+    }
+    if (fields.firstName.length < 2 && fields.lastName.length < 2 && fields.email.length < 2) continue
+    conflicts.push({ emailKey: key, rows, fields })
+  }
+  return conflicts
+}
+
+export function keepChosenDetails(attendees, key, choice) {
+  const matches = attendees.filter((attendee) => emailKey(attendee.email) === key)
+  if (!matches.length) return attendees
+  const choiceFirst = fieldCompare('firstName', choice.firstName)
+  const choiceLast = fieldCompare('lastName', choice.lastName)
+  const choiceEmail = fieldCompare('email', choice.email)
+  const exact = matches.find((row) => (
+    fieldCompare('firstName', row.firstName) === choiceFirst
+    && fieldCompare('lastName', row.lastName) === choiceLast
+    && fieldCompare('email', row.email) === choiceEmail
+  ))
+  const keeper = exact || matches[0]
+  const sourceNames = []
+  for (const field of ['firstName', 'lastName', 'email']) {
+    const wanted = field === 'firstName' ? choiceFirst : field === 'lastName' ? choiceLast : choiceEmail
+    for (const row of matches) {
+      if (fieldCompare(field, row[field]) !== wanted) continue
+      const source = row.sourceName || PASTE_SOURCE_NAME
+      if (!sourceNames.includes(source)) sourceNames.push(source)
+    }
+  }
+  const updated = {
+    ...updateAttendee(keeper, {
+      firstName: choice.firstName,
+      lastName: choice.lastName,
+      email: choice.email,
+    }),
+    sourceId: keeper.sourceId,
+    sourceName: sourceNames.join(', ') || keeper.sourceName,
+  }
+  return attendees
+    .filter((attendee) => attendee.id === keeper.id || emailKey(attendee.email) !== key)
+    .map((attendee) => (attendee.id === keeper.id ? updated : attendee))
+}
+
+function stripSourceName(attendee, removedName) {
+  if (!removedName || !attendee.sourceName) return attendee
+  const names = attendee.sourceName.split(', ').filter((name) => name !== removedName)
+  if (names.length === attendee.sourceName.split(', ').length) return attendee
+  return { ...attendee, sourceName: names.join(', ') }
+}
+
+export function getReviewFlags(attendee, duplicateKeys, conflictingKeys = new Set()) {
   const flags = []
   if (!attendee.firstName) flags.push({ id: 'missing-first', label: 'Missing first name', tone: 'warning' })
   if (!attendee.lastName) flags.push({ id: 'missing-last', label: 'Missing last name', tone: 'warning' })
   if (!normalizeEmail(attendee.email)) flags.push({ id: 'missing-email', label: 'Missing email', tone: 'warning' })
   else if (!isValidEmail(attendee.email)) flags.push({ id: 'invalid-email', label: 'Invalid email', tone: 'warning' })
   const key = emailKey(attendee.email)
-  if (key && duplicateKeys.has(key)) flags.push({ id: 'duplicate', label: 'Duplicate email', tone: 'alert' })
+  if (key && duplicateKeys.has(key)) {
+    flags.push({
+      id: 'duplicate',
+      label: conflictingKeys.has(key) ? 'Conflicting details' : 'Duplicate email',
+      tone: 'alert',
+    })
+  }
   if (attendee.nameSplitUnclear) flags.push({ id: 'split', label: 'Check name split', tone: 'warning' })
   if (attendee.suggestion) flags.push({ id: 'suggestion', label: 'Pending suggestion', tone: 'info' })
   return flags
@@ -575,7 +787,7 @@ export function exportStatus(attendees) {
     const noun = duplicateEmails === 1 ? 'address' : 'addresses'
     return {
       ok: false,
-      reason: `Resolve ${duplicateEmails} duplicate email ${noun} before exporting. Conflicting rows stay in the list until you edit or remove them.`,
+      reason: `Resolve ${duplicateEmails} duplicate email ${noun} before exporting. Choose which details to keep, or remove the extra rows.`,
     }
   }
   return { ok: true, reason: '' }
