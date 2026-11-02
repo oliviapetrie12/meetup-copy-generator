@@ -6,6 +6,7 @@ import MeetupFollowUp from './MeetupFollowUp.jsx'
 import ConferenceFollowUp from './ConferenceFollowUp.jsx'
 import PreliminaryBoothStaff from './PreliminaryBoothStaff.jsx'
 import DevrelEventAssets from './DevrelEventAssets.jsx'
+import AttendeeListFormatter from './AttendeeListFormatter.jsx'
 import {
   FieldLabel,
   GeneratorHeader,
@@ -433,6 +434,14 @@ const GENERATOR_TYPES = [
   { value: 'qrCodeGenerator', label: 'QR Code Generator' },
 ]
 
+function visibleNavLabel(title) {
+  return title.split(' ').slice(1).join(' ')
+}
+
+function byVisibleNavLabel(a, b) {
+  return visibleNavLabel(a.title).localeCompare(visibleNavLabel(b.title), undefined, { sensitivity: 'base' })
+}
+
 const GENERATOR_SECTIONS = [
   {
     id: 'promote',
@@ -496,16 +505,21 @@ const GENERATOR_SECTIONS = [
     icon: '🛠️',
     tools: [
       {
-        value: 'urlQrGenerator',
-        title: '🔗 UTM URL Builder',
-        description: 'Build, shorten, or QR a tracked URL.',
+        value: 'attendeeListFormatter',
+        title: '👥 Attendee List Formatter',
+        description: 'Format spreadsheet rows into first, last, and email.',
       },
       {
         value: 'qrCodeGenerator',
         title: '◉ QR Code Generator',
         description: 'Branded QR code as a high-res PNG.',
       },
-    ],
+      {
+        value: 'urlQrGenerator',
+        title: '🔗 UTM URL Builder',
+        description: 'Build, shorten, or QR a tracked URL.',
+      },
+    ].sort(byVisibleNavLabel),
   },
 ]
 
@@ -2390,6 +2404,8 @@ export default function App() {
           <PreliminaryBoothStaff />
         ) : generatorType === 'devrelEventAssets' ? (
           <DevrelEventAssets />
+        ) : generatorType === 'attendeeListFormatter' ? (
+          <AttendeeListFormatter />
         ) : (
         <>
         <aside className="form-panel gen-form-panel">
