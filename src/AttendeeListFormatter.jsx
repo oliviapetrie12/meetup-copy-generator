@@ -346,8 +346,8 @@ export default function AttendeeListFormatter() {
         <form className="form gen-form" onSubmit={onFormat} noValidate>
           <GeneratorHeader
             title="Attendee List Formatter"
-            description="Combine spreadsheet and CSV registrations into one first name, last name, and email list."
-            emoji="👥"
+            description="Combine registration lists into an alphabetized attendee list with first name, last name, and email—ready for building security, venue access, or event check-in."
+            emoji="🪪"
             tone="teal"
             resetLabel="Clear list"
             onReset={() => {

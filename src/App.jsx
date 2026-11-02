@@ -506,8 +506,8 @@ const GENERATOR_SECTIONS = [
     tools: [
       {
         value: 'attendeeListFormatter',
-        title: '👥 Attendee List Formatter',
-        description: 'Combine registration CSVs into one attendee list.',
+        title: '🪪 Attendee List Formatter',
+        description: 'Prepare attendee lists for building security and event check-in.',
       },
       {
         value: 'qrCodeGenerator',
